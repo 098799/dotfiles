@@ -1,0 +1,2 @@
+#!/bin/bash
+ssh -Y -p 222 -L 9504:192.168.0.45:22 -fN tiger.chem.uw.edu.pl
