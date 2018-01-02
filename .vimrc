@@ -2,9 +2,11 @@ syntax enable
 set background=light
 colorscheme solarized
 set encoding=utf-8
-set tabstop=4 softtabstop=0 shiftwidth=4 expandtab smarttab
-set autoindent
-
+set tabstop=4 softtabstop=4 shiftwidth=4 expandtab smarttab
+set autoindent smartindent
+let fortran_do_enddo=1
+let fortran_more_precise=1
+let fortran_have_tabs=1
 
 
 
@@ -20,16 +22,16 @@ set autoindent
 " http://vim.wikia.com/wiki/Mapping_fast_keycodes_in_terminal_Vim
 
 if exists("g:loaded_bracketed_paste")
-  finish
+finish
 endif
 let g:loaded_bracketed_paste = 1
 let &t_ti .= "\<Esc>[?2004h"
 let &t_te .= "\<Esc>[?2004l"
 
 function! XTermPasteBegin(ret)
-set pastetoggle=<f29>
-set paste
-return a:ret
+    set pastetoggle=<f29>
+    set paste
+    return a:ret
 endfunction
 
 execute "set <f28>=\<Esc>[200~"
