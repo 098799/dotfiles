@@ -1,9 +1,8 @@
+;; MELPA
 (when (require 'package nil 'noerror)
   (setq package-archives
 	'(("melpa" . "http://melpa.org/packages/")))
   (package-initialize))
-
-(add-to-list 'load-path "~/.emacs.d/tabbar/")
 
 ;; HELM
 (require 'package)
@@ -15,9 +14,9 @@
 (define-key global-map [remap dabbrev-expand] 'helm-dabbrev)
 (define-key global-map [remap execute-extended-command] 'helm-M-x)
 (define-key helm-find-files-map "\t" 'helm-execute-persistent-action)
-;; /HELM
-
 (global-set-key (kbd "C-k") 'kill-whole-line)
+
+;; VISUALS
 (menu-bar-mode -1)
 (when (fboundp 'tool-bar-mode)
   (tool-bar-mode -1))
@@ -26,15 +25,19 @@
 (when (fboundp 'horizontal-scroll-bar-mode)
   (horizontal-scroll-bar-mode -1))
 
+;; THEME
 (load-theme 'solarized-light t)
 
+;; LOAD TABBAR
+(add-to-list 'load-path "~/.emacs.d/tabbar/")
 (load "tabbar")
 
+;; MODES
 (cua-mode t)
 (tabbar-mode t)
 (global-undo-tree-mode)
 
-;; Tabbar mode configuration
+;; TABBAR CONFIG
 (defun tabbar-buffer-groups ()
   "Return the list of group names the current buffer belongs to.
      Return a list of one element based on major mode."
@@ -99,8 +102,8 @@
 
 (global-set-key (kbd "<C-tab>") 'tabbar-forward-tab)
 (global-set-key (kbd "<C-iso-lefttab>") 'tabbar-backward-tab)
-;; Tabbar mode configuration end
 
+;; ???
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
