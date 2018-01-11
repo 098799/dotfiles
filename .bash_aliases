@@ -5,3 +5,4 @@ alias mdview='google-chrome'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
 alias cal='ncal -M -C'
+alias sl='ls' #no trains for me

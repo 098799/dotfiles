@@ -1,4 +1,7 @@
 # What to install for this emacs to run?
-* `M-x package-install RET helm RET`
-* `M-x package-install RET solarized-theme RET`
-* `M-x package-install RET undo-tree RET`
+* `M-x package-install RET <<stuff in here>> RET` and the stuff is:
+ - helm
+ - solarized-theme
+ - undo-tree
+ - markdown-mode
+ - markdown-mode+ (requires `sudo apt-get install pandoc`)

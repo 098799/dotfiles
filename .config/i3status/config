@@ -5,7 +5,7 @@ general {
 }
 
 order += "disk /"
-order += "ethernet enp2s0"
+order += "ethernet wlp8s0"
 order += "load"
 order += "battery 0"
 order += "tztime local"
@@ -16,7 +16,7 @@ cpu_usage {
 
 ethernet wlp8s0 {
         # if you use %speed, i3status requires the cap_net_admin capability
-        format_up = "E: %ip (%speed)"
+        format_up = "E: %ip"
         format_down = "E: down"
 }
 

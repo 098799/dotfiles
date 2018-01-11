@@ -115,8 +115,3 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-
-#lol moje
-
-project=/home/grining/Robota/Grining/drake
-
