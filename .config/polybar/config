@@ -8,13 +8,14 @@
 ;=====================================================
 
 [colors]
-background = #222
+background = #002b36
 background-alt = #444
 foreground = #dfdfdf
 foreground-alt = #55
 primary = #ffb52a
 secondary = #e60053
 alert = #bd2c40
+datunderline = #93A1A1
 
 [global/wm]
 margin-top = 5
@@ -77,11 +78,11 @@ label = %title:0:100:...%
 type = internal/xkeyboard
 blacklist-0 = num lock
 label-layout = %{F#55}%{F-} %layout%
-label-layout-underline = ${colors.secondary}
+label-layout-underline = ${colors.datunderline}
 label-indicator-padding = 2
 label-indicator-margin = 1
 label-indicator-background = ${colors.secondary}
-label-indicator-underline = ${colors.secondary}
+label-indicator-underline = ${colors.datunderline}
 
 [module/filesystem]
 type = internal/fs
@@ -101,7 +102,7 @@ type = internal/bspwm
 
 label-focused = %index%
 label-focused-background = ${colors.background-alt}
-label-focused-underline= ${colors.primary}
+label-focused-underline= ${colors.datunderline}
 label-focused-padding = 2
 
 label-occupied = %index%
@@ -191,17 +192,17 @@ type = internal/cpu
 interval = 2
 format-prefix = " "
 format-prefix-foreground = ${colors.foreground-alt}
-format-underline = #ff8000
+format-underline = ${colors.datunderline}
 ;#f90000
-label = %percentage%%
+label = CPU usage: %percentage%%
 
 [module/memory]
 type = internal/memory
 interval = 2
 format-prefix = " "
 format-prefix-foreground = ${colors.foreground-alt}
-format-underline = #4bffdc
-label = %percentage_used%%
+format-underline = ${colors.datunderline}
+label = Memory: %percentage_used%%
 
 [module/wlan]
 type = internal/network
@@ -209,7 +210,7 @@ interface = wlp8s0
 interval = 3.0
 
 format-connected = <ramp-signal> <label-connected>
-format-connected-underline = #9f78e1
+format-connected-underline = ${colors.datunderline}
 format-disconnected-underline = ${self.format-connected-underline}
 
 label-connected = %essid%
@@ -249,7 +250,7 @@ time-alt = %H:%M:%S
 
 format-prefix = 
 format-prefix-foreground = ${colors.foreground-alt}
-format-underline = #0a6cf5
+format-underline = ${colors.datunderline}
 
 label = %date% %time%
 
@@ -287,17 +288,23 @@ bar-volume-empty-foreground = ${colors.foreground-alt}
 type = internal/battery
 battery = BAT1
 adapter = ADP1
-full-at = 85
+full-at = 75
 
 format-charging = <animation-charging> <label-charging>
-format-charging-underline = #ffb52a
+format-charging-underline = ${colors.datunderline}
+
+label-charging = Charging %percentage%%
 
 format-discharging = <ramp-capacity> <label-discharging>
-format-discharging-underline = ${self.format-charging-underline}
+format-discharging-underline = ${colors.secondary}
+
+label-discharging = Discharging %percentage%%
 
 format-full-prefix = " "
 format-full-prefix-foreground = ${colors.foreground-alt}
 format-full-underline = ${self.format-charging-underline}
+
+label-full = Fully-charged
 
 ramp-capacity-0 = 
 ramp-capacity-1 = 
@@ -316,7 +323,7 @@ thermal-zone = 0
 warn-temperature = 60
 
 format = <ramp> <label>
-format-underline = #f50a4d
+format-underline = ${colors.datunderline}
 format-warn = <ramp> <label-warn>
 format-warn-underline = ${self.format-underline}
 
@@ -335,9 +342,9 @@ type = custom/menu
 format-spacing = 1
 
 label-open =  power
-label-open-foreground = ${colors.secondary}
+label-open-foreground = ${colors.datunderline}
 label-close =  cancel
-label-close-foreground = ${colors.secondary}
+label-close-foreground = ${colors.foreground-alt}
 label-separator = |
 label-separator-foreground = ${colors.foreground-alt}
 

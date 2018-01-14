@@ -1,5 +1,5 @@
 syntax enable
-set background=light
+set background=dark
 colorscheme solarized
 set encoding=utf-8
 set tabstop=4 softtabstop=4 shiftwidth=4 expandtab smarttab

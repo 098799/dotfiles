@@ -88,7 +88,7 @@ bindsym $mod+Shift+space floating toggle
 bindsym $mod+space focus mode_toggle
 
 # focus the parent container
-bindsym $mod+a focus parent
+#bindsym $mod+a focus parent
 
 # focus the child container
 #bindsym $mod+d focus child
@@ -172,6 +172,7 @@ bindsym $mod+r mode "resize"
 #        tray_output primary
 #}
 exec_always --no-startup-id $HOME/.config/polybar/launch.sh
+exec_always --no-startup-id xsetroot -solid "#444444"
 
 bindsym $mod1+d exec gnome-terminal
 bindsym $mod1+s exec google-chrome
@@ -180,7 +181,7 @@ bindsym $mod1+r exec emacsclient -c
 bindsym $mod1+q exec nemo --no-desktop
 bindsym $mod1+a exec tilix --quake
 bindsym Ctrl+Mod1+L exec i3lock -c 000000
-bindsym button3 floating toggle
+bindsym $mod+a floating toggle
 bindsym Mod1+F4 kill
 bindsym Print scrot
 
@@ -189,6 +190,7 @@ bindsym XF86AudioLowerVolume exec pactl set-sink-volume 1 -5%
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
+new_window 1pixel
 
 exec emacs --daemon
 exec gnome-settings-daemon

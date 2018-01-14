@@ -26,7 +26,7 @@
   (horizontal-scroll-bar-mode -1))
 
 ;; THEME
-(load-theme 'solarized-light t)
+(load-theme 'solarized-dark t)
 
 ;; LOAD TABBAR
 (add-to-list 'load-path "~/.emacs.d/tabbar/")
@@ -34,7 +34,7 @@
 
 ;; MODES
 (cua-mode t)
-(tabbar-mode t)
+;; (tabbar-mode t)
 (global-undo-tree-mode)
 
 ;; TABBAR CONFIG
