@@ -35,6 +35,7 @@
 ;; MODES
 (cua-mode t)
 ;; (tabbar-mode t)
+(global-linum-mode t)
 (global-undo-tree-mode)
 
 ;; TABBAR CONFIG

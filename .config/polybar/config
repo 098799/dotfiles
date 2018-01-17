@@ -72,7 +72,7 @@ tray-padding = 2
 
 [module/xwindow]
 type = internal/xwindow
-label = %title:0:100:...%
+label = %title:0:150:...%
 
 [module/xkeyboard]
 type = internal/xkeyboard
@@ -288,7 +288,7 @@ bar-volume-empty-foreground = ${colors.foreground-alt}
 type = internal/battery
 battery = BAT1
 adapter = ADP1
-full-at = 75
+full-at = 80
 
 format-charging = <animation-charging> <label-charging>
 format-charging-underline = ${colors.datunderline}
