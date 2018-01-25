@@ -28,81 +28,89 @@
 ;; THEME
 (load-theme 'solarized-dark t)
 
-;; LOAD TABBAR
-(add-to-list 'load-path "~/.emacs.d/tabbar/")
-(load "tabbar")
+;; RECENTF
+(recentf-mode 1)
+(setq recentf-max-menu-items 25)
+(global-set-key "\C-x\ \C-r" 'recentf-open-files)
+(run-at-time nil (* 5 60) 'recentf-save-list)
 
 ;; MODES
 (cua-mode t)
-;; (tabbar-mode t)
 (global-linum-mode t)
 (global-undo-tree-mode)
+(column-number-mode t)
+(line-number-mode t)
+(global-column-enforce-mode t)
+(setq column-enforce-comments nil)
 
-;; TABBAR CONFIG
-(defun tabbar-buffer-groups ()
-  "Return the list of group names the current buffer belongs to.
- Return a list of one element based on major mode."
-  (list
-   (cond
-    ((or (get-buffer-process (current-buffer))
-	 ;; Check if the major mode derives from `comint-mode' or
-	 ;; `compilation-mode'.
-	 (tabbar-buffer-mode-derived-p
-	  major-mode '(comint-mode compilation-mode)))
-     "Process"
-     )
-    ;; ((member (buffer-name)
-    ;;          '("*scratch*" "*Messages*" "*Help*"))
-    ;;  "Common"
-    ;;  )
-    ((string-equal "*" (substring (buffer-name) 0 1))
-     "Common"
-     )
-    ((member (buffer-name)
-	     '("xyz" "day" "m3" "abi" "for" "nws" "eng" "f_g" "tim" "tmp"))
-     "Main"
-     )
-    ((eq major-mode 'dired-mode)
-     "Dired"
-     )
-    ((memq major-mode
-	   '(help-mode apropos-mode Info-mode Man-mode))
-     "Common"
-     )
-    ((memq major-mode
-	   '(rmail-mode
-	     rmail-edit-mode vm-summary-mode vm-mode mail-mode
-	     mh-letter-mode mh-show-mode mh-folder-mode
-	     gnus-summary-mode message-mode gnus-group-mode
-	     gnus-article-mode score-mode gnus-browse-killed-mode))
-     "Mail"
-     )
-    (t
-     ;; Return `mode-name' if not blank, `major-mode' otherwise.
-     (if (and (stringp mode-name)
-	      ;; Take care of preserving the match-data because this
-	      ;; function is called when updating the header line.
-	      (save-match-data (string-match "[^ ]" mode-name)))
-	 mode-name
-       (symbol-name major-mode))
-     ))))
+;; (tabbar-mode t)           ;; this one wasn't pretty enough, sorry
 
-(defun tabbar-add-tab (tabset object &optional append_ignored)
-  "Add to TABSET a tab with value OBJECT if there isn't one there yet.
- If the tab is added, it is added at the beginning of the tab list,
- unless the optional argument APPEND is non-nil, in which case it is
- added at the end."
-  (let ((tabs (tabbar-tabs tabset)))
-    (if (tabbar-get-tab object tabset)
-	tabs
-      (let ((tab (tabbar-make-tab object tabset)))
-	(tabbar-set-template tabset nil)
-	(set tabset (sort (cons tab tabs)
-			  (lambda (a b) (string< (buffer-name (car a)) (buffer-name (car b))))))))))
+;; LOAD TABBAR
+;; (add-to-list 'load-path "~/.emacs.d/tabbar/")
+;; (load "tabbar")
 
-
-(global-set-key (kbd "<C-tab>") 'tabbar-forward-tab)
-(global-set-key (kbd "<C-iso-lefttab>") 'tabbar-backward-tab)
+;; ;; TABBAR CONFIG
+;; (defun tabbar-buffer-groups ()
+;;   "Return the list of group names the current buffer belongs to.
+;;  Return a list of one element based on major mode."
+;;   (list
+;;    (cond
+;;     ((or (get-buffer-process (current-buffer))
+;; 	 ;; Check if the major mode derives from `comint-mode' or
+;; 	 ;; `compilation-mode'.
+;; 	 (tabbar-buffer-mode-derived-p
+;; 	  major-mode '(comint-mode compilation-mode)))
+;;      "Process"
+;;      )
+;;     ;; ((member (buffer-name)
+;;     ;;          '("*scratch*" "*Messages*" "*Help*"))
+;;     ;;  "Common"
+;;     ;;  )
+;;     ((string-equal "*" (substring (buffer-name) 0 1))
+;;      "Common"
+;;      )
+;;     ((member (buffer-name)
+;; 	     '("xyz" "day" "m3" "abi" "for" "nws" "eng" "f_g" "tim" "tmp"))
+;;      "Main"
+;;      )
+;;     ((eq major-mode 'dired-mode)
+;;      "Dired"
+;;      )
+;;     ((memq major-mode
+;; 	   '(help-mode apropos-mode Info-mode Man-mode))
+;;      "Common"
+;;      )
+;;     ((memq major-mode
+;; 	   '(rmail-mode
+;; 	     rmail-edit-mode vm-summary-mode vm-mode mail-mode
+;; 	     mh-letter-mode mh-show-mode mh-folder-mode
+;; 	     gnus-summary-mode message-mode gnus-group-mode
+;; 	     gnus-article-mode score-mode gnus-browse-killed-mode))
+;;      "Mail"
+;;      )
+;;     (t
+;;      ;; Return `mode-name' if not blank, `major-mode' otherwise.
+;;      (if (and (stringp mode-name)
+;; 	      ;; Take care of preserving the match-data because this
+;; 	      ;; function is called when updating the header line.
+;; 	      (save-match-data (string-match "[^ ]" mode-name)))
+;; 	 mode-name
+;;        (symbol-name major-mode))
+;;      ))))
+;; (defun tabbar-add-tab (tabset object &optional append_ignored)
+;;   "Add to TABSET a tab with value OBJECT if there isn't one there yet.
+;;  If the tab is added, it is added at the beginning of the tab list,
+;;  unless the optional argument APPEND is non-nil, in which case it is
+;;  added at the end."
+;;   (let ((tabs (tabbar-tabs tabset)))
+;;     (if (tabbar-get-tab object tabset)
+;; 	tabs
+;;       (let ((tab (tabbar-make-tab object tabset)))
+;; 	(tabbar-set-template tabset nil)
+;; 	(set tabset (sort (cons tab tabs)
+;; 			  (lambda (a b) (string< (buffer-name (car a)) (buffer-name (car b))))))))))
+;; (global-set-key (kbd "<C-tab>") 'tabbar-forward-tab)
+;; (global-set-key (kbd "<C-iso-lefttab>") 'tabbar-backward-tab)
 
 ;; ???
 
@@ -149,7 +157,7 @@
     ("#dc322f" "#cb4b16" "#b58900" "#546E00" "#B4C342" "#00629D" "#2aa198" "#d33682" "#6c71c4")))
  '(package-selected-packages
    (quote
-    (markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
+    (column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
  '(pos-tip-background-color "#eee8d5")
  '(pos-tip-foreground-color "#586e75")
  '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#eee8d5" 0.2))

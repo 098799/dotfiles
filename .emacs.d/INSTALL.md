@@ -5,3 +5,4 @@
  - undo-tree
  - markdown-mode
  - markdown-mode+ (requires `sudo apt-get install pandoc`)
+ - column-enforce-mode
