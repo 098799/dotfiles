@@ -16,6 +16,7 @@ primary = #ffb52a
 secondary = #e60053
 alert = #bd2c40
 datunderline = #93A1A1
+green = #00A86B
 
 [global/wm]
 margin-top = 5
@@ -288,28 +289,40 @@ bar-volume-empty-foreground = ${colors.foreground-alt}
 type = internal/battery
 battery = BAT1
 adapter = ADP1
-full-at = 80
+full-at = 85
 
 format-charging = <animation-charging> <label-charging>
-format-charging-underline = ${colors.datunderline}
+format-charging-underline = ${colors.green}
 
 label-charging = Charging %percentage%%
 
 format-discharging = <ramp-capacity> <label-discharging>
-format-discharging-underline = ${colors.secondary}
+format-discharging-underline = ${colors.datunderline}
+;${colors.}
+ramp-capacity-0 = (sic!)
+ramp-capacity-0-background = ${colors.secondary}
+ramp-capacity-1 = (sic!)
+ramp-capacity-1-background = ${colors.secondary}
+ramp-capacity-2 = 
+ramp-capacity-2-background = ${colors.background}
+ramp-capacity-3 = 
+ramp-capacity-3-background = ${colors.background}
+ramp-capacity-4 = 
+ramp-capacity-4-background = ${colors.background}
+ramp-capacity-5 =
+ramp-capacity-5-background = ${colors.background}
+ramp-capacity-6 =
+ramp-capacity-7-background = ${colors.background}
+ramp-capacity-7 =
 
 label-discharging = Discharging %percentage%%
 
-format-full-prefix = " "
-format-full-prefix-foreground = ${colors.foreground-alt}
-format-full-underline = ${self.format-charging-underline}
+;format-full-prefix = " "
+;format-full-prefix-foreground = ${colors.foreground-alt}
+ormat-full-underline = ${self.format-charging-underline}
 
 label-full = Fully-charged
-
-ramp-capacity-0 = 
-ramp-capacity-1 = 
-ramp-capacity-2 = 
-ramp-capacity-foreground = ${colors.foreground-alt}
+label-full-underline = ${colors.green}
 
 animation-charging-0 = 
 animation-charging-1 = 

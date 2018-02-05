@@ -37,11 +37,17 @@
 ;; MODES
 (cua-mode t)
 (global-linum-mode t)
+(add-hook 'shell-mode-hook (lambda () (linum-mode -1)))
 (global-undo-tree-mode)
 (column-number-mode t)
 (line-number-mode t)
 (global-column-enforce-mode t)
 (setq column-enforce-comments nil)
+
+;; CUSTOM KEYBINDING
+(global-set-key (kbd "M-\\") 'indent-rigidly-right-to-tab-stop)
+(global-set-key (kbd "C-M-\\") 'indent-rigidly-left-to-tab-stop)
+
 
 ;; (tabbar-mode t)           ;; this one wasn't pretty enough, sorry
 
