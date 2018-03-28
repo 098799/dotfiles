@@ -105,7 +105,7 @@ source $ZSH/oh-my-zsh.sh
 export WORKON_HOME=~/.virtualenvs
 source /usr/local/bin/virtualenvwrapper.sh
 export PYTHONPATH="~/.virtualenvs"
-export VIRTUALENVWRAPPER_PYTHON=`which python3.6`
+export VIRTUALENVWRAPPER_PYTHON=`which python3`
 
 alias cd..='cd ..'
 LC_NUMERIC="en_US.UTF-8"
