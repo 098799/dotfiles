@@ -100,22 +100,32 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
+#[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
+if [ $TILIX_ID ] || [ $VTE_VERSION ]; then
+        source /etc/profile.d/vte.sh
+fi
 
 export WORKON_HOME=~/.virtualenvs
-source /usr/local/bin/virtualenvwrapper.sh
+#source /usr/local/bin/virtualenvwrapper.sh
 export PYTHONPATH="~/.virtualenvs"
 export VIRTUALENVWRAPPER_PYTHON=`which python3`
 
 alias cd..='cd ..'
-LC_NUMERIC="en_US.UTF-8"
+#LC_NUMERIC="en_US.UTF-8"
 alias p3='python3'
-alias mdview='google-chrome'
+alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
 alias cal='ncal -M -C'
 alias sl='ls' #no trains for me
+alias pyt='pytest -s -x -k ""'
 alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias ll='ls -alh'
+alias vi='vim'
+alias tox3='tox -e py36'
+alias tox8='tox -e flake8'
+alias pyt='pytest -s -x -k ""'
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
+
+dbus-update-activation-environment --all

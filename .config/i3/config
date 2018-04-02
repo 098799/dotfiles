@@ -176,35 +176,37 @@ exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 exec_always --no-startup-id xsetroot -solid "#444444"
 
 bindsym $mod1+d exec gnome-terminal
-bindsym $mod1+s exec google-chrome
+bindsym $mod1+s exec google-chrome-stable
 bindsym $mod1+e exec pluma
 bindsym $mod1+r exec emacsclient -c
 bindsym $mod1+q exec nemo --no-desktop
 bindsym $mod1+a exec tilix --quake
 bindsym Ctrl+Mod1+L exec i3lock -c 000000
-bindsym $mod+f floating toggle
+bindsym $mod+q floating toggle
 bindsym Mod1+F4 kill
 bindsym Print scrot
 
-bindsym XF86AudioRaiseVolume exec pactl set-sink-volume 1 +5%
-bindsym XF86AudioLowerVolume exec pactl set-sink-volume 1 -5%
+bindsym XF86AudioRaiseVolume exec amixer -q sset Master 5%+
+bindsym XF86AudioLowerVolume exec amixer -q sset Master 5%-
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
 # Looks
-gaps inner 15
-gaps outer -6
+gaps inner 0
+gaps outer 0
 new_window pixel 1 
 smart_gaps on
 smart_borders on
 
 exec emacs --daemon
-exec gnome-settings-daemon
+#exec gnome-settings-daemon
 #exec gnome-keyring-daemon
 
 exec dropbox start
 
 exec synapse
+
+exec dbus-update-activation-environment --all
 
 #bindsym Control+Mod1+Up focus output VGA1, workspace prev_on_output, focus output HDMI1, workspace prev_on_output
 #bindsym Control+Mod1+Down focus output VGA1, workspace next_on_output, focus output HDMI1, workspace next_on_output
