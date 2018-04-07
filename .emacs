@@ -1,25 +1,27 @@
-;;; MELPA
+;;; .emacs --- Initialization file for Emacs
+
+;;; Commentary:
+;;; Emacs dotfile
+
+
+;;; Code:
+
+
+;;;;;;;;;;;;;
+;;; MELPA ;;;
+;;;;;;;;;;;;;
+
 (when (require 'package nil 'noerror)
   (setq package-archives
 	'(("melpa" . "http://melpa.org/packages/")))
   (package-initialize))
 
-;; HELM
-(require 'package)
-(require 'helm-config)
-(helm-mode 1)
-(define-key global-map [remap find-file] 'helm-find-files)
-(define-key global-map [remap occur] 'helm-occur)
-(define-key global-map [remap list-buffers] 'helm-buffers-list)
-(define-key global-map [remap dabbrev-expand] 'helm-dabbrev)
-(define-key global-map [remap execute-extended-command] 'helm-M-x)
-(setq helm-M-x-fuzzy-match t)
-(define-key helm-find-files-map "\t" 'helm-execute-persistent-action)
-(global-set-key (kbd "C-x b") 'helm-mini)
-(setq helm-buffers-fuzzy-matching t
-      helm-recentf-fuzzy-match    t)
 
-;; VISUALS
+;;;;;;;;;;;;;;;
+;;; VISUALS ;;;
+;;;;;;;;;;;;;;;
+
+;; bars
 (menu-bar-mode -1)
 (when (fboundp 'tool-bar-mode)
   (tool-bar-mode -1))
@@ -28,109 +30,183 @@
 (when (fboundp 'horizontal-scroll-bar-mode)
   (horizontal-scroll-bar-mode -1))
 
-;; THEME
+;; fonts
+(custom-set-faces
+ '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 110 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))
+
+;; theme
 (load-theme 'solarized-dark t)
 
-;; ;; RECENTF
-(recentf-mode 1)
-(setq-default recent-save-file "~/.emacs.d/recentf")
-;; (setq recentf-max-menu-items 25)
-(global-set-key "\C-x\ \C-r" 'helm-recentf) ;;  much better!!!
-;; (run-at-time nil (* 5 60) 'recentf-save-list)
-
-;; MODES
-(cua-mode t)
-(global-linum-mode t)
-(add-hook 'shell-mode-hook (lambda () (linum-mode -1)))
-(load "~/.emacs.d/undo-tree/undo-tree.el")
-(global-undo-tree-mode 1)
-(column-number-mode t)
-(line-number-mode t)
-(setq column-enforce-comments nil)
-(require 'better-defaults)
-(elpy-enable)
-;;(sml/setup)
-(global-flycheck-mode)(eval-after-load 'flycheck
-  '(define-key flycheck-mode-map (kbd "C-c ! h") 'helm-flycheck))
-(require 'powerline)
-(powerline-default-theme)
-
-;; VENV stuff
-(require 'virtualenvwrapper)
-(venv-initialize-interactive-shells)
-(setq python-environment-directory "/home/grining/.virtualenvs/")
-(setq venv-location "/home/grining/.virtualenvs/")
-
-;; PROJECTILE & HELM PROJECTILE
-(projectile-mode)
-(setq projectile-completion-system 'helm)
-(helm-projectile-on)
-
-;; JEDI
-(require 'auto-complete)
-(global-auto-complete-mode t)
-(add-hook 'python-mode-hook 'jedi:setup)
-(setq jedi:complete-on-dot t)
-(setq python-environment-directory "~/.virtualenvs")
-
-;; DEBUGGING
-(defun python-add-breakpoint ()
-  (interactive)
-  (newline-and-indent)
-  (insert "import ipdb; ipdb.set_trace()")
-  (highlight-lines-matching-regexp "^[ ]*import ipdb; ipdb.set_trace()"))
- 
-(define-key global-map (kbd "C-c C-w") 'python-add-breakpoint)
-
-;; CUSTOM KEYBINDING
-(global-set-key (kbd "C-k") 'kill-whole-line)
-(global-set-key (kbd "C-c p s g") 'helm-do-ag-project-root)
-
-
-;; LOAD TABBAR
+;; tabbar
 (add-to-list 'load-path "~/.emacs.d/tabbar/")
 (load "tabbar")
 (global-set-key (kbd "<C-tab>") 'tabbar-forward-tab)
 (global-set-key (kbd "<C-iso-lefttab>") 'tabbar-backward-tab)
 
-;; EXPERIMENTAL TABBAR TWEAKS
-;; https://gist.github.com/3demax/1264635#file-tabbar-tweak-el
 
-;; Tabbar
-(require 'tabbar)
+;;;;;;;;;;;;;;;
+;;; GENERAL ;;;
+;;;;;;;;;;;;;;;
+
+(defvar my-local-home (getenv "HOME"))
+(global-set-key (kbd "C-k") 'kill-whole-line)
+
+;; better-defaults
+(require 'better-defaults)
+
+;; column-number
+(column-number-mode t)
+
+;; cua
+(cua-mode t)
+
+;; dashboard
+(require 'dashboard)
+(dashboard-setup-startup-hook)
+
+;; helm
+(require 'helm-config)
+(helm-mode 1)
+(define-key global-map [remap find-file] 'helm-find-files)
+(define-key global-map [remap occur] 'helm-occur)
+(define-key global-map [remap list-buffers] 'helm-buffers-list)
+(define-key global-map [remap dabbrev-expand] 'helm-dabbrev)
+(define-key global-map [remap execute-extended-command] 'helm-M-x)
+(defvar helm-M-x-fuzzy-match t)
+(defvar helm-buffers-fuzzy-matching)
+(defvar helm-recentf-fuzzy-match)
+(global-set-key (kbd "C-x b") 'helm-mini)
+(setq helm-buffers-fuzzy-matching t)
+(setq helm-recentf-fuzzy-match t)
+(global-set-key (kbd "C-c p s g") 'helm-do-ag-project-root)
+
+;; line-number
+(line-number-mode t)
+
+;; linum
+(global-linum-mode t)
+(add-hook 'shell-mode-hook (lambda () (linum-mode -1)))
+
+;; powerline
+(require 'powerline)
+(powerline-center-theme)
+
+;; recentf
+(recentf-mode 1)
+(setq-default recent-save-file "~/.emacs.d/recentf")
+(global-set-key "\C-x\ \C-r" 'helm-recentf)
+
+;; swiper-helm
+(global-set-key (kbd "C-s") 'swiper-helm)
+
+;; undo-tree
+(load "~/.emacs.d/undo-tree/undo-tree.el")
+(global-undo-tree-mode 1)
+
+;; which-key
+(which-key-mode)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; PYTHON AND PROJECTS ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; auto-complete
+(require 'auto-complete)
+(global-auto-complete-mode t)
+
+;; elpy
+(elpy-enable)
+
+;; flycheck
+(global-flycheck-mode)
+(defvar flycheck-mode-map)
+(eval-after-load 'flycheck
+  '(define-key flycheck-mode-map (kbd "C-c ! h") 'helm-flycheck))
+
+;; jedi
+(add-hook 'python-mode-hook 'jedi:setup)
+(defvar jedi:complete-on-dot)
+(setq jedi:complete-on-dot t)
+
+;; neotree projectile
+(defun neotree-project-dir ()
+  "Open NeoTree using the git root."
+  (interactive)
+  (let ((project-dir (projectile-project-root))
+        (file-name (buffer-file-name)))
+    (neotree-toggle)
+    (if project-dir
+        (if (neo-global--window-exists-p)
+            (progn
+              (neotree-dir project-dir)
+              (neotree-find file-name)))
+      (message "Could not find git project root."))))
+(global-set-key [f8] 'neotree-project-dir)
+(defvar neo-theme)
+(setq neo-theme (if (display-graphic-p) 'icons 'arrow))
+
+;; projectile
+(projectile-mode)
+(defvar projectile-completion-system)
+(setq projectile-completion-system 'helm)
+(helm-projectile-on)
+
+;; python debugging
+(defun python-add-breakpoint ()
+  "Adding a breakpoint to a python code."
+  (interactive)
+  (newline-and-indent)
+  (insert "import ipdb; ipdb.set_trace()")
+  (highlight-lines-matching-regexp "^[ ]*import ipdb; ipdb.set_trace()"))
+(define-key global-map (kbd "C-c C-w") 'python-add-breakpoint)
+
+;; virtualevn + wrapper
+(require 'virtualenvwrapper)
+(venv-initialize-interactive-shells)
+(defvar python-environment-directory)
+(setq python-environment-directory (concat my-local-home "/.virtualenvs/"))
+(setq venv-location (concat my-local-home "/.virtualenvs/"))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; EXPERIMENTAL TABBAR TWEAKS ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; https://gist.github.com/3demax/1264635#file-tabbar-tweak-el
 ;; Tabbar settings
 (set-face-attribute
  'tabbar-default nil
- :background "gray20"
- :foreground "gray20"
+ :background "#002b36"
+ :foreground "#002b36"
  :underline nil
- :box '(:line-width 1 :color "gray20" :style nil))
+ :box nil)
 (set-face-attribute
  'tabbar-unselected nil
- :background "gray30"
- :foreground "white"
+ :background "#002b36"
+ :foreground "#aaaaaa"
  :underline nil
- :box '(:line-width 1 :color "gray30" :style nil))
+ :box nil)
 (set-face-attribute
  'tabbar-selected nil
- :background "gray75"
- :foreground "black"
+ :background "#aaaaaa"
+ :foreground "#002b36"
  :underline nil
- :box '(:line-width 1 :color "gray75" :style nil))
+ :box nil)
 (set-face-attribute
  'tabbar-highlight nil
- :background "white"
- :foreground "black"
+ :background "#aaaaaa"
+ :foreground "#002b36"
  :underline nil
- :box '(:line-width 1 :color "white" :style nil))
+ :box nil)
 (set-face-attribute
  'tabbar-button nil
  :underline nil
- :box '(:line-width 1 :color "gray20" :style nil))
+ :box nil)
 (set-face-attribute
  'tabbar-separator nil
  :underline nil
- :background "gray20"
+ :background "#002b36em"
  :height 0.6)
 
 ;; Change padding of the tabs
@@ -179,7 +255,7 @@
     ("#dc322f" "#cb4b16" "#b58900" "#546E00" "#B4C342" "#00629D" "#2aa198" "#d33682" "#6c71c4")))
  '(package-selected-packages
    (quote
-    (flycheck-pyflakes helm-flycheck elpy ag powerline column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
+    (all-the-icons helm-google company-jedi swiper-helm swiper which-key dashboard neotree google-this flycheck-pyflakes helm-flycheck elpy ag powerline column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
  '(pos-tip-background-color "#eee8d5")
  '(pos-tip-foreground-color "#586e75")
  '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#eee8d5" 0.2))
@@ -302,10 +378,3 @@ That is, a string used to represent it on the tab bar."
                                 (tabbar-current-tabset)))))))))
 
 (tabbar-mode 1)
-
-(custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 110 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))

@@ -116,7 +116,8 @@ alias p3='python3'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
-alias cal='ncal -M -C'
+alias cal='ncal -C'
+export VISUAL="vim" 
 alias sl='ls' #no trains for me
 alias pyt='pytest -s -x -k ""'
 alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'

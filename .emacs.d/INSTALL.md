@@ -1,0 +1,24 @@
+# Packages to be installed on a clean emacs installation:
+* ag
+* all-the-icons
+* auto-complete
+* better-defaults
+* color-theme-solarized
+* dash
+* elpy
+* flycheck
+* flycheck-pyflakes
+* helm
+* helm-flycheck
+* helm-projectile
+* jedi
+* markdown-mode
+* markdown-mode+
+* neotree
+* powerline
+* projectile
+* sml-modeline
+* swiper-helm
+* virtualenv
+* virtualenvwrapper
+* which-key
