@@ -12,8 +12,10 @@
 ;;;;;;;;;;;;;
 
 (when (require 'package nil 'noerror)
-  (setq package-archives
-	'(("melpa" . "http://melpa.org/packages/")))
+  (add-to-list
+   'package-archives
+   '("melpa" . "http://melpa.org/packages/")
+   t)
   (package-initialize))
 
 
@@ -96,6 +98,9 @@
 (setq-default recent-save-file "~/.emacs.d/recentf")
 (global-set-key "\C-x\ \C-r" 'helm-recentf)
 
+;; sml
+(sml/setup)
+
 ;; swiper-helm
 (global-set-key (kbd "C-s") 'swiper-helm)
 
@@ -112,8 +117,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; auto-complete
-(require 'auto-complete)
-(global-auto-complete-mode t)
+;;(require 'auto-complete)
+;;(global-auto-complete-mode t)
+
+;; company
+(add-hook 'after-init-hook 'global-company-mode)
 
 ;; elpy
 (elpy-enable)
@@ -160,6 +168,9 @@
   (insert "import ipdb; ipdb.set_trace()")
   (highlight-lines-matching-regexp "^[ ]*import ipdb; ipdb.set_trace()"))
 (define-key global-map (kbd "C-c C-w") 'python-add-breakpoint)
+
+;; python pytest
+(use-package python-pytest)
 
 ;; virtualevn + wrapper
 (require 'virtualenvwrapper)
