@@ -40,7 +40,7 @@ bindsym $mod+Shift+q kill
 # start dmenu (a program launcher)
 #bindsym $mod+d exec dmenu_run
 bindsym $mod1+w exec rofi -show run -lines 6 -eh 1 -width 60 -padding 405 -bw 0 -font "Ubuntu 25"
-bindsym $mod+z exec rofi -show window -lines 10 -eh 1 -width 60 -bw 0 -font "Ubuntu 25"
+bindsym $mod1+Tab exec rofi -show window -lines 10 -eh 1 -width 60 -bw 0 -font "Ubuntu 25"
 # There also is the (new) i3-dmenu-desktop which only displays applications
 # shipping a .desktop file. It is a wrapper around dmenu, so you need that
 # installed.
@@ -186,7 +186,7 @@ bindsym $mod1+a exec tilix --quake
 bindsym Ctrl+Mod1+L exec i3lock -c 000000
 bindsym $mod+q floating toggle
 bindsym Mod1+F4 kill
-bindsym Print scrot
+bindsym Print exec scrot
 
 bindsym XF86AudioRaiseVolume exec amixer -q sset Master 5%+
 bindsym XF86AudioLowerVolume exec amixer -q sset Master 5%-
@@ -194,16 +194,15 @@ bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
 # Looks
-gaps inner 0
-gaps outer 0
 smart_gaps on
 smart_borders on
-new_window 1pixel
+gaps inner 8
+new_window pixel 3
 new_float normal
 
-bindsym $mod+p        gaps inner all plus 15
-bindsym $mod+o        gaps inner all minus 15
-bindsym $mod+Shift+p  gaps outer all plus 15
+bindsym $mod+p       gaps inner all plus 15
+bindsym $mod+o       gaps inner all minus 15
+bindsym $mod+Shift+p gaps outer all plus 15
 bindsym $mod+Shift+o gaps outer all minus 15
 
 bindsym $mod1+Control+Right workspace next
@@ -215,6 +214,8 @@ exec emacs --daemon
 
 exec dropbox start
 
+exec-always --no-startup-id compton --config $HOME/.config/compton/config
+
 #exec synapse
 
 ### Some window configurations
@@ -225,14 +226,13 @@ for_window [window_role="Preferences"] floating enable
 for_window [window_type="dialog"] floating enable
 for_window [window_type="menu"] floating enable
 
+set $bg-color            #002b36
+set $bd-color            #268bd2
+set $text-color          #ffb52a
+set $inactive-text-color #93A1A1
+# Coloring
+client.focused              $bd-color       $bg-color       $text-color          $bd-color  $bd-color  
+client.unfocused            $bg-color       $bg-color       $inactive-text-color $bg-color  $bg-color
+
 ### Nasty hack
 exec dbus-update-activation-environment --all
-
-#bindsym Control+Mod1+Up focus output VGA1, workspace prev_on_output, focus output HDMI1, workspace prev_on_output
-#bindsym Control+Mod1+Down focus output VGA1, workspace next_on_output, focus output HDMI1, workspace next_on_output
-#bindsym Control+Mod1+Left focus output VGA1, workspace prev_on_output, focus output HDMI1, workspace prev_on_output
-#bindsym Control+Mod1+Right focus output VGA1, workspace next_on_output, focus output HDMI1, workspace next_on_output
-#bindsym Shift+Control+Mod1+Up move container to workspace prev
-#bindsym Shift+Control+Mod1+Down move container to workspace next
-#bindsym Shift+Control+Mod1+Left move container to workspace prev
-#bindsym Shift+Control+Mod1+Right move container to workspace next

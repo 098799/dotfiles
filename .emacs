@@ -53,6 +53,9 @@
 (defvar my-local-home (getenv "HOME"))
 (global-set-key (kbd "C-k") 'kill-whole-line)
 
+;; auto-revert
+(global-auto-revert-mode)
+
 ;; better-defaults
 (require 'better-defaults)
 
@@ -65,6 +68,9 @@
 ;; dashboard
 (require 'dashboard)
 (dashboard-setup-startup-hook)
+
+;; find-file-in-project
+(require 'find-file-in-project)
 
 ;; helm
 (require 'helm-config)
@@ -101,12 +107,15 @@
 ;; sml
 (sml/setup)
 
-;; swiper-helm
-(global-set-key (kbd "C-s") 'swiper-helm)
+;; ;; swiper-helm
+;; (global-set-key (kbd "C-s") 'swiper-helm)
 
 ;; undo-tree
-(load "~/.emacs.d/undo-tree/undo-tree.el")
-(global-undo-tree-mode 1)
+(when (string=(system-name) "pc") (global-undo-tree-mode))
+(when (string=(system-name) "tot")
+  (load "~/.emacs.d/undo-tree/undo-tree.el")
+  (global-undo-tree-mode 1)
+  )
 
 ;; which-key
 (which-key-mode)
@@ -136,6 +145,9 @@
 (add-hook 'python-mode-hook 'jedi:setup)
 (defvar jedi:complete-on-dot)
 (setq jedi:complete-on-dot t)
+
+;; magit
+(global-set-key (kbd "C-x g") 'magit-status)
 
 ;; neotree projectile
 (defun neotree-project-dir ()
