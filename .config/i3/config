@@ -176,6 +176,7 @@ bindsym $mod+r mode "resize"
 #}
 exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 exec_always --no-startup-id xsetroot -solid "#444444"
+exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
 
 bindsym $mod1+d exec gnome-terminal
 bindsym $mod1+s exec google-chrome-stable

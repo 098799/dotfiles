@@ -34,7 +34,7 @@
 
 ;; fonts
 (custom-set-faces
- '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 110 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))
+ '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 130 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))
 
 ;; theme
 (load-theme 'solarized-dark t)
@@ -108,14 +108,10 @@
 (sml/setup)
 
 ;; ;; swiper-helm
-;; (global-set-key (kbd "C-s") 'swiper-helm)
+(global-set-key (kbd "C-s") 'swiper-helm)
 
 ;; undo-tree
-(when (string=(system-name) "pc") (global-undo-tree-mode))
-(when (string=(system-name) "tot")
-  (load "~/.emacs.d/undo-tree/undo-tree.el")
-  (global-undo-tree-mode 1)
-  )
+(global-undo-tree-mode)
 
 ;; which-key
 (which-key-mode)
@@ -278,7 +274,7 @@
     ("#dc322f" "#cb4b16" "#b58900" "#546E00" "#B4C342" "#00629D" "#2aa198" "#d33682" "#6c71c4")))
  '(package-selected-packages
    (quote
-    (all-the-icons helm-google company-jedi swiper-helm swiper which-key dashboard neotree google-this flycheck-pyflakes helm-flycheck elpy ag powerline column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
+    (python-pytest magit all-the-icons helm-google company-jedi swiper-helm swiper which-key dashboard neotree google-this flycheck-pyflakes helm-flycheck elpy ag powerline column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
  '(pos-tip-background-color "#eee8d5")
  '(pos-tip-foreground-color "#586e75")
  '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#eee8d5" 0.2))
