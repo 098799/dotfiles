@@ -191,6 +191,7 @@ bindsym Print exec scrot
 
 bindsym XF86AudioRaiseVolume exec amixer -q sset Master 5%+
 bindsym XF86AudioLowerVolume exec amixer -q sset Master 5%-
+bindsym $mod+Esc exec amixer -q sset Master on
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
@@ -215,7 +216,8 @@ exec emacs --daemon
 
 exec dropbox start
 
-exec-always --no-startup-id compton --config $HOME/.config/compton/config
+exec --no-startup-id compton --config $HOME/.config/compton/config
+exec --no-startup-id ~/.config/blurme &
 
 #exec synapse
 
