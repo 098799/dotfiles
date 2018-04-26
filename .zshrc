@@ -117,8 +117,8 @@ alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
 alias cal='ncal -C'
-export VISUAL="vim" 
-alias sl='ls' #no trains for me
+alias sl='ls' #no trains for mei
+alias LS='ls'
 alias pyt='pytest -s -x -k ""'
 alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias ll='ls -alh'
@@ -126,6 +126,7 @@ alias vi='vim'
 alias tox3='tox -e py36'
 alias tox8='tox -e flake8'
 alias pyt='pytest -s -x -k ""'
+alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
 
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
