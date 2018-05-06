@@ -36,6 +36,9 @@
 (custom-set-faces
  '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 130 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))
 
+;; rainbow-mode
+(rainbow-mode t)
+
 ;; theme
 (load-theme 'solarized-dark t)
 
@@ -68,6 +71,10 @@
 ;; dashboard
 (require 'dashboard)
 (dashboard-setup-startup-hook)
+
+;; expand-region
+(require 'expand-region)
+(global-set-key (kbd "C-=") 'er/expand-region)
 
 ;; find-file-in-project
 (require 'find-file-in-project)
