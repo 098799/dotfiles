@@ -152,6 +152,7 @@
 (defvar company-jedi:complete-on-dot)
 (setq company-jedi:complete-on-dot t)
 (defun my/python-mode-hook ()
+  "Company jedi."
   (add-to-list 'company-backends 'company-jedi))
 (add-hook 'python-mode-hook 'my/python-mode-hook)
 
