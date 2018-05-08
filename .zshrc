@@ -8,7 +8,8 @@
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 #ZSH_THEME="robbyrussell"
-ZSH_THEME="agnoster"
+ZSH_THEME="mod-agnoster"
+#ZSH_THEME="bullet-train"
 
 # Set list of themes to load
 # Setting this variable when ZSH_THEME=random
@@ -63,6 +64,7 @@ plugins=(
   command-not-found
   fast-syntax-highlighting
   git
+  helm
   pip
   python
   sudo
@@ -108,16 +110,18 @@ fi
 export WORKON_HOME=~/.virtualenvs
 #source /usr/local/bin/virtualenvwrapper.sh
 export PYTHONPATH="~/.virtualenvs"
-export VIRTUALENVWRAPPER_PYTHON=`which python3`
+export VIRTUALENVWRAPPER_PYTHON=`which python3.6`
+export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
+
 
 alias cd..='cd ..'
 #LC_NUMERIC="en_US.UTF-8"
-alias p3='python3'
+alias p3='ipython3'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
 alias cal='ncal -C'
-alias sl='ls' #no trains for mei
+alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -s -x -k ""'
 alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
@@ -125,9 +129,6 @@ alias ll='ls -alh'
 alias vi='vim'
 alias tox3='tox -e py36'
 alias tox8='tox -e flake8'
-alias pyt='pytest -s -x -k ""'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
-
-export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
 dbus-update-activation-environment --all

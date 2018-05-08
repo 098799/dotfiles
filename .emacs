@@ -114,8 +114,8 @@
 ;; sml
 (sml/setup)
 
-;; ;; swiper-helm
-(global-set-key (kbd "C-s") 'swiper-helm)
+;; swiper
+;; (global-set-key (kbd "C-s") 'swiper)
 
 ;; undo-tree
 (global-undo-tree-mode)
@@ -144,10 +144,16 @@
 (eval-after-load 'flycheck
   '(define-key flycheck-mode-map (kbd "C-c ! h") 'helm-flycheck))
 
+;; imenu
+(global-set-key [f9] 'imenu-list-minor-mode)
+
 ;; jedi
 (add-hook 'python-mode-hook 'jedi:setup)
-(defvar jedi:complete-on-dot)
-(setq jedi:complete-on-dot t)
+(defvar company-jedi:complete-on-dot)
+(setq company-jedi:complete-on-dot t)
+(defun my/python-mode-hook ()
+  (add-to-list 'company-backends 'company-jedi))
+(add-hook 'python-mode-hook 'my/python-mode-hook)
 
 ;; magit
 (global-set-key (kbd "C-x g") 'magit-status)

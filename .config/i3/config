@@ -182,7 +182,7 @@ bindsym $mod1+d exec gnome-terminal
 bindsym $mod1+s exec google-chrome-stable
 bindsym $mod1+e exec pluma
 bindsym $mod1+r exec emacsclient -c
-bindsym $mod1+q exec nemo --no-desktop
+bindsym $mod1+q exec thunar
 bindsym $mod1+a exec tilix --quake
 bindsym Ctrl+Mod1+L exec i3lock -c 000000
 bindsym $mod+q floating toggle
@@ -219,8 +219,6 @@ exec dropbox start
 
 exec --no-startup-id compton --config $HOME/.config/compton/config
 exec --no-startup-id ~/.config/blurme &
-
-#exec synapse
 
 ### Some window configurations
 for_window [window_role="pop-up"] floating enable
