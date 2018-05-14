@@ -14,7 +14,7 @@
 (when (require 'package nil 'noerror)
   (add-to-list
    'package-archives
-   '("melpa" . "http://melpa.org/packages/")
+   '("melpa" . "http://melpa.milkbox.net/packages/")
    t)
   (package-initialize))
 
@@ -54,6 +54,7 @@
 ;;;;;;;;;;;;;;;
 
 (defvar my-local-home (getenv "HOME"))
+(setq browse-url-browser-function 'browse-url-chrome)
 (global-set-key (kbd "C-k") 'kill-whole-line)
 
 ;; auto-revert
@@ -102,17 +103,17 @@
 (global-linum-mode t)
 (add-hook 'shell-mode-hook (lambda () (linum-mode -1)))
 
-;; powerline
-(require 'powerline)
-(powerline-center-theme)
+;; org-mode
+(setq org-support-shift-select t)
 
 ;; recentf
 (recentf-mode 1)
 (setq-default recent-save-file "~/.emacs.d/recentf")
 (global-set-key "\C-x\ \C-r" 'helm-recentf)
 
-;; sml
-(sml/setup)
+;; spaceline
+(require 'spaceline-config)
+(spaceline-spacemacs-theme)
 
 ;; swiper
 ;; (global-set-key (kbd "C-s") 'swiper)
@@ -129,11 +130,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; auto-complete
-;;(require 'auto-complete)
-;;(global-auto-complete-mode t)
+(require 'auto-complete)
+(global-auto-complete-mode t)
 
 ;; company
-(add-hook 'after-init-hook 'global-company-mode)
+;; (add-hook 'after-init-hook 'global-company-mode)
 
 ;; elpy
 (elpy-enable)
@@ -149,12 +150,15 @@
 
 ;; jedi
 (add-hook 'python-mode-hook 'jedi:setup)
-(defvar company-jedi:complete-on-dot)
-(setq company-jedi:complete-on-dot t)
-(defun my/python-mode-hook ()
-  "Company jedi."
-  (add-to-list 'company-backends 'company-jedi))
-(add-hook 'python-mode-hook 'my/python-mode-hook)
+(defvar jedi:complete-on-dot)
+(setq jedi:complete-on-dot t)
+;; (defun my/python-mode-hook ()
+;;   "Company jedi."
+;;   (add-to-list 'company-backends 'company-jedi))
+;; (add-hook 'python-mode-hook 'my/python-mode-hook)
+
+;; jira
+(setq jiralib-url "https://jira.rdpnts.com/")
 
 ;; magit
 (global-set-key (kbd "C-x g") 'magit-status)
