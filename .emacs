@@ -55,7 +55,26 @@
 
 (defvar my-local-home (getenv "HOME"))
 (setq browse-url-browser-function 'browse-url-chrome)
-(global-set-key (kbd "C-k") 'kill-whole-line)
+(global-set-key (kbd "C-j") 'backward-char)  ; used to be electric-newline-and-maybe-indent
+(global-set-key (kbd "C-k") 'next-line)  ; used to be kill-whole-line
+(global-set-key (kbd "C-l") 'previous-line)  ; used to be recenter-top-bottom
+(global-set-key (kbd "C-;") 'forward-char)
+
+(global-set-key (kbd "M-j") 'backward-word)  ; was indent-new-comment-line
+(global-set-key (kbd "M-k") 'forward-paragraph)  ; was kill-sentence
+(global-set-key (kbd "M-l") 'backward-paragraph)  ; was downcase-word
+(global-set-key (kbd "M-;") 'forward-word) ; was comment-dwim
+
+(global-set-key (kbd "C-M-j") 'move-beginning-of-line)  ; was comment-indent-new-line
+(global-set-key (kbd "C-M-k") 'scroll-up-command)  ; was kill-sexp
+(global-set-key (kbd "C-M-l") 'scroll-down-command)  ; was reposition
+(global-set-key (kbd "C-M-;") 'move-end-of-line)
+
+(global-set-key (kbd "M-o") 'ace-window)
+
+(global-set-key (kbd "C-a") 'comment-dwim)  ; was move-beginning-of-line
+(global-set-key (kbd "C-f") 'recenter-top-bottom)  ; was forward-char
+(global-set-key (kbd "C-d") 'kill-whole-line)  ; was some delete
 
 ;; auto-revert
 (global-auto-revert-mode)
@@ -138,6 +157,9 @@
 
 ;; elpy
 (elpy-enable)
+(setq elpy-rpc-backend "jedi")
+(setq python-shell-interpreter "ipython"
+      python-shell-interpreter-args "-i --simple-prompt")
 
 ;; flycheck
 (global-flycheck-mode)
@@ -150,15 +172,7 @@
 
 ;; jedi
 (add-hook 'python-mode-hook 'jedi:setup)
-(defvar jedi:complete-on-dot)
 (setq jedi:complete-on-dot t)
-;; (defun my/python-mode-hook ()
-;;   "Company jedi."
-;;   (add-to-list 'company-backends 'company-jedi))
-;; (add-hook 'python-mode-hook 'my/python-mode-hook)
-
-;; jira
-(setq jiralib-url "https://jira.rdpnts.com/")
 
 ;; magit
 (global-set-key (kbd "C-x g") 'magit-status)

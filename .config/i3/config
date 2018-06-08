@@ -71,10 +71,10 @@ bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
 
 # split in horizontal orientation
-bindsym $mod+h split h
+bindsym $mod+x split h
 
 # split in vertical orientation
-bindsym $mod+v split v
+bindsym $mod+z split v
 
 # enter fullscreen mode for the focused container
 bindsym $mod+a fullscreen toggle
@@ -184,6 +184,7 @@ bindsym $mod1+e exec pluma
 bindsym $mod1+r exec emacsclient -c
 bindsym $mod1+q exec thunar
 bindsym $mod1+a exec tilix --quake
+# bindsym $mod1+a exec ~/.emacs_anywhere/bin/run
 bindsym Ctrl+Mod1+L exec i3lock -c 000000
 bindsym $mod+q floating toggle
 bindsym Mod1+F4 kill
@@ -196,28 +197,32 @@ bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
 # Looks
-smart_gaps on
+# smart_gaps on
 smart_borders on
-gaps inner 13
-gaps outer -5
-new_window pixel 3
+# set $gaps_inner 25
+# set $gaps_outer -5
+# gaps inner $gaps_inner
+# gaps outer $gaps_outer
+new_window pixel 5
 new_float normal
 
-bindsym $mod+p       gaps inner all plus 15
-bindsym $mod+o       gaps inner all minus 15
-bindsym $mod+Shift+p gaps outer all plus 15
-bindsym $mod+Shift+o gaps outer all minus 15
+bindsym $mod+p       gaps inner all set 0
+bindsym $mod+o       gaps inner all set $gaps_inner
+bindsym $mod+Shift+p gaps outer all set 0
+bindsym $mod+Shift+o gaps outer all set $gaps_outer
+
+exec setxkbmap -layout us
 
 bindsym $mod1+Control+Right workspace next
 bindsym $mod1+Control+Left workspace prev
 
 exec emacs --daemon
-#exec gnome-settings-daemon
-#exec gnome-keyring-daemon
+# exec gnome-settings-daemon
+# exec gnome-keyring-daemon
 
 exec dropbox start
 
-exec --no-startup-id compton --config $HOME/.config/compton/config
+exec_always --no-startup-id compton --config $HOME/.config/compton/config
 exec --no-startup-id ~/.config/blurme &
 
 ### Some window configurations
@@ -228,13 +233,10 @@ for_window [window_role="Preferences"] floating enable
 for_window [window_type="dialog"] floating enable
 for_window [window_type="menu"] floating enable
 
-set $bg-color            #002b36
-set $bd-color            #268bd2
-set $text-color          #ffb52a
-set $inactive-text-color #93A1A1
-# Coloring
-client.focused              $bd-color       $bg-color       $text-color          $bd-color  $bd-color  
-client.unfocused            $bg-color       $bg-color       $inactive-text-color $bg-color  $bg-color
+client.focused #859900 #859900 #fdf6e3 #6c71c4
+client.focused_inactive #073642 #073642 #eee8d5 #6c71c4
+client.unfocused #073642 #073642 #93a1a1 #586e75
+client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 
 ### Nasty hack
 exec dbus-update-activation-environment --all
