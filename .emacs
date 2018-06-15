@@ -34,7 +34,14 @@
 
 ;; fonts
 (custom-set-faces
- '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 130 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 102 :width normal :family "Ubuntu Mono")))))
+
+;; nav-flash
+(nav-flash-show)
 
 ;; rainbow-mode
 (rainbow-mode t)
@@ -53,8 +60,15 @@
 ;;; GENERAL ;;;
 ;;;;;;;;;;;;;;;
 
-(defvar my-local-home (getenv "HOME"))
+(defun vi-open-line-below ()
+  "Insert a newline below the current line and put point at beginning."
+  (interactive)
+  (unless (eolp)
+    (end-of-line))
+  (newline-and-indent))
+
 (setq browse-url-browser-function 'browse-url-chrome)
+
 (global-set-key (kbd "C-j") 'backward-char)  ; used to be electric-newline-and-maybe-indent
 (global-set-key (kbd "C-k") 'next-line)  ; used to be kill-whole-line
 (global-set-key (kbd "C-l") 'previous-line)  ; used to be recenter-top-bottom
@@ -70,6 +84,7 @@
 (global-set-key (kbd "C-M-l") 'scroll-down-command)  ; was reposition
 (global-set-key (kbd "C-M-;") 'move-end-of-line)
 
+(global-set-key (kbd "C-o") 'vi-open-line-below)
 (global-set-key (kbd "M-o") 'ace-window)
 
 (global-set-key (kbd "C-a") 'comment-dwim)  ; was move-beginning-of-line
@@ -114,6 +129,7 @@
 (setq helm-buffers-fuzzy-matching t)
 (setq helm-recentf-fuzzy-match t)
 (global-set-key (kbd "C-c p s g") 'helm-do-ag-project-root)
+(helm-adaptive-mode t)
 
 ;; line-number
 (line-number-mode t)
@@ -124,6 +140,7 @@
 
 ;; org-mode
 (setq org-support-shift-select t)
+(require 'ox-qmd)
 
 ;; recentf
 (recentf-mode 1)
@@ -216,8 +233,8 @@
 (require 'virtualenvwrapper)
 (venv-initialize-interactive-shells)
 (defvar python-environment-directory)
-(setq python-environment-directory (concat my-local-home "/.virtualenvs/"))
-(setq venv-location (concat my-local-home "/.virtualenvs/"))
+(setq python-environment-directory "~/.virtualenvs/")
+(setq venv-location "~/.virtualenvs/")
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -309,6 +326,7 @@
     (python-pytest magit all-the-icons helm-google company-jedi swiper-helm swiper which-key dashboard neotree google-this flycheck-pyflakes helm-flycheck elpy ag powerline column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
  '(pos-tip-background-color "#eee8d5")
  '(pos-tip-foreground-color "#586e75")
+ '(python-check-command "flake8")
  '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#eee8d5" 0.2))
  '(sml/mode-width
    (if
