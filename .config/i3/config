@@ -176,15 +176,13 @@ bindsym $mod+r mode "resize"
 # }
 exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 exec_always --no-startup-id xsetroot -solid "#444444"
-exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
 
 bindsym $mod1+d exec gnome-terminal
 bindsym $mod1+s exec google-chrome-stable
 bindsym $mod1+e exec pluma
 bindsym $mod1+r exec emacsclient -c
 bindsym $mod1+q exec thunar
-bindsym $mod1+a exec tilix --quake
-# bindsym $mod1+a exec ~/.emacs_anywhere/bin/run
+bindsym $mod1+a exec ~/.emacs_anywhere/bin/run
 bindsym Ctrl+$mod+$mod1+l exec i3lock -c 000000
 bindsym $mod+q floating toggle
 bindsym Mod1+F4 kill
@@ -223,7 +221,7 @@ exec emacs --daemon
 exec dropbox start
 
 exec_always --no-startup-id compton --config $HOME/.config/compton/config
-exec --no-startup-id ~/.config/blurme &
+# exec --no-startup-id ~/.config/blurme &
 
 ### Some window configurations
 for_window [window_role="pop-up"] floating enable

@@ -140,7 +140,20 @@
 
 ;; org-mode
 (setq org-support-shift-select t)
-(require 'ox-qmd)
+;; (set-default 'truncate-lines t)
+(setq org-latex-pdf-process
+      '("pdflatex -interaction nonstopmode -output-directory %o %f"
+        "bibtex %b"
+        "pdflatex -interaction nonstopmode -output-directory %o %f"
+        "pdflatex -interaction nonstopmode -output-directory %o %f"))
+(require 'org-ref)
+(autoload 'helm-bibtex "helm-bibtex" "" t)
+(setq reftex-default-bibliography "/home/grining/boybi.bib")
+(setq org-ref-bibliography-notes "~/notes.org")
+(setq org-ref-default-bibliography reftex-default-bibliography)
+(setq org-ref-pdf-directory "~/Documents/Mendeley Desktop")
+(setq bibtex-completion-bibliography reftex-default-bibliography)
+(setq bibtex-completion-library-path "~/Documents/Mendeley Desktop/")
 
 ;; recentf
 (recentf-mode 1)
@@ -151,14 +164,14 @@
 (require 'spaceline-config)
 (spaceline-spacemacs-theme)
 
-;; swiper
-;; (global-set-key (kbd "C-s") 'swiper)
-
 ;; undo-tree
 (global-undo-tree-mode)
 
 ;; which-key
 (which-key-mode)
+
+;; winner-mode
+(winner-mode 1)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -189,6 +202,7 @@
 
 ;; jedi
 (add-hook 'python-mode-hook 'jedi:setup)
+(defvar jedi:complete-on-dot)
 (setq jedi:complete-on-dot t)
 
 ;; magit
