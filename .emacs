@@ -40,6 +40,14 @@
  ;; If there is more than one, they won't work right.
  '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 102 :width normal :family "Ubuntu Mono")))))
 
+;; highlight
+(require 'highlight-symbol)
+(global-set-key [(control f5)] 'highlight-symbol)
+(global-set-key [f5] 'highlight-symbol-next)
+(global-set-key [(shift f5)] 'highlight-symbol-prev)
+(global-set-key [(meta f5)] 'highlight-symbol-query-replace)
+(global-set-key [(super f5)] 'highlight-symbol-remove-all)
+
 ;; nav-flash
 (nav-flash-show)
 
@@ -69,20 +77,23 @@
 
 (setq browse-url-browser-function 'browse-url-chrome)
 
-(global-set-key (kbd "C-j") 'backward-char)  ; used to be electric-newline-and-maybe-indent
-(global-set-key (kbd "C-k") 'next-line)  ; used to be kill-whole-line
-(global-set-key (kbd "C-l") 'previous-line)  ; used to be recenter-top-bottom
-(global-set-key (kbd "C-;") 'forward-char)
+(global-set-key (kbd "M-j") 'backward-char)  ; used to be electric-newline-and-maybe-indent
+(global-set-key (kbd "M-k") 'next-line)  ; used to be kill-whole-line
+(global-set-key (kbd "M-l") 'previous-line)  ; used to be recenter-top-bottom
+(global-set-key (kbd "M-;") 'forward-char)
+(global-set-key (kbd "M-:") (kbd "S-<right>"))
 
-(global-set-key (kbd "M-j") 'backward-word)  ; was indent-new-comment-line
-(global-set-key (kbd "M-k") 'forward-paragraph)  ; was kill-sentence
-(global-set-key (kbd "M-l") 'backward-paragraph)  ; was downcase-word
-(global-set-key (kbd "M-;") 'forward-word) ; was comment-dwim
+(global-set-key (kbd "C-j") 'backward-word)  ; was indent-new-comment-line
+(global-set-key (kbd "C-k") 'forward-paragraph)  ; was kill-sentence
+(global-set-key (kbd "C-l") 'backward-paragraph)  ; was downcase-word
+(global-set-key (kbd "C-;") 'forward-word) ; was comment-dwim
+(global-set-key (kbd "C-:") (kbd "S-M-f"))
 
 (global-set-key (kbd "C-M-j") 'move-beginning-of-line)  ; was comment-indent-new-line
 (global-set-key (kbd "C-M-k") 'scroll-up-command)  ; was kill-sexp
 (global-set-key (kbd "C-M-l") 'scroll-down-command)  ; was reposition
 (global-set-key (kbd "C-M-;") 'move-end-of-line)
+(global-set-key (kbd "C-M-:") (kbd "S-<end>"))
 
 (global-set-key (kbd "C-o") 'vi-open-line-below)
 (global-set-key (kbd "M-o") 'ace-window)
@@ -90,6 +101,9 @@
 (global-set-key (kbd "C-a") 'comment-dwim)  ; was move-beginning-of-line
 (global-set-key (kbd "C-f") 'recenter-top-bottom)  ; was forward-char
 (global-set-key (kbd "C-d") 'kill-whole-line)  ; was some delete
+
+(global-set-key (kbd "C-e") 'highlight-symbol-next)  ; was same as <end>
+(global-set-key (kbd "M-e") 'highlight-symbol)  ; was forward-sentence
 
 ;; auto-revert
 (global-auto-revert-mode)
