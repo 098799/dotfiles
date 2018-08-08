@@ -103,6 +103,7 @@
 (global-set-key (kbd "C-d") 'kill-whole-line)  ; was some delete
 
 (global-set-key (kbd "C-e") 'highlight-symbol-next)  ; was same as <end>
+(global-set-key (kbd "C-S-e") 'highlight-symbol-prev)
 (global-set-key (kbd "M-e") 'highlight-symbol)  ; was forward-sentence
 
 ;; auto-revert
@@ -263,6 +264,7 @@
 (defvar python-environment-directory)
 (setq python-environment-directory "~/.virtualenvs/")
 (setq venv-location "~/.virtualenvs/")
+(define-key global-map (kbd "C-c C-q") 'venv-workon)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
