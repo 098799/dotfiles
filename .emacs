@@ -83,10 +83,10 @@
 (global-set-key (kbd "M-;") 'forward-char)
 (global-set-key (kbd "M-:") (kbd "S-<right>"))
 
-(global-set-key (kbd "C-j") 'backward-word)  ; was indent-new-comment-line
-(global-set-key (kbd "C-k") 'forward-paragraph)  ; was kill-sentence
+(global-set-key (kbd "C-j") 'left-word)  ; was indent-new-comment-line
+(global-set-key (kbd "C-k") 'forward-paragraph)  ; was kill-sentence; can be done now by M-0 C-d
 (global-set-key (kbd "C-l") 'backward-paragraph)  ; was downcase-word
-(global-set-key (kbd "C-;") 'forward-word) ; was comment-dwim
+(global-set-key (kbd "C-;") 'right-word) ; was comment-dwim
 (global-set-key (kbd "C-:") (kbd "S-M-f"))
 
 (global-set-key (kbd "C-M-j") 'move-beginning-of-line)  ; was comment-indent-new-line
@@ -250,6 +250,7 @@
 (defun python-add-breakpoint ()
   "Adding a breakpoint to a python code."
   (interactive)
+  (move-end-of-line 1)
   (newline-and-indent)
   (insert "import ipdb; ipdb.set_trace()")
   (highlight-lines-matching-regexp "^[ ]*import ipdb; ipdb.set_trace()"))
@@ -477,3 +478,6 @@ That is, a string used to represent it on the tab bar."
                                 (tabbar-current-tabset)))))))))
 
 (tabbar-mode 1)
+
+(provide '.emacs)
+;;; .emacs ends here
