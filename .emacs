@@ -7,16 +7,30 @@
 ;;; Code:
 
 
-;;;;;;;;;;;;;
-;;; MELPA ;;;
-;;;;;;;;;;;;;
+;;;;;;;;;;;;;;
+;;; CONFIG ;;;
+;;;;;;;;;;;;;;
 
-(when (require 'package nil 'noerror)
-  (add-to-list
-   'package-archives
-   '("melpa" . "http://melpa.milkbox.net/packages/")
-   t)
-  (package-initialize))
+;; (when (require 'package nil 'noerror)
+;;   (add-to-list
+;;    'package-archives
+;;    '("melpa" . "http://melpa.milkbox.net/packages/")
+;;    t)
+;;   (package-initialize))
+
+;; melpa
+(require 'package)
+(setq package-enable-at-startup nil)
+(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+                         ("marmalade" . "https://marmalade-repo.org/packages/")
+                         ("melpa" . "https://melpa.org/packages/")))
+(package-initialize)
+
+;; use-package
+(unless (package-installed-p 'use-package)
+  (package-refresh-contents)
+  (package-install 'use-package))
+(require 'use-package)
 
 
 ;;;;;;;;;;;;;;;
@@ -31,6 +45,19 @@
   (scroll-bar-mode -1))
 (when (fboundp 'horizontal-scroll-bar-mode)
   (horizontal-scroll-bar-mode -1))
+
+;; all-the-icons
+(use-package all-the-icons :ensure t)
+
+;; auto-revert
+(global-auto-revert-mode 1)
+
+;; beacon
+(use-package beacon
+  :ensure t
+  :config
+  (beacon-mode 1)
+  )
 
 ;; fonts
 (custom-set-faces
@@ -50,9 +77,6 @@
 
 ;; nav-flash
 (nav-flash-show)
-
-;; rainbow-mode
-(rainbow-mode t)
 
 ;; theme
 (load-theme 'solarized-dark t)
@@ -77,40 +101,15 @@
 
 (setq browse-url-browser-function 'browse-url-chrome)
 
-(global-set-key (kbd "M-j") 'backward-char)  ; used to be electric-newline-and-maybe-indent
-(global-set-key (kbd "M-k") 'next-line)  ; used to be kill-whole-line
-(global-set-key (kbd "M-l") 'previous-line)  ; used to be recenter-top-bottom
-(global-set-key (kbd "M-;") 'forward-char)
-(global-set-key (kbd "M-:") (kbd "S-<right>"))
-
-(global-set-key (kbd "C-j") 'left-word)  ; was indent-new-comment-line
-(global-set-key (kbd "C-k") 'forward-paragraph)  ; was kill-sentence; can be done now by M-0 C-d
-(global-set-key (kbd "C-l") 'backward-paragraph)  ; was downcase-word
-(global-set-key (kbd "C-;") 'right-word) ; was comment-dwim
-(global-set-key (kbd "C-:") (kbd "S-M-f"))
-
-(global-set-key (kbd "C-M-j") 'move-beginning-of-line)  ; was comment-indent-new-line
-(global-set-key (kbd "C-M-k") 'scroll-up-command)  ; was kill-sexp
-(global-set-key (kbd "C-M-l") 'scroll-down-command)  ; was reposition
-(global-set-key (kbd "C-M-;") 'move-end-of-line)
-(global-set-key (kbd "C-M-:") (kbd "S-<end>"))
-
-(global-set-key (kbd "C-o") 'vi-open-line-below)
-(global-set-key (kbd "M-o") 'ace-window)
-
-(global-set-key (kbd "C-a") 'comment-dwim)  ; was move-beginning-of-line
-(global-set-key (kbd "C-f") 'recenter-top-bottom)  ; was forward-char
-(global-set-key (kbd "C-d") 'kill-whole-line)  ; was some delete
-
-(global-set-key (kbd "C-e") 'highlight-symbol-next)  ; was same as <end>
-(global-set-key (kbd "C-S-e") 'highlight-symbol-prev)
-(global-set-key (kbd "M-e") 'highlight-symbol)  ; was forward-sentence
-
-;; auto-revert
-(global-auto-revert-mode)
+(fset 'yes-or-no-p 'y-or-n-p)
 
 ;; better-defaults
 (require 'better-defaults)
+
+;; comment-dwim-2
+(use-package comment-dwim-2
+  :ensure t
+  :bind ("C-a" . comment-dwim-2))
 
 ;; column-number
 (column-number-mode t)
@@ -123,28 +122,39 @@
 (dashboard-setup-startup-hook)
 
 ;; expand-region
-(require 'expand-region)
-(global-set-key (kbd "C-=") 'er/expand-region)
+(use-package expand-region
+  :ensure t
+  :bind ("C-=" . er/expand-region))
 
 ;; find-file-in-project
 (require 'find-file-in-project)
 
 ;; helm
-(require 'helm-config)
-(helm-mode 1)
-(define-key global-map [remap find-file] 'helm-find-files)
-(define-key global-map [remap occur] 'helm-occur)
-(define-key global-map [remap list-buffers] 'helm-buffers-list)
-(define-key global-map [remap dabbrev-expand] 'helm-dabbrev)
-(define-key global-map [remap execute-extended-command] 'helm-M-x)
-(defvar helm-M-x-fuzzy-match t)
-(defvar helm-buffers-fuzzy-matching)
-(defvar helm-recentf-fuzzy-match)
-(global-set-key (kbd "C-x b") 'helm-mini)
-(setq helm-buffers-fuzzy-matching t)
-(setq helm-recentf-fuzzy-match t)
-(global-set-key (kbd "C-c p s g") 'helm-do-ag-project-root)
-(helm-adaptive-mode t)
+(use-package helm-config)
+
+(use-package helm
+  :ensure t
+  :init
+  (setq
+   helm-M-x-fuzzy-match t
+   helm-mode-fuzzy-match t
+   helm-buffers-fuzzy-matching t
+   helm-recentf-fuzzy-match t
+   helm-locate-fuzzy-match t
+   helm-semantic-fuzzy-match t
+   helm-imenu-fuzzy-match t
+   helm-completion-in-region-fuzzy-match t
+  )
+  :config
+  (helm-mode 1)
+  (helm-adaptive-mode t)
+  :bind
+  ("C-c p s g" . helm-do-ag-project-root)
+  ("C-c p s g" . helm-do-ag-project-root)
+  ("M-x" . helm-M-x)
+  ("C-x C-f" . helm-find-files)
+  ("C-x b" . helm-mini)
+  )
 
 ;; line-number
 (line-number-mode t)
@@ -156,19 +166,19 @@
 ;; org-mode
 (setq org-support-shift-select t)
 ;; (set-default 'truncate-lines t)
-(setq org-latex-pdf-process
-      '("pdflatex -interaction nonstopmode -output-directory %o %f"
-        "bibtex %b"
-        "pdflatex -interaction nonstopmode -output-directory %o %f"
-        "pdflatex -interaction nonstopmode -output-directory %o %f"))
-(require 'org-ref)
-(autoload 'helm-bibtex "helm-bibtex" "" t)
-(setq reftex-default-bibliography "/home/grining/boybi.bib")
-(setq org-ref-bibliography-notes "~/notes.org")
-(setq org-ref-default-bibliography reftex-default-bibliography)
-(setq org-ref-pdf-directory "~/Documents/Mendeley Desktop")
-(setq bibtex-completion-bibliography reftex-default-bibliography)
-(setq bibtex-completion-library-path "~/Documents/Mendeley Desktop/")
+;; (setq org-latex-pdf-process
+;;       '("pdflatex -interaction nonstopmode -output-directory %o %f"
+;;         "bibtex %b"
+;;         "pdflatex -interaction nonstopmode -output-directory %o %f"
+;;         "pdflatex -interaction nonstopmode -output-directory %o %f"))
+;; (require 'org-ref)
+;; (autoload 'helm-bibtex "helm-bibtex" "" t)
+;; (setq reftex-default-bibliography "/home/grining/boybi.bib")
+;; (setq org-ref-bibliography-notes "~/notes.org")
+;; (setq org-ref-default-bibliography reftex-default-bibliography)
+;; (setq org-ref-pdf-directory "~/Documents/Mendeley Desktop")
+;; (setq bibtex-completion-bibliography reftex-default-bibliography)
+;; (setq bibtex-completion-library-path "~/Documents/Mendeley Desktop/")
 
 ;; recentf
 (recentf-mode 1)
@@ -183,32 +193,80 @@
 (global-undo-tree-mode)
 
 ;; which-key
-(which-key-mode)
+(use-package which-key
+  :ensure t
+  :init
+  (setq which-key-separator " ")
+  (setq which-key-prefix-prefix "+")
+  :config
+  (which-key-mode 1))
+
+;; whitespace-cleanup-mode
+(use-package whitespace-cleanup-mode
+  :ensure t
+  :config (global-whitespace-cleanup-mode))
 
 ;; winner-mode
 (winner-mode 1)
+
+;;;;;;;;;;;;;;;;;
+;;; SHORTCUTS ;;;
+;;;;;;;;;;;;;;;;;
+
+
+(bind-keys*
+ ("M-j" . left-char)  ; used to be electric-newline-and-maybe-indent
+ ("M-k" . next-line)  ; used to be kill-whole-line
+ ("M-l" . previous-line)  ; used to be recenter-top-bottom
+ ("M-;" . right-char)
+ ("C-j" . left-word)  ; was indent-new-comment-line
+ ("C-k" . forward-paragraph)  ; was kill-sentence; can be done now by M-0 C-d
+ ("C-l" . backward-paragraph)  ; was downcase-word
+ ("C-;" . right-word) ; was comment-dwim
+ ("C-M-j" . move-beginning-of-line)  ; was comment-indent-new-line
+ ("C-M-k" . scroll-up-command)  ; was kill-sexp
+ ("C-M-l" . scroll-down-command)  ; was reposition
+ ("C-M-;" . move-end-of-line)
+ ("C-o" . vi-open-line-below)
+ ("M-o" . ace-window)
+ ;; ("C-a" . comment-dwim)  ; was move-beginning-of-line
+ ("C-f" . recenter-top-bottom)  ; was forward-char
+ ("C-d" . kill-whole-line)  ; was some delete
+ ("C-e" . highlight-symbol-next)  ; was same as <end>
+ ("C-S-e" . highlight-symbol-prev)
+ ("C-M-e" . highlight-symbol)  ; was forward-sentence
+)
+
+(global-set-key (kbd "M-:") (kbd "S-<right>"))
+(global-set-key (kbd "C-:") (kbd "S-M-f"))
+(global-set-key (kbd "C-M-:") (kbd "S-<end>"))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; PYTHON AND PROJECTS ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; auto-complete
-(require 'auto-complete)
-(global-auto-complete-mode t)
+;; ;; auto-complete
+;; (require 'auto-complete)
+;; (global-auto-complete-mode t)
 
-;; company
-;; (add-hook 'after-init-hook 'global-company-mode)
+(use-package company
+  :ensure t
+  :config (global-company-mode))
 
 ;; elpy
-(elpy-enable)
-(setq elpy-rpc-backend "jedi")
+(use-package elpy
+  :ensure t
+  :init (elpy-enable))
+;; (setq elpy-rpc-backend "jedi")
 (setq python-shell-interpreter "ipython"
       python-shell-interpreter-args "-i --simple-prompt")
 
 ;; flycheck
-(global-flycheck-mode)
-(defvar flycheck-mode-map)
+(use-package flycheck
+  :ensure t
+  :init
+  (global-flycheck-mode))
 (eval-after-load 'flycheck
   '(define-key flycheck-mode-map (kbd "C-c ! h") 'helm-flycheck))
 
@@ -216,15 +274,27 @@
 (global-set-key [f9] 'imenu-list-minor-mode)
 
 ;; jedi
-(add-hook 'python-mode-hook 'jedi:setup)
-(defvar jedi:complete-on-dot)
-(setq jedi:complete-on-dot t)
+;; (add-hook 'python-mode-hook 'jedi:setup)
+;; (defvar jedi:complete-on-dot)
+;; (setq jedi:complete-on-dot t)
 
 ;; magit
-(global-set-key (kbd "C-x g") 'magit-status)
+(use-package magit
+  :ensure t
+  :bind
+  ("C-x g" . magit-status)
+  ("C-c m" . magit-blame)
+  :config (magit-add-section-hook 'magit-status-sections-hook
+                                'magit-insert-unpushed-to-upstream
+                                'magit-insert-unpushed-to-upstream-or-recent
+                                'replace))
 
 ;; neotree projectile
-(defun neotree-project-dir ()
+(use-package neotree
+  :ensure t
+  :init
+  (setq neo-theme (if (display-graphic-p) 'icons 'arrow))
+  (defun neotree-project-dir ()
   "Open NeoTree using the git root."
   (interactive)
   (let ((project-dir (projectile-project-root))
@@ -236,15 +306,18 @@
               (neotree-dir project-dir)
               (neotree-find file-name)))
       (message "Could not find git project root."))))
+  )
 (global-set-key [f8] 'neotree-project-dir)
-(defvar neo-theme)
-(setq neo-theme (if (display-graphic-p) 'icons 'arrow))
 
 ;; projectile
-(projectile-mode)
-(defvar projectile-completion-system)
-(setq projectile-completion-system 'helm)
-(helm-projectile-on)
+(use-package projectile
+  :ensure t
+  :init
+  :config
+  (projectile-mode)
+  (setq projectile-completion-system 'helm)
+  (helm-projectile-on)
+)
 
 ;; python debugging
 (defun python-add-breakpoint ()
@@ -260,12 +333,55 @@
 (use-package python-pytest)
 
 ;; virtualevn + wrapper
-(require 'virtualenvwrapper)
+(use-package virtualenvwrapper
+  :ensure t)
 (venv-initialize-interactive-shells)
 (defvar python-environment-directory)
 (setq python-environment-directory "~/.virtualenvs/")
 (setq venv-location "~/.virtualenvs/")
 (define-key global-map (kbd "C-c C-q") 'venv-workon)
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+;; Other Languages ;;;
+;;;;;;;;;;;;;;;;;;;;;;
+
+;; CSV
+(use-package csv-mode
+  :ensure t
+  :mode "\\.csv\\'")
+
+;; Dockerfile
+(use-package dockerfile-mode
+  :ensure t
+  :mode "\\Dockerfile\\'")
+
+;; Elisp
+(with-eval-after-load 'flycheck
+  (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc)))
+
+;; HTML
+(use-package web-mode
+  :ensure t
+  :mode ("\\.html\\'" "\\.jinja\\'")
+  :config (setq web-mode-markup-indent-offset 2
+                web-mode-code-indent-offset 2)
+  )
+
+;; Markdown
+(use-package markdown-mode
+  :ensure t)
+
+(use-package markdown-mode+
+  :ensure t)
+
+;; yaml
+(use-package yaml-mode
+  :ensure t
+  :config
+  (require 'yaml-mode)
+  (add-to-list 'auto-mode-alist '("\\.yml$" . yaml-mode))
+  )
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -307,175 +423,6 @@
  :underline nil
  :background "#002b36em"
  :height 0.6)
-
-;; Change padding of the tabs
-;; we also need to set separator to avoid overlapping tabs by highlighted tabs
-(custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(compilation-message-face (quote default))
- '(cua-global-mark-cursor-color "#2aa198")
- '(cua-normal-cursor-color "#657b83")
- '(cua-overwrite-cursor-color "#b58900")
- '(cua-read-only-cursor-color "#859900")
- '(custom-safe-themes
-   (quote
-    ("84d2f9eeb3f82d619ca4bfffe5f157282f4779732f48a5ac1484d94d5ff5b279" "b9e9ba5aeedcc5ba8be99f1cc9301f6679912910ff92fdf7980929c2fc83ab4d" "a8245b7cc985a0610d71f9852e9f2767ad1b852c2bdea6f4aadc12cce9c4d6d0" "a24c5b3c12d147da6cef80938dca1223b7c7f70f2f382b26308eba014dc4833a" "c74e83f8aa4c78a121b52146eadb792c9facc5b1f02c917e3dbb454fca931223" "3c83b3676d796422704082049fc38b6966bcad960f896669dfc21a7a37a748fa" "8aebf25556399b58091e533e455dd50a6a9cba958cc4ebb0aab175863c25b9a4" "d677ef584c6dfc0697901a44b885cc18e206f05114c8a3b7fde674fce6180879" "8db4b03b9ae654d4a57804286eb3e332725c84d7cdab38463cb6b97d5762ad26" default)))
- '(elpy-test-pytest-runner-command (quote ("pytest")))
- '(fci-rule-color "#eee8d5")
- '(highlight-changes-colors (quote ("#d33682" "#6c71c4")))
- '(highlight-symbol-colors
-   (--map
-    (solarized-color-blend it "#fdf6e3" 0.25)
-    (quote
-     ("#b58900" "#2aa198" "#dc322f" "#6c71c4" "#859900" "#cb4b16" "#268bd2"))))
- '(highlight-symbol-foreground-color "#586e75")
- '(highlight-tail-colors
-   (quote
-    (("#eee8d5" . 0)
-     ("#B4C342" . 20)
-     ("#69CABF" . 30)
-     ("#69B7F0" . 50)
-     ("#DEB542" . 60)
-     ("#F2804F" . 70)
-     ("#F771AC" . 85)
-     ("#eee8d5" . 100))))
- '(hl-bg-colors
-   (quote
-    ("#DEB542" "#F2804F" "#FF6E64" "#F771AC" "#9EA0E5" "#69B7F0" "#69CABF" "#B4C342")))
- '(hl-fg-colors
-   (quote
-    ("#fdf6e3" "#fdf6e3" "#fdf6e3" "#fdf6e3" "#fdf6e3" "#fdf6e3" "#fdf6e3" "#fdf6e3")))
- '(magit-diff-use-overlays nil)
- '(nrepl-message-colors
-   (quote
-    ("#dc322f" "#cb4b16" "#b58900" "#546E00" "#B4C342" "#00629D" "#2aa198" "#d33682" "#6c71c4")))
- '(package-selected-packages
-   (quote
-    (python-pytest magit all-the-icons helm-google company-jedi swiper-helm swiper which-key dashboard neotree google-this flycheck-pyflakes helm-flycheck elpy ag powerline column-enforce-mode column-marker markdown-mode+ markdown-mode better-defaults undo-tree solarized-theme helm color-theme-solarized)))
- '(pos-tip-background-color "#eee8d5")
- '(pos-tip-foreground-color "#586e75")
- '(python-check-command "flake8")
- '(smartrep-mode-line-active-bg (solarized-color-blend "#859900" "#eee8d5" 0.2))
- '(sml/mode-width
-   (if
-       (eq
-        (powerline-current-separator)
-        (quote arrow))
-       (quote right)
-     (quote full)))
- '(sml/pos-id-separator
-   (quote
-    (""
-     (:propertize " " face powerline-active1)
-     (:eval
-      (propertize " "
-                  (quote display)
-                  (funcall
-                   (intern
-                    (format "powerline-%s-%s"
-                            (powerline-current-separator)
-                            (car powerline-default-separator-dir)))
-                   (quote powerline-active1)
-                   (quote powerline-active2))))
-     (:propertize " " face powerline-active2))))
- '(sml/pos-minor-modes-separator
-   (quote
-    (""
-     (:propertize " " face powerline-active1)
-     (:eval
-      (propertize " "
-                  (quote display)
-                  (funcall
-                   (intern
-                    (format "powerline-%s-%s"
-                            (powerline-current-separator)
-                            (cdr powerline-default-separator-dir)))
-                   (quote powerline-active1)
-                   (quote sml/global))))
-     (:propertize " " face sml/global))))
- '(sml/pre-id-separator
-   (quote
-    (""
-     (:propertize " " face sml/global)
-     (:eval
-      (propertize " "
-                  (quote display)
-                  (funcall
-                   (intern
-                    (format "powerline-%s-%s"
-                            (powerline-current-separator)
-                            (car powerline-default-separator-dir)))
-                   (quote sml/global)
-                   (quote powerline-active1))))
-     (:propertize " " face powerline-active1))))
- '(sml/pre-minor-modes-separator
-   (quote
-    (""
-     (:propertize " " face powerline-active2)
-     (:eval
-      (propertize " "
-                  (quote display)
-                  (funcall
-                   (intern
-                    (format "powerline-%s-%s"
-                            (powerline-current-separator)
-                            (cdr powerline-default-separator-dir)))
-                   (quote powerline-active2)
-                   (quote powerline-active1))))
-     (:propertize " " face powerline-active1))))
- '(sml/pre-modes-separator (propertize " " (quote face) (quote sml/modes)))
- '(tabbar-separator (quote (0.2)))
- '(term-default-bg-color "#fdf6e3")
- '(term-default-fg-color "#657b83")
- '(vc-annotate-background nil)
- '(vc-annotate-background-mode nil)
- '(vc-annotate-color-map
-   (quote
-    ((20 . "#dc322f")
-     (40 . "#ff7f00")
-     (60 . "#ffbf00")
-     (80 . "#b58900")
-     (100 . "#ffff00")
-     (120 . "#ffff00")
-     (140 . "#ffff00")
-     (160 . "#ffff00")
-     (180 . "#859900")
-     (200 . "#aaff55")
-     (220 . "#7fff7f")
-     (240 . "#55ffaa")
-     (260 . "#2affd4")
-     (280 . "#2aa198")
-     (300 . "#00ffff")
-     (320 . "#00ffff")
-     (340 . "#00ffff")
-     (360 . "#268bd2"))))
- '(vc-annotate-very-old-color nil)
- '(weechat-color-list
-   (quote
-    (unspecified "#fdf6e3" "#eee8d5" "#990A1B" "#dc322f" "#546E00" "#859900" "#7B6000" "#b58900" "#00629D" "#268bd2" "#93115C" "#d33682" "#00736F" "#2aa198" "#657b83" "#839496")))
- '(xterm-color-names
-   ["#eee8d5" "#dc322f" "#859900" "#b58900" "#268bd2" "#d33682" "#2aa198" "#073642"])
- '(xterm-color-names-bright
-   ["#fdf6e3" "#cb4b16" "#93a1a1" "#839496" "#657b83" "#6c71c4" "#586e75" "#002b36"]))
-;; adding spaces
-(defun tabbar-buffer-tab-label (tab)
-  "Return a label for TAB.
-That is, a string used to represent it on the tab bar."
-  (let ((label  (if tabbar--buffer-show-groups
-                    (format "[%s]  " (tabbar-tab-tabset tab))
-                  (format "%s  " (tabbar-tab-value tab)))))
-    ;; Unless the tab bar auto scrolls to keep the selected tab
-    ;; visible, shorten the tab label to keep as many tabs as possible
-    ;; in the visible area of the tab bar.
-    (if tabbar-auto-scroll-flag
-        label
-      (tabbar-shorten
-       label (max 1 (/ (window-width)
-                       (length (tabbar-view
-                                (tabbar-current-tabset)))))))))
 
 (tabbar-mode 1)
 
