@@ -330,7 +330,10 @@
 (define-key global-map (kbd "C-c C-w") 'python-add-breakpoint)
 
 ;; python pytest
-(use-package python-pytest)
+(use-package python-pytest
+  :bind
+  ("C-c C-a" . python-pytest-popup)
+  )
 
 ;; virtualevn + wrapper
 (use-package virtualenvwrapper
@@ -423,6 +426,23 @@
  :underline nil
  :background "#002b36em"
  :height 0.6)
+
+;; adding spaces
+(defun tabbar-buffer-tab-label (tab)
+  "Return a label for TAB.
+That is, a string used to represent it on the tab bar."
+  (let ((label  (if tabbar--buffer-show-groups
+                    (format "[%s]  " (tabbar-tab-tabset tab))
+                  (format "%s  " (tabbar-tab-value tab)))))
+    ;; Unless the tab bar auto scrolls to keep the selected tab
+    ;; visible, shorten the tab label to keep as many tabs as possible
+    ;; in the visible area of the tab bar.
+    (if tabbar-auto-scroll-flag
+        label
+      (tabbar-shorten
+       label (max 1 (/ (window-width)
+                       (length (tabbar-view
+                                (tabbar-current-tabset)))))))))
 
 (tabbar-mode 1)
 
