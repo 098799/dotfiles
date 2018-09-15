@@ -2,14 +2,15 @@
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-  export ZSH=/home/grining/.oh-my-zsh
+export ZSH="$HOME/.oh-my-zsh"
 
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 #ZSH_THEME="robbyrussell"
 ZSH_THEME="mod-agnoster"
-#ZSH_THEME="bullet-train"
+
+export WORKON_HOME="$HOME/.virtualenvs"
 
 # Set list of themes to load
 # Setting this variable when ZSH_THEME=random
@@ -102,16 +103,11 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-#[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
-if [ $TILIX_ID ] || [ $VTE_VERSION ]; then
-        source /etc/profile.d/vte.sh
-fi
+[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
 
-export WORKON_HOME=~/.virtualenvs
-#source /usr/local/bin/virtualenvwrapper.sh
-export PYTHONPATH="~/.virtualenvs"
-export VIRTUALENVWRAPPER_PYTHON=`which python3.6`
-export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
+source /usr/bin/virtualenvwrapper.sh
+export PYTHONPATH="$HOME/.virtualenvs"
+export VIRTUALENVWRAPPER_PYTHON=`which python3`
 
 
 alias cd..='cd ..'
@@ -120,6 +116,7 @@ alias p3='ipython3'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
+export VISUAL="emacsclient -t"
 alias cal='ncal -C'
 alias sl='ls' #no trains for me
 alias LS='ls'
@@ -129,6 +126,29 @@ alias ll='ls -alh'
 alias vi='vim'
 alias tox3='tox -e py36'
 alias tox8='tox -e flake8'
+alias pens='cd ~/Dropbox/pens/pypen'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
+alias pip_install='pip install -r requirements/flake8.txt --pre'
+alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
+
+export PATH_TO_HTML=/tmp
+
+cd `pwd`
 
 dbus-update-activation-environment --all
+
+export FC="gfortran"
+export CXX="g++"
+export CC="gcc"
+PATH="$PATH:/home/grining/.gem/ruby/2.5.0/bin"
+PATH="$PATH:/root/.gem/ruby/2.5.0/bin"
+
+if [[ "$TERM" == "dumb" ]]
+then
+    unsetopt zle
+    unsetopt prompt_cr
+    unsetopt prompt_subst
+    unfunction precmd
+    unfunction preexec
+    PS1='$ '
+fi
