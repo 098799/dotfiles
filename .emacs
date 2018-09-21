@@ -185,6 +185,33 @@
 (setq-default recent-save-file "~/.emacs.d/recentf")
 (global-set-key "\C-x\ \C-r" 'helm-recentf)
 
+;; slack
+(use-package slack
+  :commands (slack-start)
+  :init
+  (setq slack-buffer-emojify t) ;; if you want to enable emoji, default nil
+  (setq slack-prefer-current-team t)
+  :config
+  (slack-register-team
+   :name "red-points"
+   :default t
+   :client-id ""
+   :client-secret ""
+   :token "xoxs-"
+   :subscribed-channels '(test-rename crawler)
+   :full-and-display-names t)
+  :bind
+  ("C-c s q" . slack-start)
+  ("C-c s w" . slack-select-rooms)
+  ("C-c s e" . slack-im-open)
+  )
+
+(use-package alert
+  :commands (alert)
+  :init
+  (setq alert-default-style 'notifier)
+  )
+
 ;; spaceline
 (require 'spaceline-config)
 (spaceline-spacemacs-theme)
@@ -209,10 +236,11 @@
 ;; winner-mode
 (winner-mode 1)
 
+
+
 ;;;;;;;;;;;;;;;;;
 ;;; SHORTCUTS ;;;
 ;;;;;;;;;;;;;;;;;
-
 
 (bind-keys*
  ("M-j" . left-char)  ; used to be electric-newline-and-maybe-indent
@@ -232,6 +260,7 @@
  ;; ("C-a" . comment-dwim)  ; was move-beginning-of-line
  ("C-f" . recenter-top-bottom)  ; was forward-char
  ("C-d" . kill-whole-line)  ; was some delete
+ ("C-w" . backward-kill-word)  ; was kill-region
  ("C-e" . highlight-symbol-next)  ; was same as <end>
  ("C-S-e" . highlight-symbol-prev)
  ("C-M-e" . highlight-symbol)  ; was forward-sentence
@@ -250,6 +279,12 @@
 ;; (require 'auto-complete)
 ;; (global-auto-complete-mode t)
 
+;; blacken
+(use-package blacken
+  :ensure t
+  )
+
+;; company
 (use-package company
   :ensure t
   :config (global-company-mode))
@@ -258,7 +293,7 @@
 (use-package elpy
   :ensure t
   :init (elpy-enable))
-;; (setq elpy-rpc-backend "jedi")
+(setq elpy-rpc-backend "jedi")
 (setq python-shell-interpreter "ipython"
       python-shell-interpreter-args "-i --simple-prompt")
 
@@ -273,6 +308,14 @@
 ;; imenu
 (global-set-key [f9] 'imenu-list-minor-mode)
 
+;; ;; isort
+;; (use-package py-isort
+;;   :ensure t
+;;   :config
+;;   (add-hook 'before-save-hook 'py-isort-before-save)
+;;   (setq py-isort-options '("--lines=100 --project=crwcommon"))
+;;   )
+
 ;; jedi
 ;; (add-hook 'python-mode-hook 'jedi:setup)
 ;; (defvar jedi:complete-on-dot)
@@ -283,11 +326,7 @@
   :ensure t
   :bind
   ("C-x g" . magit-status)
-  ("C-c m" . magit-blame)
-  :config (magit-add-section-hook 'magit-status-sections-hook
-                                'magit-insert-unpushed-to-upstream
-                                'magit-insert-unpushed-to-upstream-or-recent
-                                'replace))
+  ("C-c m" . magit-blame))
 
 ;; neotree projectile
 (use-package neotree
@@ -375,6 +414,11 @@
 (use-package markdown-mode+
   :ensure t)
 
+;; rst
+(use-package auto-complete-rst
+  :ensure t
+  )
+
 ;; yaml
 (use-package yaml-mode
   :ensure t
@@ -423,6 +467,23 @@
  :underline nil
  :background "#002b36em"
  :height 0.6)
+
+;; adding spaces
+(defun tabbar-buffer-tab-label (tab)
+  "Return a label for TAB.
+That is, a string used to represent it on the tab bar."
+  (let ((label  (if tabbar--buffer-show-groups
+                    (format "[%s]  " (tabbar-tab-tabset tab))
+                  (format "%s  " (tabbar-tab-value tab)))))
+    ;; Unless the tab bar auto scrolls to keep the selected tab
+    ;; visible, shorten the tab label to keep as many tabs as possible
+    ;; in the visible area of the tab bar.
+    (if tabbar-auto-scroll-flag
+        label
+      (tabbar-shorten
+       label (max 1 (/ (window-width)
+                       (length (tabbar-view
+                                (tabbar-current-tabset)))))))))
 
 (tabbar-mode 1)
 

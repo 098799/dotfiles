@@ -2,14 +2,15 @@
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-  export ZSH=/home/grining/.oh-my-zsh
+export ZSH="$HOME/.oh-my-zsh"
 
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 #ZSH_THEME="robbyrussell"
 ZSH_THEME="mod-agnoster"
-#ZSH_THEME="bullet-train"
+
+export WORKON_HOME="$HOME/.virtualenvs"
 
 # Set list of themes to load
 # Setting this variable when ZSH_THEME=random
@@ -102,17 +103,12 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-#[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
-if [ $TILIX_ID ] || [ $VTE_VERSION ]; then
-        source /etc/profile.d/vte.sh
-fi
+[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
 
-export WORKON_HOME=~/.virtualenvs
-#source /usr/local/bin/virtualenvwrapper.sh
-export PYTHONPATH="~/.virtualenvs"
-export VIRTUALENVWRAPPER_PYTHON=`which python3.6`
+source /usr/local/bin/virtualenvwrapper.sh
+export PYTHONPATH="$HOME/.virtualenvs"
+export VIRTUALENVWRAPPER_PYTHON=`which python3`
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
-
 
 alias cd..='cd ..'
 #LC_NUMERIC="en_US.UTF-8"
@@ -120,15 +116,35 @@ alias p3='ipython3'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 export EDITOR="emacsclient -t"
-alias cal='ncal -C'
+export VISUAL="emacsclient -t"
+alias cal='ncal -M -b -3'
 alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -s -x -k ""'
 alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
+alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | rev`'
+alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
 alias vi='vim'
 alias tox3='tox -e py36'
 alias tox8='tox -e flake8'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
+alias pip_install='pip install -r requirements/flake8.txt --pre'
+alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
+alias pip_r='pip_uninstall && pip_install'
+
+export PATH_TO_HTML=/tmp
+
+cd `pwd`
+
+if [[ "$TERM" == "dumb" ]]
+then
+    unsetopt zle
+    unsetopt prompt_cr
+    unsetopt prompt_subst
+    unfunction precmd
+    unfunction preexec
+    PS1='$ '
+fi
 
 dbus-update-activation-environment --all
