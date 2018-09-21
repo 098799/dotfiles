@@ -369,7 +369,10 @@
 (define-key global-map (kbd "C-c C-w") 'python-add-breakpoint)
 
 ;; python pytest
-(use-package python-pytest)
+(use-package python-pytest
+  :bind
+  ("C-c C-a" . python-pytest-popup)
+  )
 
 ;; virtualevn + wrapper
 (use-package virtualenvwrapper

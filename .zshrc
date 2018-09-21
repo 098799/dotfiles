@@ -128,6 +128,7 @@ alias ll='ls -alh'
 alias vi='vim'
 alias tox3='tox -e py36'
 alias tox8='tox -e flake8'
+alias pens='cd ~/Dropbox/pens/pypen'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
 alias pip_install='pip install -r requirements/flake8.txt --pre'
 alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
@@ -148,3 +149,9 @@ then
 fi
 
 dbus-update-activation-environment --all
+
+export FC="gfortran"
+export CXX="g++"
+export CC="gcc"
+PATH="$PATH:/home/grining/.gem/ruby/2.5.0/bin"
+PATH="$PATH:/root/.gem/ruby/2.5.0/bin"
