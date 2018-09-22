@@ -97,7 +97,8 @@
   (interactive)
   (unless (eolp)
     (end-of-line))
-  (newline-and-indent))
+  (newline-and-indent)
+  )
 
 (setq browse-url-browser-function 'browse-url-chrome)
 
@@ -326,7 +327,8 @@
   :ensure t
   :bind
   ("C-x g" . magit-status)
-  ("C-c m" . magit-blame))
+  ("C-c m" . magit-blame)
+  )
 
 ;; neotree projectile
 (use-package neotree
@@ -491,4 +493,6 @@ That is, a string used to represent it on the tab bar."
 (tabbar-mode 1)
 
 (provide '.emacs)
+
+
 ;;; .emacs ends here

@@ -97,36 +97,35 @@ bindsym $mod+space focus mode_toggle
 # focus the child container
 #bindsym $mod+d focus child
 
-#exec xrandr --output HDMI1 --primary
-exec xrandr --output eDP1 --primary #auto --right-of HDMI1
+exec-always --no-startup-id /home/grining/bin/set_layout
 
 #my monitor binding
-workspace 1:chrome output eDP1
-workspace 2:terminal output eDP1
+workspace 1 output eDP1
+workspace 2 output eDP1
 workspace 3 output eDP1
-workspace 4 output HMDI1
+workspace 4 output eDP1
 workspace 5 output eDP1
-workspace 6 output eDP1
-workspace 7 output eDP1
-workspace 8 output eDP1
-workspace 9 output eDP1
-workspace 10 output eDP1
+workspace 6 output HDMI1
+workspace 7 output HDMI1
+workspace 8 output HDMI1
+workspace 9 output HDMI1
+workspace 10 output HDMI1
 
 # switch to workspace
-bindsym $mod+1 workspace 1:chrome, focus output eDP1
-bindsym $mod+2 workspace 2:terminal, focus output eDP1
+bindsym $mod+1 workspace 1, focus output eDP1
+bindsym $mod+2 workspace 2, focus output eDP1
 bindsym $mod+3 workspace 3, focus output eDP1
 bindsym $mod+4 workspace 4, focus output eDP1
 bindsym $mod+5 workspace 5, focus output eDP1
-bindsym $mod+6 workspace 6, focus output eDP1
-bindsym $mod+7 workspace 7, focus output eDP1
-bindsym $mod+8 workspace 8, focus output eDP1
-bindsym $mod+9 workspace 9, focus output eDP1
-bindsym $mod+0 workspace 10, focus output eDP1
+bindsym $mod+6 workspace 6, focus output HDMI1
+bindsym $mod+7 workspace 7, focus output HDMI1
+bindsym $mod+8 workspace 8, focus output HDMI1
+bindsym $mod+9 workspace 9, focus output HDMI1
+bindsym $mod+0 workspace 10, focus output HDMI1
 
 # move focused container to workspace
-bindsym $mod+Shift+1 move container to workspace 1:chrome
-bindsym $mod+Shift+2 move container to workspace 2:terminal
+bindsym $mod+Shift+1 move container to workspace 1
+bindsym $mod+Shift+2 move container to workspace 2
 bindsym $mod+Shift+3 move container to workspace 3
 bindsym $mod+Shift+4 move container to workspace 4
 bindsym $mod+Shift+5 move container to workspace 5
@@ -244,4 +243,4 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 ### Nasty hack
 exec dbus-update-activation-environment --all
 
-exec setxkbmap -layout pl
+exec setxkbmap pl
