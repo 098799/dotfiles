@@ -97,8 +97,7 @@
   (interactive)
   (unless (eolp)
     (end-of-line))
-  (newline-and-indent)
-  )
+  (newline-and-indent))
 
 (setq browse-url-browser-function 'browse-url-chrome)
 
@@ -217,6 +216,10 @@
 (require 'spaceline-config)
 (spaceline-spacemacs-theme)
 
+;; transpose-trame
+(use-package transpose-frame
+  :ensure t)
+
 ;; undo-tree
 (global-undo-tree-mode)
 
@@ -252,6 +255,8 @@
  ("C-k" . forward-paragraph)  ; was kill-sentence; can be done now by M-0 C-d
  ("C-l" . backward-paragraph)  ; was downcase-word
  ("C-;" . right-word) ; was comment-dwim
+ ("C-," . forward-sexp)
+ ("C-." . backward-sexp)
  ("C-M-j" . move-beginning-of-line)  ; was comment-indent-new-line
  ("C-M-k" . scroll-up-command)  ; was kill-sexp
  ("C-M-l" . scroll-down-command)  ; was reposition
@@ -290,6 +295,11 @@
   :ensure t
   :config (global-company-mode))
 
+;; docker
+(use-package docker
+  :ensure t
+  :bind ("C-c d" . docker))
+
 ;; elpy
 (use-package elpy
   :ensure t
@@ -327,8 +337,7 @@
   :ensure t
   :bind
   ("C-x g" . magit-status)
-  ("C-c m" . magit-blame)
-  )
+  ("C-c m" . magit-blame))
 
 ;; neotree projectile
 (use-package neotree
@@ -373,6 +382,7 @@
 ;; python pytest
 (use-package python-pytest
   :bind
+  ("C-c a" . python-pytest-repeat)
   ("C-c C-a" . python-pytest-popup)
   )
 
@@ -384,6 +394,9 @@
 (setq python-environment-directory "~/.virtualenvs/")
 (setq venv-location "~/.virtualenvs/")
 (define-key global-map (kbd "C-c C-q") 'venv-workon)
+(add-hook 'python-mode-hook #'auto-virtualenvwrapper-activate)
+(add-hook 'window-configuration-change-hook #'auto-virtualenvwrapper-activate)
+(add-hook 'focus-in-hook #'auto-virtualenvwrapper-activate)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;
@@ -493,6 +506,4 @@ That is, a string used to represent it on the tab bar."
 (tabbar-mode 1)
 
 (provide '.emacs)
-
-
 ;;; .emacs ends here

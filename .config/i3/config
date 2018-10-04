@@ -180,12 +180,12 @@ exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
 
 bindsym $mod1+d exec gnome-terminal
 bindsym $mod1+s exec google-chrome-stable
-bindsym $mod1+e exec gnome-terminal; exec emacs
+# bindsym $mod1+e exec gnome-terminal; exec emacs
 bindsym $mod1+r exec emacsclient -c
 bindsym $mod1+q exec thunar  #nemo --no-desktop
-bindsym $mod1+a exec ~/.emacs_anywhere/bin/run
+# bindsym $mod1+a exec ~/.emacs_anywhere/bin/run
 bindsym Ctrl+$mod+$mod1+l exec i3lock -c 000000
-bindsym $mod+q floating toggle
+bindsym $mod+t floating toggle
 bindsym Mod1+F4 kill
 bindsym Print exec scrot
 
