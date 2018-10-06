@@ -21,16 +21,26 @@
 ;; melpa
 (require 'package)
 (setq package-enable-at-startup nil)
-(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+(setq package-archives '(("melpa" . "http://melpa.milkbox.net/packages/")
+                         ("gnu" . "https://elpa.gnu.org/packages/")
                          ("marmalade" . "https://marmalade-repo.org/packages/")
-                         ("melpa" . "https://melpa.org/packages/")))
+                         ))
 (package-initialize)
 
 ;; use-package
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
   (package-install 'use-package))
-(require 'use-package)
+(eval-when-compile
+  (require 'use-package))
+
+(use-package auto-package-update
+   :ensure t
+   :config
+   (setq auto-package-update-delete-old-versions t
+         auto-package-update-interval 4)
+   (auto-package-update-maybe))
+
 
 
 ;;;;;;;;;;;;;;;
@@ -68,15 +78,20 @@
  '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 102 :width normal :family "Ubuntu Mono")))))
 
 ;; highlight
-(require 'highlight-symbol)
-(global-set-key [(control f5)] 'highlight-symbol)
-(global-set-key [f5] 'highlight-symbol-next)
-(global-set-key [(shift f5)] 'highlight-symbol-prev)
-(global-set-key [(meta f5)] 'highlight-symbol-query-replace)
-(global-set-key [(super f5)] 'highlight-symbol-remove-all)
+(use-package highlight-symbol
+  :ensure t
+  :bind
+  ("C-<f5>" . highlight-symbol)
+  ("<f5>" . highlight-symbol-next)
+  ("S-<f5>" . highlight-symbol-prev)
+  ("M-<f5>" . highlight-symbol-query-replace)
+  )
 
 ;; nav-flash
-(nav-flash-show)
+(use-package nav-flash
+  :ensure t
+  :config
+  (nav-flash-show))
 
 ;; theme
 (load-theme 'solarized-dark t)
@@ -104,7 +119,8 @@
 (fset 'yes-or-no-p 'y-or-n-p)
 
 ;; better-defaults
-(require 'better-defaults)
+(use-package better-defaults
+  :ensure t)
 
 ;; comment-dwim-2
 (use-package comment-dwim-2
@@ -118,8 +134,10 @@
 (cua-mode t)
 
 ;; dashboard
-(require 'dashboard)
-(dashboard-setup-startup-hook)
+(use-package dashboard
+  :ensure t
+  :config
+  (dashboard-setup-startup-hook))
 
 ;; expand-region
 (use-package expand-region
@@ -127,7 +145,8 @@
   :bind ("C-=" . er/expand-region))
 
 ;; find-file-in-project
-(require 'find-file-in-project)
+(use-package find-file-in-project
+  :ensure t)
 
 ;; helm
 (use-package helm-config)
@@ -203,18 +222,18 @@
   :bind
   ("C-c s q" . slack-start)
   ("C-c s w" . slack-select-rooms)
-  ("C-c s e" . slack-im-open)
-  )
+  ("C-c s e" . slack-im-open))
 
 (use-package alert
   :commands (alert)
   :init
-  (setq alert-default-style 'notifier)
-  )
+  (setq alert-default-style 'notifier))
 
 ;; spaceline
-(require 'spaceline-config)
-(spaceline-spacemacs-theme)
+(use-package spaceline
+  :ensure t
+  :config
+  (spaceline-spacemacs-theme))
 
 ;; tramp
 (setq tramp-default-method "ssh")
@@ -224,7 +243,10 @@
   :ensure t)
 
 ;; undo-tree
-(global-undo-tree-mode)
+(use-package undo-tree
+  :ensure t
+  :config
+  (global-undo-tree-mode))
 
 ;; which-key
 (use-package which-key
@@ -348,10 +370,11 @@
 
 ;; nameframe
 (use-package nameframe
+  :ensure t)
+(use-package nameframe-projectile
   :ensure t
   :config
-  (nameframe-projectile-mode t)
-  )
+  (nameframe-projectile-mode t))
 
 ;; neotree projectile
 (use-package neotree
@@ -381,7 +404,19 @@
   (projectile-mode)
   (setq projectile-completion-system 'helm)
   (helm-projectile-on)
-)
+  :bind
+  ("C-c p p" . projectile-switch-project)
+  ("C-c p h" . projectile-find-file)
+  ("C-c p f" . projectile-find-file)
+  ("C-c p d" . projectile-dir)
+  ("C-c p t" . projectile-toggle-between-implementation-and-test)
+  ("C-c p r" . projectile-replace)
+  ("C-c p e" . projectile-replace-regexp)
+  ("C-c p s s" . projectile-ag)
+  ("C-c p s g" . projectile-grep)
+  ("C-c p s r" . projectile-ripgrep)
+  ("C-c p k" . projectile-kill-buffers)
+  ("C-c p S" . projectile-save-project-buffers))
 
 ;; python debugging
 (defun python-add-breakpoint ()
@@ -408,9 +443,12 @@
 (setq python-environment-directory "~/.virtualenvs/")
 (setq venv-location "~/.virtualenvs/")
 (define-key global-map (kbd "C-c C-q") 'venv-workon)
-(add-hook 'python-mode-hook #'auto-virtualenvwrapper-activate)
-(add-hook 'window-configuration-change-hook #'auto-virtualenvwrapper-activate)
-(add-hook 'focus-in-hook #'auto-virtualenvwrapper-activate)
+(use-package auto-virtualenvwrapper
+  :ensure t
+  :config
+  (add-hook 'python-mode-hook #'auto-virtualenvwrapper-activate)
+  (add-hook 'window-configuration-change-hook #'auto-virtualenvwrapper-activate)
+  (add-hook 'focus-in-hook #'auto-virtualenvwrapper-activate))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;
