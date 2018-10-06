@@ -224,9 +224,6 @@ exec dropbox start
 exec_always --no-startup-id compton --config $HOME/.config/compton/config
 # exec --no-startup-id ~/.config/blurme &
 
-### Layouts
-exec --no-startup-id ~/.config/i3/alternating_layouts.py
-
 ### Some window configurations
 for_window [window_role="pop-up"] floating enable
 for_window [window_role="bubble"] floating enable

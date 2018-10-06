@@ -216,6 +216,9 @@
 (require 'spaceline-config)
 (spaceline-spacemacs-theme)
 
+;; tramp
+(setq tramp-default-method "ssh")
+
 ;; transpose-trame
 (use-package transpose-frame
   :ensure t)
@@ -294,6 +297,9 @@
 (use-package company
   :ensure t
   :config (global-company-mode))
+(defun my/python-mode-hook ()
+  (add-to-list 'company-backends 'company-jedi))
+(add-hook 'python-mode-hook 'my/python-mode-hook)
 
 ;; docker
 (use-package docker
@@ -337,7 +343,15 @@
   :ensure t
   :bind
   ("C-x g" . magit-status)
-  ("C-c m" . magit-blame))
+  ("C-c m" . magit-blame)
+  )
+
+;; nameframe
+(use-package nameframe
+  :ensure t
+  :config
+  (nameframe-projectile-mode t)
+  )
 
 ;; neotree projectile
 (use-package neotree
@@ -506,4 +520,6 @@ That is, a string used to represent it on the tab bar."
 (tabbar-mode 1)
 
 (provide '.emacs)
+
+
 ;;; .emacs ends here
