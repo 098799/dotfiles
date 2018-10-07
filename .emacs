@@ -172,8 +172,11 @@
   ("C-c p s g" . helm-do-ag-project-root)
   ("M-x" . helm-M-x)
   ("C-x C-f" . helm-find-files)
-  ("C-x b" . helm-mini)
-  )
+  ("C-x b" . helm-mini))
+
+;; helm-flycheck
+(use-package helm-flycheck
+  :ensure t)
 
 ;; line-number
 (line-number-mode t)
@@ -406,7 +409,7 @@
   (helm-projectile-on)
   :bind
   ("C-c p p" . projectile-switch-project)
-  ("C-c p h" . projectile-find-file)
+  ("C-c p h" . helm-projectile)
   ("C-c p f" . projectile-find-file)
   ("C-c p d" . projectile-dir)
   ("C-c p t" . projectile-toggle-between-implementation-and-test)

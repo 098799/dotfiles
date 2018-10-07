@@ -8,7 +8,13 @@ export ZSH="$HOME/.oh-my-zsh"
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 #ZSH_THEME="robbyrussell"
-ZSH_THEME="mod-agnoster"
+#ZSH_THEME="mod-agnoster"
+ZSH_THEME="powerlevel9k/powerlevel9k"
+POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv context dir vcs)
+POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status time battery)
+POWERLEVEL9K_BATTERY_STAGES=($'\u2581' $'\u2582' $'\u2583' $'\u2584' $'\u2585' $'\u2586' $'\u2587' $'\u2588')
+POWERLEVEL9K_PROMPT_ON_NEWLINE=true
+POWERLEVEL9K_TIME_FORMAT='%D{%H:%M}'
 
 export WORKON_HOME="$HOME/.virtualenvs"
 
@@ -105,8 +111,9 @@ source $ZSH/oh-my-zsh.sh
 
 [ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
 
-source /usr/local/bin/virtualenvwrapper.sh
-export PYTHONPATH="$HOME/.virtualenvs"
+source /usr/bin/virtualenvwrapper.sh
+export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
+export PYTHONPATH="${PYTHONPATH}:$HOME"
 export VIRTUALENVWRAPPER_PYTHON=`which python3`
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
@@ -155,3 +162,5 @@ export CXX="g++"
 export CC="gcc"
 PATH="$PATH:/home/grining/.gem/ruby/2.5.0/bin"
 PATH="$PATH:/root/.gem/ruby/2.5.0/bin"
+
+PATH="$PATH:/home/grining/bin"
