@@ -122,6 +122,7 @@ alias cd..='cd ..'
 alias p3='ipython3'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
+alias ee="emacsclient -c"
 export EDITOR="emacsclient -t"
 export VISUAL="emacsclient -t"
 alias cal='ncal -M -b -3'

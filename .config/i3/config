@@ -240,4 +240,4 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 ### Nasty hack
 exec dbus-update-activation-environment --all
 
-exec setxkbmap pl
+exec setxkbmap -layout pl -option caps:escape

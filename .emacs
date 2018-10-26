@@ -118,6 +118,10 @@
 
 (fset 'yes-or-no-p 'y-or-n-p)
 
+;; ace-window
+(use-package ace-window
+  :ensure t)
+
 ;; better-defaults
 (use-package better-defaults
   :ensure t)
@@ -148,6 +152,28 @@
 (use-package find-file-in-project
   :ensure t)
 
+;; god-mode
+(use-package god-mode
+  :ensure t
+  :bind
+  ("<escape>" . god-mode-all))
+
+;; (define-key isearch-mode-map (kbd "<escape>") 'god-mode-isearch-activate)
+;; (define-key god-mode-isearch-map (kbd "<escape>") 'god-mode-isearch-disable)
+
+(defun my-update-cursor ()
+  (setq cursor-type (if (or god-local-mode buffer-read-only)
+                        'box
+                      'bar)))
+
+(add-hook 'god-mode-enabled-hook 'my-update-cursor)
+(add-hook 'god-mode-disabled-hook 'my-update-cursor)
+
+;; (global-set-key (kbd "C-x C-1") 'delete-other-windows)
+;; (global-set-key (kbd "C-x C-2") 'split-window-below)
+;; (global-set-key (kbd "C-x C-3") 'split-window-right)
+;; (global-set-key (kbd "C-x C-0") 'delete-window)
+
 ;; helm
 (use-package helm-config)
 
@@ -168,14 +194,19 @@
   (helm-mode 1)
   (helm-adaptive-mode t)
   :bind
-  ("C-c p s g" . helm-do-ag-project-root)
+  ("C-c C-p C-s C-g" . helm-do-ag-project-root)
   ("C-c p s g" . helm-do-ag-project-root)
   ("M-x" . helm-M-x)
   ("C-x C-f" . helm-find-files)
+  ("C-x C-b" . helm-mini)
   ("C-x b" . helm-mini))
 
 ;; helm-flycheck
 (use-package helm-flycheck
+  :ensure t)
+
+;; helm-projectile
+(use-package helm-projectile
   :ensure t)
 
 ;; line-number
@@ -225,7 +256,9 @@
   :bind
   ("C-c s q" . slack-start)
   ("C-c s w" . slack-select-rooms)
-  ("C-c s e" . slack-im-open))
+  ("C-c s e" . slack-im-open)
+  ("C-c s a" . slack-message-add-reaction)
+  )
 
 (use-package alert
   :commands (alert)
@@ -236,7 +269,14 @@
 (use-package spaceline
   :ensure t
   :config
-  (spaceline-spacemacs-theme))
+  (spaceline-spacemacs-theme)
+  (defun spaceline-highlight-face-god-state ()
+    (if (bound-and-true-p god-local-mode)
+        'spaceline-evil-normal          ;'spaceline-evil-visual
+      'spaceline-evil-emacs             ;'spaceline-evil-insert
+      ))
+  (setq spaceline-highlight-face-func #'spaceline-highlight-face-god-state)
+  )
 
 ;; tramp
 (setq tramp-default-method "ssh")
@@ -303,6 +343,8 @@
 (global-set-key (kbd "M-:") (kbd "S-<right>"))
 (global-set-key (kbd "C-:") (kbd "S-M-f"))
 (global-set-key (kbd "C-M-:") (kbd "S-<end>"))
+(global-set-key (kbd "C-<") (kbd "S-C-,"))
+(global-set-key (kbd "C->") (kbd "S-C-."))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -321,7 +363,20 @@
 ;; company
 (use-package company
   :ensure t
-  :config (global-company-mode))
+  :config
+  ;; (setq company-auto-complete t)
+  (setq company-idle-delay .1)
+  ;; (company-show-numbers t)
+  ;; (company-tooltip-align-annotations 't)
+  (setq company-minimum-prefix-length 1)
+  (setq company-selection-wrap-around t)
+  (company-tng-configure-default)
+  (global-company-mode t)
+  )
+
+;; company-jedi
+(use-package company-jedi
+  :ensure t)
 (defun my/python-mode-hook ()
   (add-to-list 'company-backends 'company-jedi))
 (add-hook 'python-mode-hook 'my/python-mode-hook)
@@ -329,21 +384,27 @@
 ;; docker
 (use-package docker
   :ensure t
-  :bind ("C-c d" . docker))
+  :bind
+  ("C-c d" . docker)
+  ("C-c C-d" . docker)
+  )
 
 ;; elpy
 (use-package elpy
   :ensure t
-  :init (elpy-enable))
-(setq elpy-rpc-backend "jedi")
-(setq python-shell-interpreter "ipython"
-      python-shell-interpreter-args "-i --simple-prompt")
+  :config (elpy-enable)
+  (setq elpy-rpc-backend "jedi")
+  (setq python-shell-interpreter "ipython"
+        python-shell-interpreter-args "-i --simple-prompt")
+  )
 
 ;; flycheck
 (use-package flycheck
   :ensure t
   :init
   (global-flycheck-mode))
+(eval-after-load 'flycheck
+  '(define-key flycheck-mode-map (kbd "C-c C-! C-h") 'helm-flycheck))
 (eval-after-load 'flycheck
   '(define-key flycheck-mode-map (kbd "C-c ! h") 'helm-flycheck))
 
@@ -358,10 +419,14 @@
 ;;   (setq py-isort-options '("--lines=100 --project=crwcommon"))
 ;;   )
 
-;; jedi
-;; (add-hook 'python-mode-hook 'jedi:setup)
-;; (defvar jedi:complete-on-dot)
-;; (setq jedi:complete-on-dot t)
+(use-package jedi
+  :config
+  ;; (add-hook 'python-mode-hook 'jedi:setup)
+  (setq
+   jedi:complete-on-dot t
+   jedi:use-shortcuts t
+   jedi:environment-root "jedi"
+   python-environment-directory "~/.virtualenvs"))
 
 ;; magit
 (use-package magit
@@ -408,6 +473,18 @@
   (setq projectile-completion-system 'helm)
   (helm-projectile-on)
   :bind
+  ("C-c C-p C-p" . projectile-switch-project)
+  ("C-c C-p C-h" . helm-projectile)
+  ("C-c C-p C-f" . projectile-find-file)
+  ("C-c C-p C-d" . projectile-dir)
+  ("C-c C-p C-t" . projectile-toggle-between-implementation-and-test)
+  ("C-c C-p C-r" . projectile-replace)
+  ("C-c C-p C-e" . projectile-replace-regexp)
+  ("C-c C-p C-s s" . projectile-ag)
+  ("C-c C-p C-s g" . projectile-grep)
+  ("C-c C-p C-s r" . projectile-ripgrep)
+  ("C-c C-p C-k" . projectile-kill-buffers)
+  ("C-c C-p C-S" . projectile-save-project-buffers)
   ("C-c p p" . projectile-switch-project)
   ("C-c p h" . helm-projectile)
   ("C-c p f" . projectile-find-file)
@@ -561,6 +638,11 @@ That is, a string used to represent it on the tab bar."
 (tabbar-mode 1)
 
 (provide '.emacs)
+
+(put 'downcase-region 'disabled nil)
+(put 'upcase-region 'disabled nil)
+(put 'narrow-to-page 'disabled nil)
+(put 'narrow-to-region 'disabled nil)
 
 
 ;;; .emacs ends here
