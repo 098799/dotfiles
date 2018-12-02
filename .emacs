@@ -126,6 +126,15 @@
 (use-package better-defaults
   :ensure t)
 
+;; boon
+(use-package boon
+  :ensure t
+  :init
+  (require 'boon-qwerty)
+  :config
+  (boon-mode)
+  )
+
 ;; comment-dwim-2
 (use-package comment-dwim-2
   :ensure t
@@ -175,7 +184,10 @@
 ;; (global-set-key (kbd "C-x C-0") 'delete-window)
 
 ;; helm
-(use-package helm-config)
+(use-package helm-config
+  :config
+  (helm-mode 1)
+  )
 
 (use-package helm
   :ensure t
@@ -191,7 +203,6 @@
    helm-completion-in-region-fuzzy-match t
   )
   :config
-  (helm-mode 1)
   (helm-adaptive-mode t)
   :bind
   ("C-c C-p C-s C-g" . helm-do-ag-project-root)
@@ -199,7 +210,8 @@
   ("M-x" . helm-M-x)
   ("C-x C-f" . helm-find-files)
   ("C-x C-b" . helm-mini)
-  ("C-x b" . helm-mini))
+  ("C-x b" . helm-mini)
+  )
 
 ;; helm-flycheck
 (use-package helm-flycheck
@@ -280,6 +292,11 @@
 
 ;; tramp
 (setq tramp-default-method "ssh")
+(use-package helm-tramp
+  :ensure t)
+;; (add-hook 'helm-tramp-pre-command-hook '(lambda () (projectile-mode 0)))
+;; (add-hook 'helm-tramp-quit-hook '(lambda () (projectile-mode 1)))
+(eval-after-load 'tramp '(setenv "SHELL" "/bin/bash"))
 
 ;; transpose-trame
 (use-package transpose-frame
@@ -364,14 +381,14 @@
 (use-package company
   :ensure t
   :config
+  (global-company-mode)
   ;; (setq company-auto-complete t)
   (setq company-idle-delay .1)
-  ;; (company-show-numbers t)
-  ;; (company-tooltip-align-annotations 't)
+  (setq company-show-numbers t)
+  (setq company-tooltip-align-annotations 't)
   (setq company-minimum-prefix-length 1)
   (setq company-selection-wrap-around t)
-  (company-tng-configure-default)
-  (global-company-mode t)
+  ;; (company-tng-configure-default)
   )
 
 ;; company-jedi
@@ -426,7 +443,8 @@
    jedi:complete-on-dot t
    jedi:use-shortcuts t
    jedi:environment-root "jedi"
-   python-environment-directory "~/.virtualenvs"))
+   python-environment-directory "~/.virtualenvs")
+  )
 
 ;; magit
 (use-package magit
@@ -496,7 +514,8 @@
   ("C-c p s g" . projectile-grep)
   ("C-c p s r" . projectile-ripgrep)
   ("C-c p k" . projectile-kill-buffers)
-  ("C-c p S" . projectile-save-project-buffers))
+  ("C-c p S" . projectile-save-project-buffers)
+  )
 
 ;; python debugging
 (defun python-add-breakpoint ()
