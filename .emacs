@@ -203,6 +203,7 @@
    helm-completion-in-region-fuzzy-match t
   )
   :config
+  (helm-mode 1)
   (helm-adaptive-mode t)
   :bind
   ("C-c C-p C-s C-g" . helm-do-ag-project-root)
@@ -409,10 +410,10 @@
 ;; elpy
 (use-package elpy
   :ensure t
-  :config (elpy-enable)
+  :config
+  (elpy-enable)
+  (elpy-use-ipython)
   (setq elpy-rpc-backend "jedi")
-  (setq python-shell-interpreter "ipython"
-        python-shell-interpreter-args "-i --simple-prompt")
   )
 
 ;; flycheck
@@ -453,14 +454,15 @@
   ("C-x g" . magit-status)
   ("C-c m" . magit-blame)
   )
+(setenv "EDITOR" "emacsclient")
 
-;; nameframe
-(use-package nameframe
-  :ensure t)
-(use-package nameframe-projectile
-  :ensure t
-  :config
-  (nameframe-projectile-mode t))
+;; ;; nameframe
+;; (use-package nameframe
+;;   :ensure t)
+;; (use-package nameframe-projectile
+;;   :ensure t
+;;   :config
+;;   (nameframe-projectile-mode t))
 
 ;; neotree projectile
 (use-package neotree
