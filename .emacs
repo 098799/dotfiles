@@ -126,14 +126,14 @@
 (use-package better-defaults
   :ensure t)
 
-;; boon
-(use-package boon
-  :ensure t
-  :init
-  (require 'boon-qwerty)
-  :config
-  (boon-mode)
-  )
+;; ;; boon
+;; (use-package boon
+;;   :ensure t
+;;   :init
+;;   (require 'boon-qwerty)
+;;   :config
+;;   (boon-mode)
+;;   )
 
 ;; comment-dwim-2
 (use-package comment-dwim-2
@@ -161,22 +161,22 @@
 (use-package find-file-in-project
   :ensure t)
 
-;; god-mode
-(use-package god-mode
-  :ensure t
-  :bind
-  ("<escape>" . god-mode-all))
+;; ;; god-mode
+;; (use-package god-mode
+;;   :ensure t
+;;   :bind
+;;   ("<escape>" . god-mode-all))
 
 ;; (define-key isearch-mode-map (kbd "<escape>") 'god-mode-isearch-activate)
 ;; (define-key god-mode-isearch-map (kbd "<escape>") 'god-mode-isearch-disable)
 
-(defun my-update-cursor ()
-  (setq cursor-type (if (or god-local-mode buffer-read-only)
-                        'box
-                      'bar)))
+;; (defun my-update-cursor ()
+;;   (setq cursor-type (if (or god-local-mode buffer-read-only)
+;;                         'box
+;;                       'bar)))
 
-(add-hook 'god-mode-enabled-hook 'my-update-cursor)
-(add-hook 'god-mode-disabled-hook 'my-update-cursor)
+;; (add-hook 'god-mode-enabled-hook 'my-update-cursor)
+;; (add-hook 'god-mode-disabled-hook 'my-update-cursor)
 
 ;; (global-set-key (kbd "C-x C-1") 'delete-other-windows)
 ;; (global-set-key (kbd "C-x C-2") 'split-window-below)
@@ -221,6 +221,14 @@
 ;; helm-projectile
 (use-package helm-projectile
   :ensure t)
+
+;; keyfreq
+(use-package keyfreq
+  :ensure t
+  :config
+  (keyfreq-mode 1)
+  (keyfreq-autosave-mode 1)
+  )
 
 ;; line-number
 (line-number-mode t)
@@ -463,6 +471,10 @@
 ;;   :ensure t
 ;;   :config
 ;;   (nameframe-projectile-mode t))
+;; (use-package nameframe-perspective
+;;   :ensure t
+;;   :config
+;;   (nameframe-perspective-mode t))
 
 ;; neotree projectile
 (use-package neotree
@@ -657,6 +669,152 @@ That is, a string used to represent it on the tab bar."
                                 (tabbar-current-tabset)))))))))
 
 (tabbar-mode 1)
+
+(defun copy-thing (begin-of-thing end-of-thing &optional arg)
+  "Copy thing between beg & end into kill ring."
+  (save-excursion
+    (let ((beg (get-point begin-of-thing 1))
+          (end (get-point end-of-thing arg)))
+      (copy-region-as-kill beg end))))
+
+(defun get-point (symbol &optional arg)
+  "get the point"
+  (funcall symbol arg)
+  (point))
+
+(defun copy-line-or-region (arg)
+  "Copy line or region"
+  (interactive "P")
+  (if (region-active-p)
+      (cua-copy-region arg)
+    (copy-thing 'beginning-of-line 'end-of-line arg)
+    )
+  )
+
+
+(defun kill-whole-line-or-region (arg)
+  "Kills line or region"
+  (interactive "P")
+  (if (region-active-p)
+      (cua-cut-region arg)
+    (kill-whole-line)
+    )
+  )
+
+
+(defun mark-forward-paragraph (arg)
+  "k-with-region"
+  (interactive "P")
+  (if (region-active-n)
+      (cua-set-mark))
+    (forward-paragraph)
+  )
+
+
+;; RYOMODEEEE
+(use-package ryo-modal
+  :commands ryo-modal-mode
+  :bind ("<escape>" . ryo-modal-mode)
+  :config
+  (add-hook 'text-mode-hook #'ryo-modal-mode)
+  (add-hook 'prog-mode-hook #'ryo-modal-mode)
+  (add-hook 'fundamental-mode-hook #'ryo-modal-mode)
+  ;; (add-hook 'special-mode-hook #'ryo-modal-mode)
+  (add-hook 'conf-unix-mode-hook #'ryo-modal-mode)
+  (ryo-modal-mode)
+  (ryo-modal-keys
+   ;; ("," ryo-modal-repeat)
+   ;; ("q" ryo-modal-mode)
+   ("u" backward-char)
+   ("i" next-line)
+   ("o" previous-line)
+   ("p" forward-char)
+   ("j" left-word)
+   ("k" forward-paragraph)
+   ("K" mark-forward-paragraph)
+   ("l" backward-paragraph)
+   (";" right-word)
+   ("m" move-beginning-of-line)
+   ("," cua-scroll-up)
+   ("." cua-scroll-down)
+   ("/" move-end-of-line)
+   )
+
+  (ryo-modal-keys
+   ("q" kill-word)
+   ("w" backward-kill-word)
+   ("e" highlight-symbol-next)
+   ("r" copy-line-or-region)
+   ("a" comment-dwim-2)
+   ("s" swiper)
+   ("d" kill-whole-line-or-region)
+   ("f" recenter-top-bottom)
+   ("g" keyboard-quit)
+   ("z" undo-tree-undo)
+   ("v" cua-paste)
+   ("=" er/expand-region)
+   ("SPC" cua-set-mark)
+   )
+
+  (ryo-modal-keys
+   (:norepeat t)
+   ("0" "M-0")
+   ("1" "M-1")
+   ("2" "M-2")
+   ("3" "M-3")
+   ("4" "M-4")
+   ("5" "M-5")
+   ("6" "M-6")
+   ("7" "M-7")
+   ("8" "M-8")
+   ("9" "M-9")
+   )
+
+  (ryo-modal-key
+   "["'(
+        ("s s" helm-projectile-ag)
+        ("s g" helm-projectile-grep)
+        ("s r" projectile-ripgrep)
+        ("p" helm-projectile-switch-project)
+        ("h" helm-projectile)
+        ("S" projectile-save-project-buffers)
+        ("d" projectile-dir)
+        ("e" projectile-replace-regexp)
+        ("f" projectile-find-file)
+        ("k" projectile-kill-buffers)
+        ("r" projectile-replace)
+        ("t" projectile-toggle-between-implementation-and-test)
+         )
+   )
+
+  (ryo-modal-key
+   "x" '(
+         ("e" eval-last-sexp)
+         ("r" helm-recentf)
+         ("u" undo-tree-visualize)
+         ("o" vi-open-line-below)
+         ("s" save-buffer)
+         ("d" dired)
+         ("f" helm-find-files)
+         ("g" magit-status)
+         ("h" mark-whole-buffer)
+         ("k" kill-buffer)
+         ("x" helm-M-x)
+         ("b" helm-mini)
+         ("n" magit-blame)
+         ("C-u" upcase-region)
+         ("C-l" downcase-region)
+         ("0" delete-window)
+         ("1" delete-other-windows)
+         ("2" split-window-below)
+         ("3" split-window-right)
+         ("5 0" delete-frame)
+         ("5 1" delete-other-frames)
+         ("5 2" make-frame-command)
+         )
+   )
+  )
+
 
 (provide '.emacs)
 
