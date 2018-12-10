@@ -175,9 +175,9 @@ bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
 # Looks
 # smart_gaps on
-smart_borders on
-# set $gaps_inner 25
-# set $gaps_outer -5
+# smart_borders on
+set $gaps_inner 25
+set $gaps_outer -5
 # gaps inner $gaps_inner
 # gaps outer $gaps_outer
 new_window pixel 5

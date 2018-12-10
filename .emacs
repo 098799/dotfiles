@@ -122,6 +122,9 @@
 (use-package ace-window
   :ensure t)
 
+(use-package avy
+  :ensure t)
+
 ;; better-defaults
 (use-package better-defaults
   :ensure t)
@@ -183,8 +186,14 @@
 ;; (global-set-key (kbd "C-x C-3") 'split-window-right)
 ;; (global-set-key (kbd "C-x C-0") 'delete-window)
 
+;; goto-last-change  ;; TODO figure it out
+(use-package goto-last-change
+  :ensure t
+  )
+
 ;; helm
 (use-package helm-config
+  :ensure t
   :config
   (helm-mode 1)
   )
@@ -299,6 +308,12 @@
   (setq spaceline-highlight-face-func #'spaceline-highlight-face-god-state)
   )
 
+;; swiper
+(use-package swiper
+  :ensure t)
+(use-package swiper-helm
+  :ensure t)
+
 ;; tramp
 (setq tramp-default-method "ssh")
 (use-package helm-tramp
@@ -397,6 +412,7 @@
   (setq company-tooltip-align-annotations 't)
   (setq company-minimum-prefix-length 1)
   (setq company-selection-wrap-around t)
+  (setq completion-ignore-case 0)
   ;; (company-tng-configure-default)
   )
 
@@ -423,6 +439,14 @@
   (elpy-use-ipython)
   (setq elpy-rpc-backend "jedi")
   )
+;; (defun elpy-goto-definition-or-rgrep ()
+;;   "Go to the definition of the symbol at point, if found. Otherwise, run `elpy-rgrep-symbol'."
+;;     (interactive)
+;;     (ring-insert find-tag-marker-ring (point-marker))
+;;     (condition-case nil (elpy-goto-definition)
+;;         (error (elpy-rgrep-symbol
+;;                 (concat "\\(def\\|class\\)\s" (thing-at-point 'symbol) "(")))))
+;; (define-key elpy-mode-map (kbd "M-.") 'elpy-goto-definition-or-rgrep)
 
 ;; flycheck
 (use-package flycheck
@@ -471,10 +495,6 @@
 ;;   :ensure t
 ;;   :config
 ;;   (nameframe-projectile-mode t))
-;; (use-package nameframe-perspective
-;;   :ensure t
-;;   :config
-;;   (nameframe-perspective-mode t))
 
 ;; neotree projectile
 (use-package neotree
@@ -668,6 +688,7 @@ That is, a string used to represent it on the tab bar."
                        (length (tabbar-view
                                 (tabbar-current-tabset)))))))))
 
+
 (tabbar-mode 1)
 
 (defun copy-thing (begin-of-thing end-of-thing &optional arg)
@@ -735,25 +756,30 @@ That is, a string used to represent it on the tab bar."
    ("l" backward-paragraph)
    (";" right-word)
    ("m" move-beginning-of-line)
+   ("U" move-beginning-of-line)
    ("," cua-scroll-up)
    ("." cua-scroll-down)
    ("/" move-end-of-line)
+   ("P" move-end-of-line)
    )
 
   (ryo-modal-keys
    ("q" kill-word)
    ("w" backward-kill-word)
    ("e" highlight-symbol-next)
-   ("r" copy-line-or-region)
+   ("r" avy-goto-char-2)
    ("a" comment-dwim-2)
    ("s" swiper)
    ("d" kill-whole-line-or-region)
    ("f" recenter-top-bottom)
    ("g" keyboard-quit)
    ("z" undo-tree-undo)
+   ("c" copy-line-or-region)
    ("v" cua-paste)
    ("=" er/expand-region)
    ("SPC" cua-set-mark)
+   ("<" beginning-of-buffer)
+   (">" end-of-buffer)
    )
 
   (ryo-modal-keys
@@ -789,6 +815,8 @@ That is, a string used to represent it on the tab bar."
 
   (ryo-modal-key
    "x" '(
+         ("q" venv-workon)
+         ("w" python-add-breakpoint)
          ("e" eval-last-sexp)
          ("r" helm-recentf)
          ("u" undo-tree-visualize)
