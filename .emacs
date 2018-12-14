@@ -193,7 +193,6 @@
 
 ;; helm
 (use-package helm-config
-  :ensure t
   :config
   (helm-mode 1)
   )
@@ -436,7 +435,6 @@
   :ensure t
   :config
   (elpy-enable)
-  (elpy-use-ipython)
   (setq elpy-rpc-backend "jedi")
   )
 ;; (defun elpy-goto-definition-or-rgrep ()
@@ -696,7 +694,7 @@ That is, a string used to represent it on the tab bar."
   (save-excursion
     (let ((beg (get-point begin-of-thing 1))
           (end (get-point end-of-thing arg)))
-      (copy-region-as-kill beg end))))
+      (cua-copy-region beg end))))
 
 (defun get-point (symbol &optional arg)
   "get the point"
@@ -712,6 +710,20 @@ That is, a string used to represent it on the tab bar."
     )
   )
 
+(defun copy-word (&optional arg)
+  "Copy words at point into kill-ring"
+  (interactive "P")
+  (copy-thing 'backward-word 'forward-word arg)
+  ;;(paste-to-mark arg)
+  )
+
+ (defun copy-backward-word ()
+  "copy word before point - rocky @ stackexchange"
+   (interactive "")
+   (save-excursion
+    (let ((end (point))
+      (beg (get-point 'backward-word 1)))
+      (copy-region-as-kill beg end))))
 
 (defun kill-whole-line-or-region (arg)
   "Kills line or region"
@@ -721,7 +733,6 @@ That is, a string used to represent it on the tab bar."
     (kill-whole-line)
     )
   )
-
 
 (defun mark-forward-paragraph (arg)
   "k-with-region"
@@ -839,6 +850,9 @@ That is, a string used to represent it on the tab bar."
          ("5 0" delete-frame)
          ("5 1" delete-other-frames)
          ("5 2" make-frame-command)
+         ("SPC" rectangle-mark-mode)
+         ("." xref-find-definitions)
+         ("," xref-pop-marker-stack)
          )
    )
   )
