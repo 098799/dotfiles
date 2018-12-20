@@ -18,7 +18,6 @@
 ;;    t)
 ;;   (package-initialize))
 
-;; melpa
 (require 'package)
 (setq package-enable-at-startup nil)
 (setq package-archives '(("melpa" . "http://melpa.milkbox.net/packages/")
@@ -27,7 +26,6 @@
                          ))
 (package-initialize)
 
-;; use-package
 (unless (package-installed-p 'use-package)
   (package-refresh-contents)
   (package-install 'use-package))
@@ -47,7 +45,6 @@
 ;;; VISUALS ;;;
 ;;;;;;;;;;;;;;;
 
-;; bars
 (menu-bar-mode -1)
 (when (fboundp 'tool-bar-mode)
   (tool-bar-mode -1))
@@ -56,28 +53,23 @@
 (when (fboundp 'horizontal-scroll-bar-mode)
   (horizontal-scroll-bar-mode -1))
 
-;; all-the-icons
 (use-package all-the-icons :ensure t)
 
-;; auto-revert
 (global-auto-revert-mode 1)
 
-;; beacon
 (use-package beacon
   :ensure t
   :config
   (beacon-mode 1)
   )
 
-;; fonts
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 102 :width normal :family "Ubuntu Mono")))))
+ '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 130 :width normal :foundry "DAMA" :family "Ubuntu Mono")))))
 
-;; highlight
 (use-package highlight-symbol
   :ensure t
   :bind
@@ -87,16 +79,13 @@
   ("M-<f5>" . highlight-symbol-query-replace)
   )
 
-;; nav-flash
 (use-package nav-flash
   :ensure t
   :config
   (nav-flash-show))
 
-;; theme
 (load-theme 'solarized-dark t)
 
-;; tabbar
 (add-to-list 'load-path "~/.emacs.d/tabbar/")
 (load "tabbar")
 (global-set-key (kbd "<C-tab>") 'tabbar-forward-tab)
@@ -118,80 +107,57 @@
 
 (fset 'yes-or-no-p 'y-or-n-p)
 
-;; ace-window
 (use-package ace-window
   :ensure t)
 
 (use-package avy
   :ensure t)
 
-;; better-defaults
+(use-package avy-zap
+  :ensure t
+  :bind
+  ("M-z" . avy-zap-up-to-char-dwim)
+  )
+
 (use-package better-defaults
   :ensure t)
 
-;; ;; boon
-;; (use-package boon
-;;   :ensure t
-;;   :init
-;;   (require 'boon-qwerty)
-;;   :config
-;;   (boon-mode)
-;;   )
+(use-package centered-cursor-mode
+  :ensure t)
 
-;; comment-dwim-2
+(use-package change-inner
+  :ensure t)
+
 (use-package comment-dwim-2
   :ensure t
   :bind ("C-a" . comment-dwim-2))
 
-;; column-number
 (column-number-mode t)
 
-;; cua
 (cua-mode t)
 
-;; dashboard
-(use-package dashboard
-  :ensure t
-  :config
-  (dashboard-setup-startup-hook))
+;; (use-package dashboard
+;;   :ensure t
+;;   :config
+;;   (dashboard-setup-startup-hook))
 
-;; expand-region
+(use-package dumb-jump
+  :ensure t)
+
 (use-package expand-region
   :ensure t
   :bind ("C-=" . er/expand-region))
 
-;; find-file-in-project
 (use-package find-file-in-project
   :ensure t)
 
-;; ;; god-mode
-;; (use-package god-mode
-;;   :ensure t
-;;   :bind
-;;   ("<escape>" . god-mode-all))
+(use-package git-undo
+  :ensure t)
 
-;; (define-key isearch-mode-map (kbd "<escape>") 'god-mode-isearch-activate)
-;; (define-key god-mode-isearch-map (kbd "<escape>") 'god-mode-isearch-disable)
-
-;; (defun my-update-cursor ()
-;;   (setq cursor-type (if (or god-local-mode buffer-read-only)
-;;                         'box
-;;                       'bar)))
-
-;; (add-hook 'god-mode-enabled-hook 'my-update-cursor)
-;; (add-hook 'god-mode-disabled-hook 'my-update-cursor)
-
-;; (global-set-key (kbd "C-x C-1") 'delete-other-windows)
-;; (global-set-key (kbd "C-x C-2") 'split-window-below)
-;; (global-set-key (kbd "C-x C-3") 'split-window-right)
-;; (global-set-key (kbd "C-x C-0") 'delete-window)
-
-;; goto-last-change  ;; TODO figure it out
 (use-package goto-last-change
   :ensure t
   )
 
-;; helm
 (use-package helm-config
   :config
   (helm-mode 1)
@@ -222,15 +188,12 @@
   ("C-x b" . helm-mini)
   )
 
-;; helm-flycheck
 (use-package helm-flycheck
   :ensure t)
 
-;; helm-projectile
 (use-package helm-projectile
   :ensure t)
 
-;; keyfreq
 (use-package keyfreq
   :ensure t
   :config
@@ -238,14 +201,11 @@
   (keyfreq-autosave-mode 1)
   )
 
-;; line-number
 (line-number-mode t)
 
-;; linum
 (global-linum-mode t)
 (add-hook 'shell-mode-hook (lambda () (linum-mode -1)))
 
-;; org-mode
 (setq org-support-shift-select t)
 ;; (set-default 'truncate-lines t)
 ;; (setq org-latex-pdf-process
@@ -262,12 +222,10 @@
 ;; (setq bibtex-completion-bibliography reftex-default-bibliography)
 ;; (setq bibtex-completion-library-path "~/Documents/Mendeley Desktop/")
 
-;; recentf
 (recentf-mode 1)
 (setq-default recent-save-file "~/.emacs.d/recentf")
 (global-set-key "\C-x\ \C-r" 'helm-recentf)
 
-;; slack
 (use-package slack
   :commands (slack-start)
   :init
@@ -294,7 +252,6 @@
   :init
   (setq alert-default-style 'notifier))
 
-;; spaceline
 (use-package spaceline
   :ensure t
   :config
@@ -307,13 +264,11 @@
   (setq spaceline-highlight-face-func #'spaceline-highlight-face-god-state)
   )
 
-;; swiper
 (use-package swiper
   :ensure t)
 (use-package swiper-helm
   :ensure t)
 
-;; tramp
 (setq tramp-default-method "ssh")
 (use-package helm-tramp
   :ensure t)
@@ -321,17 +276,14 @@
 ;; (add-hook 'helm-tramp-quit-hook '(lambda () (projectile-mode 1)))
 (eval-after-load 'tramp '(setenv "SHELL" "/bin/bash"))
 
-;; transpose-trame
 (use-package transpose-frame
   :ensure t)
 
-;; undo-tree
 (use-package undo-tree
   :ensure t
   :config
   (global-undo-tree-mode))
 
-;; which-key
 (use-package which-key
   :ensure t
   :init
@@ -340,12 +292,10 @@
   :config
   (which-key-mode 1))
 
-;; whitespace-cleanup-mode
 (use-package whitespace-cleanup-mode
   :ensure t
   :config (global-whitespace-cleanup-mode))
 
-;; winner-mode
 (winner-mode 1)
 
 
@@ -391,16 +341,10 @@
 ;;; PYTHON AND PROJECTS ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; ;; auto-complete
-;; (require 'auto-complete)
-;; (global-auto-complete-mode t)
-
-;; blacken
 (use-package blacken
   :ensure t
   )
 
-;; company
 (use-package company
   :ensure t
   :config
@@ -415,14 +359,12 @@
   ;; (company-tng-configure-default)
   )
 
-;; company-jedi
 (use-package company-jedi
   :ensure t)
 (defun my/python-mode-hook ()
   (add-to-list 'company-backends 'company-jedi))
 (add-hook 'python-mode-hook 'my/python-mode-hook)
 
-;; docker
 (use-package docker
   :ensure t
   :bind
@@ -430,7 +372,6 @@
   ("C-c C-d" . docker)
   )
 
-;; elpy
 (use-package elpy
   :ensure t
   :config
@@ -446,7 +387,6 @@
 ;;                 (concat "\\(def\\|class\\)\s" (thing-at-point 'symbol) "(")))))
 ;; (define-key elpy-mode-map (kbd "M-.") 'elpy-goto-definition-or-rgrep)
 
-;; flycheck
 (use-package flycheck
   :ensure t
   :init
@@ -456,7 +396,6 @@
 (eval-after-load 'flycheck
   '(define-key flycheck-mode-map (kbd "C-c ! h") 'helm-flycheck))
 
-;; imenu
 (global-set-key [f9] 'imenu-list-minor-mode)
 
 ;; ;; isort
@@ -477,7 +416,6 @@
    python-environment-directory "~/.virtualenvs")
   )
 
-;; magit
 (use-package magit
   :ensure t
   :bind
@@ -486,20 +424,10 @@
   )
 (setenv "EDITOR" "emacsclient")
 
-;; magit-forge
 (use-package forge
   :ensure t
   )
 
-;; ;; nameframe
-;; (use-package nameframe
-;;   :ensure t)
-;; (use-package nameframe-projectile
-;;   :ensure t
-;;   :config
-;;   (nameframe-projectile-mode t))
-
-;; neotree projectile
 (use-package neotree
   :ensure t
   :init
@@ -519,7 +447,6 @@
   )
 (global-set-key [f8] 'neotree-project-dir)
 
-;; projectile
 (use-package projectile
   :ensure t
   :init
@@ -554,7 +481,6 @@
   ("C-c p S" . projectile-save-project-buffers)
   )
 
-;; python debugging
 (defun python-add-breakpoint ()
   "Adding a breakpoint to a python code."
   (interactive)
@@ -564,14 +490,12 @@
   (highlight-lines-matching-regexp "^[ ]*import ipdb; ipdb.set_trace()"))
 (define-key global-map (kbd "C-c C-w") 'python-add-breakpoint)
 
-;; python pytest
 (use-package python-pytest
   :bind
   ("C-c a" . python-pytest-repeat)
   ("C-c C-a" . python-pytest-popup)
   )
 
-;; virtualevn + wrapper
 (use-package virtualenvwrapper
   :ensure t)
 (venv-initialize-interactive-shells)
@@ -591,21 +515,17 @@
 ;; Other Languages ;;;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-;; CSV
 (use-package csv-mode
   :ensure t
   :mode "\\.csv\\'")
 
-;; Dockerfile
 (use-package dockerfile-mode
   :ensure t
   :mode "\\Dockerfile\\'")
 
-;; Elisp
 (with-eval-after-load 'flycheck
   (setq-default flycheck-disabled-checkers '(emacs-lisp-checkdoc)))
 
-;; HTML
 (use-package web-mode
   :ensure t
   :mode ("\\.html\\'" "\\.jinja\\'")
@@ -613,19 +533,16 @@
                 web-mode-code-indent-offset 2)
   )
 
-;; Markdown
 (use-package markdown-mode
   :ensure t)
 
 (use-package markdown-mode+
   :ensure t)
 
-;; rst
 (use-package auto-complete-rst
   :ensure t
   )
 
-;; yaml
 (use-package yaml-mode
   :ensure t
   :config
@@ -748,7 +665,6 @@ That is, a string used to represent it on the tab bar."
   )
 
 
-;; RYOMODEEEE
 (use-package ryo-modal
   :commands ryo-modal-mode
   :bind ("<escape>" . ryo-modal-mode)
@@ -842,7 +758,9 @@ That is, a string used to represent it on the tab bar."
          ("r" helm-recentf)
          ("t" elpy-multiedit-python-symbol-at-point)
          ("u" undo-tree-visualize)
-         ("o" vi-open-line-below)
+         ("i" change-inner)
+         ("o" change-outer)
+         ("a" goto-last-change)
          ("s" save-buffer)
          ("d" dired)
          ("f" helm-find-files)
@@ -862,6 +780,8 @@ That is, a string used to represent it on the tab bar."
          ("5 1" delete-other-frames)
          ("5 2" make-frame-command)
          ("SPC" rectangle-mark-mode)
+         ("/" dumb-jump-go)
+         ("?" dumb-jump-back)
          ("." xref-find-definitions)
          ("," xref-pop-marker-stack)
          )
