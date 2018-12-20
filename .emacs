@@ -486,6 +486,11 @@
   )
 (setenv "EDITOR" "emacsclient")
 
+;; magit-forge
+(use-package forge
+  :ensure t
+  )
+
 ;; ;; nameframe
 ;; (use-package nameframe
 ;;   :ensure t)
@@ -779,15 +784,20 @@ That is, a string used to represent it on the tab bar."
    ("w" backward-kill-word)
    ("e" highlight-symbol-next)
    ("r" avy-goto-char-2)
+   ("t" vi-open-line-below)
    ("a" comment-dwim-2)
    ("s" swiper)
    ("d" kill-whole-line-or-region)
    ("f" recenter-top-bottom)
    ("g" keyboard-quit)
+   ("h" back-to-indentation)
    ("z" undo-tree-undo)
    ("c" copy-line-or-region)
    ("v" cua-paste)
+   ("!" helm-flycheck)
+   ("-" mark-paragraph)
    ("=" er/expand-region)
+   ("+" delete-horizontal-space)
    ("SPC" cua-set-mark)
    ("<" beginning-of-buffer)
    (">" end-of-buffer)
@@ -809,9 +819,9 @@ That is, a string used to represent it on the tab bar."
 
   (ryo-modal-key
    "["'(
-        ("s s" helm-projectile-ag)
-        ("s g" helm-projectile-grep)
-        ("s r" projectile-ripgrep)
+        ("s" helm-projectile-ag)
+        ("g" helm-projectile-grep)
+        ("R" projectile-ripgrep)
         ("p" helm-projectile-switch-project)
         ("h" helm-projectile)
         ("S" projectile-save-project-buffers)
@@ -830,6 +840,7 @@ That is, a string used to represent it on the tab bar."
          ("w" python-add-breakpoint)
          ("e" eval-last-sexp)
          ("r" helm-recentf)
+         ("t" elpy-multiedit-python-symbol-at-point)
          ("u" undo-tree-visualize)
          ("o" vi-open-line-below)
          ("s" save-buffer)
