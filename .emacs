@@ -637,7 +637,7 @@ That is, a string used to represent it on the tab bar."
   (save-excursion
     (move-beginning-of-line arg)
     (cua-set-mark)
-    (next-line)
+    (forward-line)
     (cua-copy-region arg)
     )
   )
@@ -662,14 +662,12 @@ That is, a string used to represent it on the tab bar."
     )
   )
 
-(defun mark-forward-paragraph (arg)
-  "k-with-region"
+(defun paste-in-new-line (arg)
+  "Pasting for full line edits"
   (interactive "P")
-  (if (region-active-n)
-      (cua-set-mark))
-    (forward-paragraph)
+  (move-beginning-of-line arg)
+  (cua-paste arg)
   )
-
 
 (use-package ryo-modal
   :commands ryo-modal-mode
@@ -684,21 +682,22 @@ That is, a string used to represent it on the tab bar."
   (ryo-modal-keys
    ;; ("," ryo-modal-repeat)
    ;; ("q" ryo-modal-mode)
+   ("U" move-beginning-of-line)
    ("u" backward-char)
    ("i" next-line)
    ("o" previous-line)
    ("p" forward-char)
+   ("P" move-end-of-line)
    ("j" left-word)
+   ("J" move-beginning-of-line)
    ("k" forward-paragraph)
-   ("K" mark-forward-paragraph)
    ("l" backward-paragraph)
    (";" right-word)
+   (":" move-end-of-line)
    ("m" move-beginning-of-line)
-   ("U" move-beginning-of-line)
    ("," cua-scroll-up)
    ("." cua-scroll-down)
    ("/" move-end-of-line)
-   ("P" move-end-of-line)
    )
 
   (ryo-modal-keys
@@ -707,6 +706,7 @@ That is, a string used to represent it on the tab bar."
    ("w" backward-kill-word)
    ("W" my-backward-copy-word)
    ("e" highlight-symbol-next)
+   ("E" highlight-symbol-prev)
    ("r" avy-goto-char-2)
    ("t" vi-open-line-below)
    ("a" comment-dwim-2)
@@ -719,6 +719,7 @@ That is, a string used to represent it on the tab bar."
    ("z" undo-tree-undo)
    ("c" copy-whole-line-or-region)
    ("v" cua-paste)
+   ("V" paste-in-new-line)
    ("!" helm-flycheck)
    ("-" mark-paragraph)
    ("=" er/expand-region)
