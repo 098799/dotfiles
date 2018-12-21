@@ -611,41 +611,47 @@ That is, a string used to represent it on the tab bar."
 
 (tabbar-mode 1)
 
-(defun copy-thing (begin-of-thing end-of-thing &optional arg)
-  "Copy thing between beg & end into kill ring."
-  (save-excursion
-    (let ((beg (get-point begin-of-thing 1))
-          (end (get-point end-of-thing arg)))
-      (cua-copy-region beg end))))
 
-(defun get-point (symbol &optional arg)
-  "get the point"
-  (funcall symbol arg)
-  (point))
 
-(defun copy-line-or-region (arg)
-  "Copy line or region"
+(defun my-copy-word (arg)
   (interactive "P")
-  (if (region-active-p)
-      (cua-copy-region arg)
-    (copy-thing 'beginning-of-line 'end-of-line arg)
+  (save-excursion
+    (cua-set-mark)
+    (right-word)
+    (cua-copy-region arg)
     )
   )
 
-(defun copy-word (&optional arg)
-  "Copy words at point into kill-ring"
+(defun my-backward-copy-word (arg)
   (interactive "P")
-  (copy-thing 'backward-word 'forward-word arg)
-  ;;(paste-to-mark arg)
+  (save-excursion
+    (cua-set-mark)
+    (left-word)
+    (cua-copy-region arg)
+    )
   )
 
- (defun copy-backward-word ()
-  "copy word before point - rocky @ stackexchange"
-   (interactive "")
-   (save-excursion
-    (let ((end (point))
-      (beg (get-point 'backward-word 1)))
-      (copy-region-as-kill beg end))))
+(defun copy-whole-line (arg)
+  "Copy whole line"
+  (interactive "P")
+  (save-excursion
+    (move-beginning-of-line arg)
+    (cua-set-mark)
+    (next-line)
+    (cua-copy-region arg)
+    )
+  )
+
+(defun copy-whole-line-or-region (arg)
+  "Copy line or region"
+  (interactive "P")
+  (save-excursion
+    (if (region-active-p)
+        (cua-copy-region arg)
+      (copy-whole-line arg)
+      )
+    )
+   )
 
 (defun kill-whole-line-or-region (arg)
   "Kills line or region"
@@ -697,18 +703,21 @@ That is, a string used to represent it on the tab bar."
 
   (ryo-modal-keys
    ("q" kill-word)
+   ("Q" my-copy-word)
    ("w" backward-kill-word)
+   ("W" my-backward-copy-word)
    ("e" highlight-symbol-next)
    ("r" avy-goto-char-2)
    ("t" vi-open-line-below)
    ("a" comment-dwim-2)
    ("s" swiper)
    ("d" kill-whole-line-or-region)
+   ("D" copy-whole-line-or-region)
    ("f" recenter-top-bottom)
    ("g" keyboard-quit)
    ("h" back-to-indentation)
    ("z" undo-tree-undo)
-   ("c" copy-line-or-region)
+   ("c" copy-whole-line-or-region)
    ("v" cua-paste)
    ("!" helm-flycheck)
    ("-" mark-paragraph)
