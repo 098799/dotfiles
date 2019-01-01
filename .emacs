@@ -96,6 +96,14 @@
 ;;; GENERAL ;;;
 ;;;;;;;;;;;;;;;
 
+(defun vi-open-line-above ()
+  "Insert a newline above the current line and put point at beginning."
+  (interactive)
+  (forward-line)
+  (unless (eolp)
+    (end-of-line))
+  (newline-and-indent))
+
 (defun vi-open-line-below ()
   "Insert a newline below the current line and put point at beginning."
   (interactive)
@@ -691,12 +699,16 @@ That is, a string used to represent it on the tab bar."
    ("j" left-word)
    ("J" move-beginning-of-line)
    ("k" forward-paragraph)
+   ("K" cua-scroll-up)
    ("l" backward-paragraph)
+   ("L" cua-scroll-down)
    (";" right-word)
    (":" move-end-of-line)
    ("m" move-beginning-of-line)
-   ("," cua-scroll-up)
-   ("." cua-scroll-down)
+   ("." xref-find-definitions)
+   ("," xref-pop-marker-stack)
+   ;; ("," cua-scroll-up)
+   ;; ("." cua-scroll-down)
    ("/" move-end-of-line)
    )
 
@@ -709,6 +721,7 @@ That is, a string used to represent it on the tab bar."
    ("E" highlight-symbol-prev)
    ("r" avy-goto-char-2)
    ("t" vi-open-line-below)
+   ("T" vi-open-line-above)
    ("a" comment-dwim-2)
    ("s" swiper)
    ("d" kill-whole-line-or-region)
@@ -792,8 +805,6 @@ That is, a string used to represent it on the tab bar."
          ("SPC" rectangle-mark-mode)
          ("/" dumb-jump-go)
          ("?" dumb-jump-back)
-         ("." xref-find-definitions)
-         ("," xref-pop-marker-stack)
          )
    )
   )
