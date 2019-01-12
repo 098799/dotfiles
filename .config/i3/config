@@ -79,7 +79,7 @@ bindsym $mod+e layout toggle split
 bindsym $mod+t floating toggle
 
 # was $mod1+w
-bindsym $mod+d exec rofi -show run -lines 6 -eh 1 -width 60 -padding 405 -bw 0 -font "Ubuntu 25"
+bindsym $mod+d exec rofi -show run -lines 6 -font "Ubuntu 25"  # -eh 1 -width 60 -padding 405 -bw 0
 # was $mod1+d
 bindsym $mod+z exec gnome-terminal
 # was $mod1+s
@@ -87,8 +87,7 @@ bindsym $mod+s exec google-chrome-stable
 # was $mod1+r
 bindsym $mod+x exec emacsclient -c
 # was $mod1+q
-bindsym $mod+q exec thunar  #nemo --no-desktop
-# bindsym $mod1+a exec ~/.emacs_anywhere/bin/run
+bindsym $mod+q exec nemo --no-desktop
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle
@@ -192,8 +191,10 @@ bindsym $mod1+Control+Right workspace next
 bindsym $mod1+Control+Left workspace prev
 
 exec emacs --daemon
+# exec --no-startup-id /usr/lib/gnome-settings-daemon/gsd-xsettings
 # exec gnome-settings-daemon
 # exec gnome-keyring-daemon
+exec --no-startup-id nm-tray
 
 exec dropbox start
 
@@ -216,4 +217,4 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 ### Nasty hack
 exec dbus-update-activation-environment --all
 
-exec setxkbmap -layout pl -option caps:escape
+exec_always --no-startup-id setxkbmap -layout pl -option caps:escape

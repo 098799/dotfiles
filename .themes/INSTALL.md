@@ -1,2 +1,3 @@
 # Theme directory
 * Currently using: Numix solarized from https://github.com/oberon2007/gtk-theme-numix-solarized. Doesn't seem updated often, so prepare for it going down...
+* This one seems also good: https://github.com/schemar/solarc-theme
