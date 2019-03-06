@@ -7,16 +7,20 @@ export ZSH="$HOME/.oh-my-zsh"
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
-#ZSH_THEME="robbyrussell"
-#ZSH_THEME="mod-agnoster"
+# ZSH_THEME="robbyrussell"
+# ZSH_THEME="mod-agnoster"
 ZSH_THEME="powerlevel9k/powerlevel9k"
-POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv context dir vcs)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status time battery)
-POWERLEVEL9K_BATTERY_STAGES=($'\u2581' $'\u2582' $'\u2583' $'\u2584' $'\u2585' $'\u2586' $'\u2587' $'\u2588')
-POWERLEVEL9K_PROMPT_ON_NEWLINE=true
-POWERLEVEL9K_TIME_FORMAT='%D{%H:%M}'
+# POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv context dir vcs)
+POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv vcs dir)
+# POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status time battery)
+POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=()
+# POWERLEVEL9K_BATTERY_STAGES=($'\u2581' $'\u2582' $'\u2583' $'\u2584' $'\u2585' $'\u2586' $'\u2587' $'\u2588')
+# POWERLEVEL9K_PROMPT_ON_NEWLINE=true
+POWERLEVEL9K_PROMPT_ON_NEWLINE=false
+# POWERLEVEL9K_TIME_FORMAT='%D{%H:%M}'
 
 export WORKON_HOME="$HOME/.virtualenvs"
+DISABLE_UPDATE_PROMPT=true
 
 # Set list of themes to load
 # Setting this variable when ZSH_THEME=random
@@ -111,7 +115,7 @@ source $ZSH/oh-my-zsh.sh
 
 [ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
 
-source /usr/bin/virtualenvwrapper.sh
+source /usr/local/bin/virtualenvwrapper.sh
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
 export PYTHONPATH="${PYTHONPATH}:$HOME"
 export VIRTUALENVWRAPPER_PYTHON=`which python3`
@@ -125,10 +129,11 @@ alias e="emacsclient -t"
 alias ee="emacsclient -c"
 export EDITOR="emacsclient -t"
 export VISUAL="emacsclient -t"
+bindkey -e
 alias cal='ncal -M -b -3'
 alias sl='ls' #no trains for me
 alias LS='ls'
-alias pyt='pytest -s -x -k ""'
+alias pyt='pytest -nauto -sxk ""'
 alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | rev`'
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
@@ -141,8 +146,11 @@ alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`;
 alias pip_install='pip install -r requirements/flake8.txt --pre'
 alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
 alias pip_r='pip_uninstall && pip_install'
+# alias flake8='flake8 --ignore=D100,D101,D102,D103,D107'
 
 export PATH_TO_HTML=/tmp
+export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
+export RP_REDIS_HOST=redis.dev.redpoints.com
 
 cd `pwd`
 
