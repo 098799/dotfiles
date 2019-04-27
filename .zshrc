@@ -118,7 +118,7 @@ source $ZSH/oh-my-zsh.sh
 source /usr/local/bin/virtualenvwrapper.sh
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
 export PYTHONPATH="${PYTHONPATH}:$HOME"
-export VIRTUALENVWRAPPER_PYTHON=`which python3`
+export VIRTUALENVWRAPPER_PYTHON=`which python3.7`
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
 alias cd..='cd ..'
@@ -134,7 +134,7 @@ alias cal='ncal -M -b -3'
 alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -nauto -sxk ""'
-alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
+alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3.7 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | rev`'
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
@@ -147,6 +147,9 @@ alias pip_install='pip install -r requirements/flake8.txt --pre'
 alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
 alias pip_r='pip_uninstall && pip_install'
 # alias flake8='flake8 --ignore=D100,D101,D102,D103,D107'
+export PYTHONBREAKPOINT=ipdb.set_trace
+alias localtestutils='pip uninstall crwtestutils -y && pip install -e ../crwtestutils'
+alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
 
 export PATH_TO_HTML=/tmp
 export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
