@@ -118,7 +118,7 @@ source $ZSH/oh-my-zsh.sh
 source /usr/local/bin/virtualenvwrapper.sh
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
 export PYTHONPATH="${PYTHONPATH}:$HOME"
-export VIRTUALENVWRAPPER_PYTHON=`which python3.7`
+export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3.7
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
 alias cd..='cd ..'
@@ -153,7 +153,7 @@ alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
 
 export PATH_TO_HTML=/tmp
 export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
-export RP_REDIS_HOST=redis.dev.redpoints.com
+# export RP_REDIS_HOST=redis.dev.redpoints.com
 
 cd `pwd`
 

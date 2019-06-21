@@ -28,6 +28,27 @@ font pango:Ubuntu Mono 10
 # X core fonts rendering does not support right-to-left and this being a bitmap
 # font, it doesn’t scale on retina/hidpi displays.
 
+bar {
+    status_command i3status --config ~/.config/i3status/config
+    # mode hide
+    position top
+    font -misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1
+    font pango:Ubuntu 12
+    strip_workspace_numbers yes
+    separator_symbol "  |  "
+    colors {
+        background #073642
+        statusline #fdf6e3
+        separator #859900
+
+        focused_workspace  #859900 #859900 #fdf6e3
+        active_workspace   #073642 #073642 #fdf6e3
+        inactive_workspace #073642 #073642 #fdf6e3
+        urgent_workspace   #d33682 #d33682 #fdf6e3
+        binding_mode       #d33682 #d33682 #fdf6e3
+    }
+}
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
@@ -75,19 +96,23 @@ bindsym $mod+c split v
 bindsym $mod+a fullscreen toggle
 bindsym $mod+f split v; layout tabbed
 bindsym $mod+w layout tabbed
+bindsym $mod+g layout stacked
 bindsym $mod+e layout toggle split
 bindsym $mod+t floating toggle
 
 # was $mod1+w
 bindsym $mod+d exec rofi -show run -lines 6 -font "Ubuntu 25"  # -eh 1 -width 60 -padding 405 -bw 0
 # was $mod1+d
-bindsym $mod+z exec gnome-terminal
+bindsym $mod+z exec termite
 # was $mod1+s
 bindsym $mod+s exec google-chrome-stable
 # was $mod1+r
 bindsym $mod+x exec emacsclient -c
 # was $mod1+q
 bindsym $mod+q exec nemo --no-desktop
+
+bindsym $mod1+z exec emacsclient -c --eval '(eshell)'
+
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle
@@ -101,54 +126,54 @@ bindsym $mod+space focus mode_toggle
 # focus the child container
 #bindsym $mod+d focus child
 
+set $big_monitor HDMI-1
+set $laptop_monitor eDP-1
+set $small_monitor DP-2-2-2
+# set_from_resource $small_monitor xrandr | grep " connected" | grep "^DP-" | cut -d" " -f1
+
 #my monitor binding
-workspace 1 output HDMI-1
-workspace 2 output HDMI-1
-workspace 3 output HDMI-1
-workspace 4 output HDMI-1
-workspace 5 output HDMI-1
-workspace 6 output eDP-1
-workspace 7 output eDP-1
-workspace 8 output DP-2-2-2
-workspace 9 output DP-2-2-2
-workspace 10 output DP-2-2-2
-workspace 11 output DP-2-2-2
-workspace 12 output DP-2-2-2
-workspace 13 output DP-2-2-2
+workspace 1 output $big_monitor
+workspace 2 output $big_monitor
+workspace 3 output $big_monitor
+workspace 4 output $big_monitor
+workspace 5 output $big_monitor
+workspace 6 output $small_monitor
+workspace 7 output $small_monitor
+workspace 8 output $small_monitor
+workspace 9 output $small_monitor
+workspace 10 output $small_monitor
+workspace 11:laptop output $laptop_monitor
 
 # switch to workspace
-bindsym $mod+1 workspace 1, focus output HDMI-1
-bindsym $mod+2 workspace 2, focus output HDMI-1
-bindsym $mod+3 workspace 3, focus output HDMI-1
-bindsym $mod+4 workspace 4, focus output HDMI-1
-bindsym $mod+5 workspace 5, focus output HDMI-1
-bindsym $mod+6 workspace 6, focus output eDP-1
-bindsym $mod+7 workspace 7, focus output eDP-1
-bindsym $mod+8 workspace 8, focus output DP-2-2-2
-bindsym $mod+9 workspace 9, focus output DP-2-2-2
-bindsym $mod+0 workspace 10, focus output DP-2-2-2
-bindsym $mod+p workspace 11, focus output DP-2-2-2
-bindsym $mod+o workspace 12, focus output DP-2-2-2
-bindsym $mod+i workspace 13, focus output DP-2-2-2
+bindsym $mod+1 workspace 1, focus output $big_monitor
+bindsym $mod+2 workspace 2, focus output $big_monitor
+bindsym $mod+3 workspace 3, focus output $big_monitor
+bindsym $mod+4 workspace 4, focus output $big_monitor
+bindsym $mod+5 workspace 5, focus output $big_monitor
+bindsym $mod+6 workspace 6, focus output $small_monitor
+bindsym $mod+7 workspace 7, focus output $small_monitor
+bindsym $mod+8 workspace 8, focus output $small_monitor
+bindsym $mod+9 workspace 9, focus output $small_monitor
+bindsym $mod+0 workspace 10, focus output $small_monitor
+bindsym $mod+p workspace , focus output $laptop_monitor
 
 # move focused container to workspace
-bindsym $mod+Shift+1 move container to workspace 1
-bindsym $mod+Shift+2 move container to workspace 2
-bindsym $mod+Shift+3 move container to workspace 3
-bindsym $mod+Shift+4 move container to workspace 4
-bindsym $mod+Shift+5 move container to workspace 5
-bindsym $mod+Shift+6 move container to workspace 6
-bindsym $mod+Shift+7 move container to workspace 7
-bindsym $mod+Shift+8 move container to workspace 8
-bindsym $mod+Shift+9 move container to workspace 9
-bindsym $mod+Shift+0 move container to workspace 10
-bindsym $mod+Shift+p move container to workspace 11
-bindsym $mod+Shift+o move container to workspace 12
-bindsym $mod+Shift+i move container to workspace 13
+bindsym $mod+Shift+1 move container to workspace 1
+bindsym $mod+Shift+2 move container to workspace 2
+bindsym $mod+Shift+3 move container to workspace 3
+bindsym $mod+Shift+4 move container to workspace 4
+bindsym $mod+Shift+5 move container to workspace 5
+bindsym $mod+Shift+6 move container to workspace 6
+bindsym $mod+Shift+7 move container to workspace 7
+bindsym $mod+Shift+8 move container to workspace 8
+bindsym $mod+Shift+9 move container to workspace 9
+bindsym $mod+Shift+0 move container to workspace 10
+bindsym $mod+Shift+p move container to workspace 
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
 # restart i3 inplace (preserves your layout/session, can be used to upgrade i3)
+bindsym $mod+Shift+w exec ./config/i3/create_config.sh
 bindsym $mod+Shift+r restart
 # exit i3 (logs you out of your X session)
 bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -b 'Yes, exit i3' 'i3-msg exit'"
@@ -167,7 +192,7 @@ mode "resize" {
         bindsym Escape mode "default"
 }
 
-exec_always --no-startup-id $HOME/.config/polybar/launch.sh
+# exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
 #exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
 
@@ -227,3 +252,4 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 exec dbus-update-activation-environment --all
 
 exec_always --no-startup-id setxkbmap -layout pl -option caps:escape
+exec_always --no-startup-id xmodmap -e "keycode 135 = Super_L"
