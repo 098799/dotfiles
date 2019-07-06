@@ -150,6 +150,7 @@ alias pip_r='pip_uninstall && pip_install'
 export PYTHONBREAKPOINT=ipdb.set_trace
 alias localtestutils='pip uninstall crwtestutils -y && pip install -e ../crwtestutils'
 alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
+alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
 
 export PATH_TO_HTML=/tmp
 export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
