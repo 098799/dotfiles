@@ -49,6 +49,11 @@ bar {
     }
 }
 
+# client.focused #859900 #859900 #fdf6e3 #6c71c4
+# client.focused_inactive #073642 #073642 #eee8d5 #6c71c4
+# client.unfocused #073642 #073642 #93a1a1 #586e75
+# client.urgent #d33682 #d33682 #fdf6e3 #dc322f
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
@@ -126,49 +131,55 @@ bindsym $mod+space focus mode_toggle
 # focus the child container
 #bindsym $mod+d focus child
 
+exec_always --no-startup-id ~/.config/i3/create_config.sh
+
 set $big_monitor HDMI-1
 set $laptop_monitor eDP-1
 set $small_monitor DP-2-2-2
+
+exec_always --no-startup-id ~/.config/i3/layout.sh
+
 # set_from_resource $small_monitor xrandr | grep " connected" | grep "^DP-" | cut -d" " -f1
 
 #my monitor binding
-workspace 1 output $big_monitor
-workspace 2 output $big_monitor
-workspace 3 output $big_monitor
-workspace 4 output $big_monitor
-workspace 5 output $big_monitor
-workspace 6 output $small_monitor
-workspace 7 output $small_monitor
-workspace 8 output $small_monitor
-workspace 9 output $small_monitor
-workspace 10 output $small_monitor
-workspace 11:laptop output $laptop_monitor
+workspace 1 output $big_monitor
+workspace 2 output $big_monitor
+workspace 3 output $big_monitor
+workspace 4 output $big_monitor
+workspace 5 output $big_monitor
+workspace 6 output $small_monitor
+workspace 7 output $small_monitor
+workspace 8 output $small_monitor
+workspace 9 output $small_monitor
+workspace 10 output $small_monitor
+workspace 11 output $laptop_monitor
 
 # switch to workspace
 bindsym $mod+1 workspace 1, focus output $big_monitor
-bindsym $mod+2 workspace 2, focus output $big_monitor
-bindsym $mod+3 workspace 3, focus output $big_monitor
+bindsym $mod+2 workspace 2, focus output $big_monitor
+bindsym $mod+3 workspace 3, focus output $big_monitor
 bindsym $mod+4 workspace 4, focus output $big_monitor
-bindsym $mod+5 workspace 5, focus output $big_monitor
+bindsym $mod+5 workspace 5, focus output $big_monitor
 bindsym $mod+6 workspace 6, focus output $small_monitor
 bindsym $mod+7 workspace 7, focus output $small_monitor
 bindsym $mod+8 workspace 8, focus output $small_monitor
 bindsym $mod+9 workspace 9, focus output $small_monitor
 bindsym $mod+0 workspace 10, focus output $small_monitor
-bindsym $mod+p workspace , focus output $laptop_monitor
+bindsym $mod+p workspace 11, focus output $laptop_monitor
+bindsym $mod+Tab workspace back_and_forth
 
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace 1
-bindsym $mod+Shift+2 move container to workspace 2
-bindsym $mod+Shift+3 move container to workspace 3
+bindsym $mod+Shift+2 move container to workspace 2
+bindsym $mod+Shift+3 move container to workspace 3
 bindsym $mod+Shift+4 move container to workspace 4
-bindsym $mod+Shift+5 move container to workspace 5
+bindsym $mod+Shift+5 move container to workspace 5
 bindsym $mod+Shift+6 move container to workspace 6
 bindsym $mod+Shift+7 move container to workspace 7
 bindsym $mod+Shift+8 move container to workspace 8
 bindsym $mod+Shift+9 move container to workspace 9
 bindsym $mod+Shift+0 move container to workspace 10
-bindsym $mod+Shift+p move container to workspace 
+bindsym $mod+Shift+p move container to workspace 11
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
