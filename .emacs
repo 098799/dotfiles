@@ -26,19 +26,24 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(awesome-tab-background-color "black")
- '(awesome-tab-mode t nil (awesome-tab))
  '(package-selected-packages
    (quote
-    (cheat-sh ibuffer-projectile ivy-youtube ivy-pass ivy-hydra string-inflection persistent-scratch company-restclient restclient-helm linum-relative fancy-battery telephone-line all-the-icons-dired spaceline-all-the-icons pyenv-mode git-undo company-quickhelp centered-cursor-mode centered-window prettify-greek switch-buffer-functions fm-bookmarks bookmark+ dired-toggle projectile-direnv direnv curl-for-url elfeed-web elfeed-org elfeed auto-virtualenv auto-virtualenvwrapper dired dired+ dired-+ dired-imenu slack py-isort eglot company-lsp lsp-python lsp-ui lsp-mode realgud py-test python-pytest python-test pytest smartparens smartparens-config smartparents-config smart-newline smartscan visual-regexp wgrep-helm wgrep helm-tramp helm-ag ryo-modal jedi yaml-mode auto-complete-rst markdown-mode+ web-mode dockerfile-mode csv-mode virtualenvwrapper neotree forge magit elpy docker company-jedi company blacken whitespace-cleanup-mode which-key undo-tree transpose-frame swiper-helm swiper spaceline keyfreq helm-projectile helm-flycheck goto-last-change find-file-in-project dumb-jump comment-dwim-2 change-inner better-defaults avy-zap ace-window use-package solarized-theme nav-flash highlight-symbol beacon auto-package-update all-the-icons)))
- '(python-pytest-arguments (quote ("--color" "--capture=no" "--verbose" "-kMonitor")))
- '(spaceline-all-the-icons-file-name-highlight t))
+    (centaur-tabs eshell-toggle ivy-rich pip-requirements helm-smex smex ace-mc multiple-cursors key-chord rainbow-delimiters doom-modeline docker-compose-mode straight company-lsp lsp-ui lsp-mode json-mode with-editor company-prescient ivy-prescient prescient company 2048-game ivy-historian spaceline-all-the-icons elfeed helm helm-swoop helm-rg counsel-tramp counsel-projectile all-the-icons-ivy counsel string-inflection flycheck modalka slack helm-navi navi-mode yaml-mode whitespace-cleanup-mode which-key web-mode use-package undo-tree transpose-frame swiper-helm spaceline solarized-theme ryo-modal py-isort persp-projectile neotree nav-flash nameframe-projectile nameframe-perspective markdown-mode+ keyfreq jedi ht highlight-symbol helm-tramp helm-projectile helm-flycheck helm-ag goto-last-change god-mode forge eyebrowse elpy dumb-jump dockerfile-mode docker discover dashboard csv-mode company-jedi comment-dwim-2 change-inner centered-cursor-mode boon blacken better-defaults beacon avy-zap auto-virtualenvwrapper auto-package-update auto-complete-rst all-the-icons ace-window))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(default ((t (:inherit nil :stipple nil :background "#002b36" :foreground "#839496" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 106 :width normal :family "Ubuntu Mono"))))
- '(awesome-tab-default ((t (:background "#002B36" :foreground "#eee8d5"))))
- '(awesome-tab-selected ((t (:background "#859900" :foreground "#eee8d5"))))
- '(awesome-tab-unselected ((t (:background "#002B36" :foreground "#eee8d5")))))
+ '(awesome-tab-selected ((t (:background "#073642" :foreground "white"))))
+ '(awesome-tab-unselected ((t (:background "#073642" :foreground "grey50"))))
+ '(centaur-tabs-default ((t (:background "#002B36" :foreground "#073642"))))
+ '(centaur-tabs-selected ((t (:background "#073642" :foreground "#859900"))))
+ '(centaur-tabs-selected-modified ((t (:background "#073642" :foreground "#859900"))))
+ '(centaur-tabs-unselected ((t (:background "#073642" :foreground "#eee8d5"))))
+ '(centaur-tabs-unselected-modified ((t (:background "#073642" :foreground "#eee8d5"))))
+ '(tabbar-default ((t (:background "#073642" :foreground "#073642"))))
+ '(tabbar-unselected ((t (:inherit tabbar-default :background "#073642" :box (:line-width 1 :color "#073642") :underline nil :slant italic)))))
+
+
+(load-theme 'solarized-dark t)
