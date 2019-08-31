@@ -150,7 +150,11 @@ alias pip_r='pip_uninstall && pip_install'
 export PYTHONBREAKPOINT=ipdb.set_trace
 alias localtestutils='pip uninstall crwtestutils -y && pip install -e ../crwtestutils'
 alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
-alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
+alias localamazon='pip uninstall crwamazoncommon -y && pip install -e ../crwamazoncommon'
+alias localebay='pip uninstall crwebaycommon -y && pip install -e ../crwebaycommon'
+# alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
+alias maintenance_test='python $HOME/rptools/rptools/monitor_test_helper.py'
+alias maintenance_run='python $HOME/rptools/rptools/monitor_test_runner.py'
 
 export PATH_TO_HTML=/tmp
 export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com

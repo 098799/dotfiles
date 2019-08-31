@@ -9,6 +9,7 @@
 (load "~/.emacs.conf/secrets.el" t)
 (load "~/.emacs.conf/elisp.el" t)
 (load "~/.emacs.conf/general.el" t)
+(load "~/.emacs.conf/macros.el" t)
 
 
 
