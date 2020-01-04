@@ -9,6 +9,7 @@
 (load "~/.emacs.conf/secrets.el" t)
 (load "~/.emacs.conf/elisp.el" t)
 (load "~/.emacs.conf/general.el" t)
+(load "~/.emacs.conf/elisp_after_general.el" t)
 (load "~/.emacs.conf/macros.el" t)
 
 
@@ -29,7 +30,9 @@
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    (quote
-    (centaur-tabs eshell-toggle ivy-rich pip-requirements helm-smex smex ace-mc multiple-cursors key-chord rainbow-delimiters doom-modeline docker-compose-mode straight company-lsp lsp-ui lsp-mode json-mode with-editor company-prescient ivy-prescient prescient company 2048-game ivy-historian spaceline-all-the-icons elfeed helm helm-swoop helm-rg counsel-tramp counsel-projectile all-the-icons-ivy counsel string-inflection flycheck modalka slack helm-navi navi-mode yaml-mode whitespace-cleanup-mode which-key web-mode use-package undo-tree transpose-frame swiper-helm spaceline solarized-theme ryo-modal py-isort persp-projectile neotree nav-flash nameframe-projectile nameframe-perspective markdown-mode+ keyfreq jedi ht highlight-symbol helm-tramp helm-projectile helm-flycheck helm-ag goto-last-change god-mode forge eyebrowse elpy dumb-jump dockerfile-mode docker discover dashboard csv-mode company-jedi comment-dwim-2 change-inner centered-cursor-mode boon blacken better-defaults beacon avy-zap auto-virtualenvwrapper auto-package-update auto-complete-rst all-the-icons ace-window))))
+    (amx amex company-posframe helm-posframe ivy-posframe markdown-mode uml-mode vterm docker-tramp hy-mode default-text-scale lsp-python-ms python-pytest gif-screencast ipython python-black centaur-tabs eshell-toggle ivy-rich pip-requirements helm-smex smex ace-mc multiple-cursors key-chord rainbow-delimiters doom-modeline docker-compose-mode straight company-lsp lsp-ui lsp-mode json-mode with-editor company-prescient ivy-prescient prescient company 2048-game ivy-historian spaceline-all-the-icons elfeed helm helm-swoop helm-rg counsel-tramp counsel-projectile all-the-icons-ivy counsel string-inflection flycheck modalka slack helm-navi navi-mode yaml-mode whitespace-cleanup-mode which-key web-mode use-package undo-tree transpose-frame swiper-helm spaceline solarized-theme ryo-modal py-isort persp-projectile neotree nav-flash nameframe-projectile nameframe-perspective markdown-mode+ keyfreq jedi ht highlight-symbol helm-tramp helm-projectile helm-flycheck helm-ag goto-last-change god-mode forge eyebrowse elpy dumb-jump dockerfile-mode docker discover dashboard csv-mode company-jedi comment-dwim-2 change-inner centered-cursor-mode boon blacken better-defaults beacon avy-zap auto-virtualenvwrapper auto-package-update auto-complete-rst all-the-icons ace-window)))
+ '(python-pytest-arguments (quote ("--capture=no" "--exitfirst" "-knot boiler")))
+ '(safe-local-variable-values (quote ((python-backend . lsp)))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

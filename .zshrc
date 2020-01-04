@@ -72,15 +72,21 @@ DISABLE_UPDATE_PROMPT=true
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-  command-not-found
-  fast-syntax-highlighting
-  git
-  helm
-  pip
-  python
-  sudo
-  virtualenvwrapper
+    command-not-found
+    docker
+    docker-compose
+    fast-syntax-highlighting
+    git
+    jira
+    history
+    pip
+    python
+    redis-cli
+    sudo
+    virtualenvwrapper
 )
+
+JIRA_URL="https://jira.rdpnts.com"
 
 source $ZSH/oh-my-zsh.sh
 
@@ -154,7 +160,11 @@ alias localamazon='pip uninstall crwamazoncommon -y && pip install -e ../crwamaz
 alias localebay='pip uninstall crwebaycommon -y && pip install -e ../crwebaycommon'
 # alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
 alias maintenance_test='python $HOME/rptools/rptools/monitor_test_helper.py'
-alias maintenance_run='python $HOME/rptools/rptools/monitor_test_runner.py'
+alias maintenance='python $HOME/rptools/rptools/monitor_test_runner.py'
+
+alias pypy='$HOME/Programs/pypy3.6-v7.1.1-linux64/bin/pypy3'
+
+alias pytest='pytest --disable-warnings'
 
 export PATH_TO_HTML=/tmp
 export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
