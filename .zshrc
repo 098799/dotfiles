@@ -133,7 +133,7 @@ alias p3='ipython3'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 alias ee="emacsclient -c"
-export EDITOR="emacsclient -t"
+export EDITOR="emacsclient -c"
 export VISUAL="emacsclient -t"
 bindkey -e
 alias cal='ncal -M -b -3'
@@ -153,11 +153,12 @@ alias pip_install='pip install -r requirements/flake8.txt --pre'
 alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
 alias pip_r='pip_uninstall && pip_install'
 # alias flake8='flake8 --ignore=D100,D101,D102,D103,D107'
-export PYTHONBREAKPOINT=ipdb.set_trace
+export PYTHONBREAKPOINT=pdb.set_trace
 alias localtestutils='pip uninstall crwtestutils -y && pip install -e ../crwtestutils'
 alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
 alias localamazon='pip uninstall crwamazoncommon -y && pip install -e ../crwamazoncommon'
 alias localebay='pip uninstall crwebaycommon -y && pip install -e ../crwebaycommon'
+alias localrpapiconn='pip uninstall rpapiconn -y && pip install -e ../rpapiconn'
 # alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
 alias maintenance_test='python $HOME/rptools/rptools/monitor_test_helper.py'
 alias maintenance='python $HOME/rptools/rptools/monitor_test_runner.py'
