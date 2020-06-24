@@ -1,3 +1,10 @@
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -72,21 +79,15 @@ DISABLE_UPDATE_PROMPT=true
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-    command-not-found
-    docker
-    docker-compose
-    fast-syntax-highlighting
-    git
-    jira
-    history
-    pip
-    python
-    redis-cli
-    sudo
-    virtualenvwrapper
+  command-not-found
+  fast-syntax-highlighting
+  git
+  helm
+  pip
+  python
+  sudo
+  virtualenvwrapper
 )
-
-JIRA_URL="https://jira.rdpnts.com"
 
 source $ZSH/oh-my-zsh.sh
 
@@ -121,26 +122,25 @@ source $ZSH/oh-my-zsh.sh
 
 [ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
 
-source /usr/local/bin/virtualenvwrapper.sh
+source /home/tgrining/.local/bin/virtualenvwrapper.sh
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
 export PYTHONPATH="${PYTHONPATH}:$HOME"
-export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3.7
+export VIRTUALENVWRAPPER_PYTHON=`which python3`
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
 alias cd..='cd ..'
 #LC_NUMERIC="en_US.UTF-8"
-alias p3='ipython3'
+alias p3='ipython'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 alias ee="emacsclient -c"
-export EDITOR="emacsclient -c"
+export EDITOR="emacsclient -t"
 export VISUAL="emacsclient -t"
-bindkey -e
-alias cal='ncal -M -b -3'
+# alias cal='ncal -C'
 alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -nauto -sxk ""'
-alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3.7 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
+alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | rev`'
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
@@ -152,24 +152,11 @@ alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`;
 alias pip_install='pip install -r requirements/flake8.txt --pre'
 alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
 alias pip_r='pip_uninstall && pip_install'
-# alias flake8='flake8 --ignore=D100,D101,D102,D103,D107'
+alias py3clean='find . -name \*.pyc -delete'
 export PYTHONBREAKPOINT=pdb.set_trace
-alias localtestutils='pip uninstall crwtestutils -y && pip install -e ../crwtestutils'
-alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
-alias localamazon='pip uninstall crwamazoncommon -y && pip install -e ../crwamazoncommon'
-alias localebay='pip uninstall crwebaycommon -y && pip install -e ../crwebaycommon'
-alias localrpapiconn='pip uninstall rpapiconn -y && pip install -e ../rpapiconn'
-# alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
-alias maintenance_test='python $HOME/rptools/rptools/monitor_test_helper.py'
-alias maintenance='python $HOME/rptools/rptools/monitor_test_runner.py'
-
-alias pypy='$HOME/Programs/pypy3.6-v7.1.1-linux64/bin/pypy3'
-
-alias pytest='pytest --disable-warnings'
 
 export PATH_TO_HTML=/tmp
 export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
-# export RP_REDIS_HOST=redis.dev.redpoints.com
 
 cd `pwd`
 
@@ -188,7 +175,40 @@ dbus-update-activation-environment --all
 export FC="gfortran"
 export CXX="g++"
 export CC="gcc"
-PATH="$PATH:/home/grining/.gem/ruby/2.5.0/bin"
-PATH="$PATH:/root/.gem/ruby/2.5.0/bin"
 
-PATH="$PATH:/home/grining/bin"
+PATH="$PATH:/home/tgrining/bin"
+source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+
+# Legartis-specific
+alias npmplease="rm -rf node_modules/ && rm -f package-lock.json && npm install"
+
+source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
+
+alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
+
+alias lm='python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/migrate-as.py && python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/migrate-ds.py && python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/migrate-ml.py && python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/migrate-os.py && python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/migrate-qs.py && python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/migrate-rs.py && python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/migrate-us.py && python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/migrate-ws.py && python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/migrate-ss.py'
+
+alias run_ds='python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/manage.py runserver 8100'
+alias run_us='python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/manage.py runserver 8110'
+alias run_ml='python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/manage.py runserver 8120'
+alias run_os='python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/manage.py runserver 8130'
+alias run_as='python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/manage.py runserver 8140'
+alias run_qs='python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/manage.py runserver 8150'
+alias run_rs='python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/manage.py runserver 8160'
+alias run_ss='python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/manage.py runserver 8170'
+alias run_ws='python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/manage.py runserver 8180'
+
+# alias ls='django_annotation & django_doc & django_ml & django_ontology & django_quota & django_resource & django_user'
+
+# Tests for services
+alias test_annotation='python -m annotation_service.manage test annotation_service common python_common django_oidc'
+alias test_document='python -m document_service.manage test document_service common python_common django_oidc'
+alias test_ml='python -m ml_service.manage test ml_service common python_common django_oidc'
+alias test_ontology='python -m ontology_service.manage test ontology_service common python_common django_oidc'
+alias test_quota='python -m quota_service.manage test quota_service common python_common django_oidc'
+alias test_resource='python -m resource_service.manage test resource_service common python_common django_oidc'
+alias test_user='python -m user_service.manage test user_service common python_common django_oidc'
