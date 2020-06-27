@@ -16,7 +16,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 # ZSH_THEME="robbyrussell"
 # ZSH_THEME="mod-agnoster"
-ZSH_THEME="powerlevel9k/powerlevel9k"
+# ZSH_THEME="powerlevel9k/powerlevel9k"
 # POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv context dir vcs)
 POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv vcs dir)
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status time battery)
@@ -82,7 +82,7 @@ plugins=(
   command-not-found
   fast-syntax-highlighting
   git
-  helm
+  # helm
   pip
   python
   sudo
@@ -90,6 +90,9 @@ plugins=(
 )
 
 source $ZSH/oh-my-zsh.sh
+
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
 
 # User configuration
 
@@ -188,27 +191,8 @@ alias npmplease="rm -rf node_modules/ && rm -f package-lock.json && npm install"
 
 source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
 
+alias legartis_fake_start='docker start legartis-postgres && docker start legartis-redis && docker start legartis-stunnel-client-legr01'
+
 alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
 
-alias lm='python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/migrate-as.py && python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/migrate-ds.py && python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/migrate-ml.py && python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/migrate-os.py && python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/migrate-qs.py && python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/migrate-rs.py && python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/migrate-us.py && python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/migrate-ws.py && python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/migrate-ss.py'
-
-alias run_ds='python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/manage.py runserver 8100'
-alias run_us='python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/manage.py runserver 8110'
-alias run_ml='python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/manage.py runserver 8120'
-alias run_os='python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/manage.py runserver 8130'
-alias run_as='python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/manage.py runserver 8140'
-alias run_qs='python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/manage.py runserver 8150'
-alias run_rs='python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/manage.py runserver 8160'
-alias run_ss='python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/manage.py runserver 8170'
-alias run_ws='python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/manage.py runserver 8180'
-
-# alias ls='django_annotation & django_doc & django_ml & django_ontology & django_quota & django_resource & django_user'
-
-# Tests for services
-alias test_annotation='python -m annotation_service.manage test annotation_service common python_common django_oidc'
-alias test_document='python -m document_service.manage test document_service common python_common django_oidc'
-alias test_ml='python -m ml_service.manage test ml_service common python_common django_oidc'
-alias test_ontology='python -m ontology_service.manage test ontology_service common python_common django_oidc'
-alias test_quota='python -m quota_service.manage test quota_service common python_common django_oidc'
-alias test_resource='python -m resource_service.manage test resource_service common python_common django_oidc'
-alias test_user='python -m user_service.manage test user_service common python_common django_oidc'
+alias lm='/home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/migrate-as.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/migrate-ds.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/migrate-ml.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/migrate-os.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/migrate-qs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/migrate-rs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/migrate-us.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/migrate-ws.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/migrate-ss.py'
