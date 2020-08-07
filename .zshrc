@@ -123,7 +123,8 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
+# [ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
+source /etc/profile.d/vte.sh
 
 source /home/tgrining/.local/bin/virtualenvwrapper.sh
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
@@ -189,9 +190,29 @@ source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 # Legartis-specific
 alias npmplease="rm -rf node_modules/ && rm -f package-lock.json && npm install"
 
-source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
+# source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
 
-alias legartis_fake_start='docker start legartis-postgres && docker start legartis-redis && docker start legartis-stunnel-client-legr01'
+function dsr() {
+        CONTAINER_NAME=$1
+        if [ -z "$CONTAINER_NAME" ]; then
+                echo "Name must not be empty"
+        else
+                echo
+                echo "Searching containers with name=$1..."
+                docker ps -a --filter="name=$CONTAINER_NAME"
+                echo
+                echo "Stopping containers..."
+                docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
+                echo
+                echo "Removing containers..."
+                docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker rm {}
+                #docker stop $(docker ps -a -q --filter="name=$CONTAINER_NAME")
+        fi
+}
+
+alias oclogin='oc login -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
+
+alias legartis_fake_start='docker start legartis-postgres && docker start legartis-redis'
 
 alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
 

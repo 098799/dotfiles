@@ -1,0 +1,16 @@
+#!/usr/bin/python
+import re
+import subprocess
+
+
+result = subprocess.run("setxkbmap -print", shell=True, stdout=subprocess.PIPE).stdout.decode()
+pl_or_pll = re.findall(r"\"pc\+(.{3})", result)[0]
+
+if pl_or_pll == "mod":
+    subprocess.run("setxkbmap -layout pl", shell=True)
+    # subprocess.run('emacsclient -e "(progn (er-switch-to-previous-buffer) (ryo-modal-off))"', shell=True)
+else:
+    subprocess.run("setxkbmap -layout mode", shell=True)
+    # subprocess.run('emacsclient -e "(progn (er-switch-to-previous-buffer) (ryo-modal-on))"', shell=True)
+
+subprocess.run("f_keys", shell=True)

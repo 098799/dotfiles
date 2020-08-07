@@ -1,3 +1,4 @@
 echo -e "$HOME/.screenlayout/main.sh
 $HOME/.screenlayout/laptop.sh
-$HOME/.screenlayout/meeting.sh" | rofi -dmenu -lines 3 -font "Ubuntu 25" | sh
+$HOME/.screenlayout/meeting.sh
+$HOME/.screenlayout/work_main.sh" | rofi -dmenu -lines 4 -font "Ubuntu 25" | sh
