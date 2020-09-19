@@ -141,6 +141,7 @@ alias ee="emacsclient -c"
 export EDITOR="emacsclient -t"
 export VISUAL="emacsclient -t"
 # alias cal='ncal -C'
+alias cal='cal -m'
 alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -nauto -sxk ""'
@@ -217,3 +218,24 @@ alias legartis_fake_start='docker start legartis-postgres && docker start legart
 alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
 
 alias lm='/home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/migrate-as.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/migrate-ds.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/migrate-ml.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/migrate-os.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/migrate-qs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/migrate-rs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/migrate-us.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/migrate-ws.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/migrate-ss.py'
+
+alias k='kubectl'
+
+function klp() {
+    kubectl logs $1 $2 -f
+}
+function kdp() {
+    kubectl describe pod $1
+}
+function kepc() {
+   k exec $1 --stdin --tty -c $2 /bin/bash
+}
+function kep() {
+    k exec $1 --stdin --tty /bin/bash
+}
+function kepshc() {
+    k exec $1 --stdin --tty -c $2 /bin/sh
+}
+function kepsh() {
+    k exec $1 --stdin --tty /bin/sh
+}

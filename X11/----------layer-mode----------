@@ -10,16 +10,18 @@ xkb_symbols "basic" {
 
     name[Group1]="Polish";
 
-    key <AE01>	{ [         1,     exclam,     notequal,   exclamdown ]	};
-    key <AE02>	{ [         2,         at,  twosuperior, questiondown ]	};
-    key <AE04>	{ [         4,     dollar,         cent,   onequarter ]	};
-    key <AE05>	{ [         5,    percent,     EuroSign,        U2030 ]	};
-    key <AE06>	{ [         6, asciicircum,     onehalf,   logicaland ]	};
-    key <AE07>	{ [         7,  ampersand,      section,        U2248 ]	};
-    key <AE08>	{ [         8,   asterisk, periodcentered, threequarters ] };
-    key <AE09>	{ [         9,  parenleft, guillemotleft,   plusminus ]	};
-    key <AE10>	{ [         0, parenright, guillemotright,     degree ]	};
-    key <AE11>	{ [     minus, underscore,       endash,       emdash ]	};
+    key <AE01>	{ [         1,     exclam,     F1,   exclamdown ]	};
+    key <AE02>	{ [         2,         at,  F2, questiondown ]	};
+    key <AE03>	{ [         3, numbersign, F3,  sterling ]	};
+    key <AE04>	{ [         4,     dollar,         F4,   onequarter ]	};
+    key <AE05>	{ [         5,    percent,     F5,        U2030 ]	};
+    key <AE06>	{ [         6, asciicircum,     F6,   logicaland ]	};
+    key <AE07>	{ [         7,  ampersand,      F7,        U2248 ]	};
+    key <AE08>	{ [         8,   asterisk, F8, threequarters ] };
+    key <AE09>	{ [         9,  parenleft, F9,   plusminus ]	};
+    key <AE10>	{ [         0, parenright, F10,     degree ]	};
+    key <AE11>	{ [     minus, underscore,       F11,       emdash ]	};
+    key <AE12>	{ [      equal,      plus, F12,  dead_ogonek ]	};
 
     key <AD01>	{ [         q,          Q,     Greek_pi,  Greek_OMEGA ]	};
     key <AD02>	{ [         w,          W,           oe,           OE ]	};
