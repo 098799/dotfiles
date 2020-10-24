@@ -219,6 +219,8 @@ alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/anno
 
 alias lm='/home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/migrate-as.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/migrate-ds.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/migrate-ml.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/migrate-os.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/migrate-qs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/migrate-rs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/migrate-us.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/migrate-ws.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/migrate-ss.py'
 
+export PYTHONPATH="${PYTHONPATH}:/home/tgrining/machine-learning/"
+
 alias k='kubectl'
 
 function klp() {

@@ -178,6 +178,7 @@ bindsym Ctrl+$mod1+l exec i3lock -c 000000
 bindsym Mod1+F4 kill
 bindsym Print exec scrot
 bindsym $mod+p exec scrot
+bindsym $mod+o exec scrot -s
 
 bindsym XF86AudioRaiseVolume exec amixer sset 'Master' 5%+
 bindsym XF86AudioLowerVolume exec amixer sset 'Master' 5%-
@@ -235,8 +236,8 @@ exec dbus-update-activation-environment --all
 exec --no-startup-id xrandr --output eDP1 --off --output DP1 --off --output DP2 --off --output HDMI1 --off --output HDMI2 --primary --mode 2560x1440 --pos 0x0 --rotate normal --output VIRTUAL1 --off
 
 bindsym F14 exec /home/tgrining/bin/set_keyboard
-exec --no-startup-id xcape -e "Shift_R=F14" -t 150
-exec --no-startup-id xcape -e "Shift_L=F14" -t 150
+# exec --no-startup-id xcape -e "Shift_R=F14" -t 150
+# exec --no-startup-id xcape -e "Shift_L=F14" -t 150
 
 bindsym $mod+bracketleft exec amixer sset 'Master' 5%-
 bindsym $mod+bracketright exec amixer sset 'Master' 5%+
