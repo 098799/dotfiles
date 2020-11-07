@@ -223,6 +223,8 @@ export PYTHONPATH="${PYTHONPATH}:/home/tgrining/machine-learning/"
 
 alias k='kubectl'
 
+alias ap='ansible-playbook'
+
 function klp() {
     kubectl logs $1 $2 -f
 }
