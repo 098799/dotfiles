@@ -150,18 +150,18 @@ alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | re
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
 alias vi='vim'
-alias tox3='tox -e py36'
-alias tox8='tox -e flake8'
-alias pens='cd ~/Dropbox/pens/pypen'
+alias supen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py su pen'
+alias suink='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py su ink'
+alias sppen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py sp'
+alias siink='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py si'
+alias lpen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py lp'
+alias link='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py li'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
-alias pip_install='pip install -r requirements/flake8.txt --pre'
-alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
-alias pip_r='pip_uninstall && pip_install'
+export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
 alias py3clean='find . -name \*.pyc -delete'
 export PYTHONBREAKPOINT=pdb.set_trace
 
 export PATH_TO_HTML=/tmp
-export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
 
 cd `pwd`
 
@@ -188,7 +188,11 @@ source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 
+
+###################
 # Legartis-specific
+###################
+
 alias npmplease="rm -rf node_modules/ && rm -f package-lock.json && npm install"
 
 # source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
@@ -212,18 +216,25 @@ function dsr() {
 }
 
 alias oclogin='oc login -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
+alias ocloginexoscale='oc login https://console.ch-gva-2.exo.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.ch-gva-2.exo.appuio.ch'
+alias oclogincloudscale='oc login https://console.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
 
 alias legartis_fake_start='docker start legartis-postgres && docker start legartis-redis'
 
 alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
 
-alias lm='/home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/annotation-service/annotation_service/annotation_service/migrate-as.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/document-service/document_service/document_service/migrate-ds.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ml-service/ml_service/ml_service/migrate-ml.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/ontology-service/ontology_service/ontology_service/migrate-os.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/quota-service/quota_service/quota_service/migrate-qs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/resource-service/resource_service/resource_service/migrate-rs.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/user-service/user_service/user_service/migrate-us.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/workflow-service/workflow_service/workflow_service/migrate-ws.py && /home/tgrining/.virtualenvs/legartis/bin/python /home/tgrining/legartis/services/backend/search-service/search_service/search_service/migrate-ss.py'
+alias lm='lmigrate ds && lmigrate as && lmigrate ss && lmigrate rs && lmigrate ws && lmigrate os && lmigrate ml && lmigrate ps && lmigrate us && lmigrate qs'
 
 export PYTHONPATH="${PYTHONPATH}:/home/tgrining/machine-learning/"
 
 alias k='kubectl'
 
 alias ap='ansible-playbook'
+
+alias run_containers='ansible-playbook $HOME/legartis/deployments/container-manager/run-containers.yml'
+alias pycharm_inspect='/opt/pycharm-professional/bin/pycharm.sh inspect /home/tgrining/legartis /home/tgrining/legartis/.idea/inspectionProfiles/profiles_settings.xml /home/tgrining/inspection_results -v2 -format plain'
+alias venv='source ~/.virtualenvs/legartis/bin/activate'
+
 
 function klp() {
     kubectl logs $1 $2 -f
