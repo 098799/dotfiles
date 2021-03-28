@@ -79,6 +79,8 @@ bindsym $mod+g layout stacked
 bindsym $mod+e layout toggle split
 bindsym $mod+t floating toggle
 
+set $path PATH=/home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
+
 # was $mod1+w
 bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25"
 # was $mod1+d
@@ -115,9 +117,12 @@ workspace 6 output HDMI2
 workspace 7 output HDMI2
 workspace 8 output HDMI2
 workspace 9 output HDMI2
-workspace 10 output HDMI2
-workspace 11 output HDMI2
-workspace 12 output HDMI2
+workspace 10 output DP1
+workspace 11 output DP1
+workspace 12 output DP1
+workspace 13 output DP1
+workspace 14 output DP1
+workspace 15 output DP1
 
 # switch to workspace
 bindsym $mod+1 workspace 1, focus output HDMI2
@@ -129,9 +134,12 @@ bindsym $mod+6 workspace 6, focus output HDMI2
 bindsym $mod+7 workspace 7, focus output HDMI2
 bindsym $mod+8 workspace 8, focus output HDMI2
 bindsym $mod+9 workspace 9, focus output HDMI2
-bindsym $mod+0 workspace 10, focus output HDMI2
-bindsym $mod+minus workspace 11, focus output HDMI2
-bindsym $mod+plus workspace 12, focus output HDMI2
+bindsym $mod+0 workspace 10, focus output DP1
+bindsym $mod+minus workspace 11, focus output DP1
+bindsym $mod+plus workspace 12, focus output DP1
+bindsym $mod+y workspace 13, focus output DP1
+bindsym $mod+u workspace 14, focus output DP1
+bindsym $mod+i workspace 15, focus output DP1
 
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace 1
@@ -146,6 +154,9 @@ bindsym $mod+Shift+9 move container to workspace 9
 bindsym $mod+Shift+0 move container to workspace 10
 bindsym $mod+Shift+minus move container to workspace 11
 bindsym $mod+Shift+plus move container to workspace 12
+bindsym $mod+Shift+y move container to workspace 13
+bindsym $mod+Shift+u move container to workspace 14
+bindsym $mod+Shift+i move container to workspace 15
 
 bindsym $mod+BackSpace exec screen_switch
 
@@ -178,7 +189,6 @@ bindsym Ctrl+$mod1+l exec i3lock -c 000000
 bindsym Mod1+F4 kill
 bindsym Print exec scrot
 bindsym $mod+p exec scrot
-bindsym $mod+o exec scrot -s
 
 bindsym XF86AudioRaiseVolume exec amixer sset 'Master' 5%+
 bindsym XF86AudioLowerVolume exec amixer sset 'Master' 5%-
@@ -242,5 +252,5 @@ bindsym F14 exec /home/tgrining/bin/set_keyboard
 bindsym $mod+bracketleft exec amixer sset 'Master' 5%-
 bindsym $mod+bracketright exec amixer sset 'Master' 5%+
 
-exec_always --no-startup-id setxkbmap -layout pl
+# exec_always --no-startup-id setxkbmap -layout pl
 # exec_always --no-startup-id xmodmap -e "keycode 135 = Super_L"
