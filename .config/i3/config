@@ -79,7 +79,7 @@ bindsym $mod+g layout stacked
 bindsym $mod+e layout toggle split
 bindsym $mod+t floating toggle
 
-set $path PATH=/home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
+set $path /home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
 
 # was $mod1+w
 bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25"
@@ -87,7 +87,7 @@ bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25"
 bindsym $mod+z exec gnome-terminal
 bindsym $mod1+z exec emacsclient -c --eval '(eshell)'
 # was $mod1+s
-bindsym $mod+s exec google-chrome-stable
+bindsym $mod+s exec firefox
 # was $mod1+r
 bindsym $mod+x exec emacsclient -c
 # was $mod1+q
@@ -123,6 +123,7 @@ workspace 12 output DP1
 workspace 13 output DP1
 workspace 14 output DP1
 workspace 15 output DP1
+workspace 16 output DP1
 
 # switch to workspace
 bindsym $mod+1 workspace 1, focus output HDMI2
@@ -140,6 +141,7 @@ bindsym $mod+plus workspace 12, focus output DP1
 bindsym $mod+y workspace 13, focus output DP1
 bindsym $mod+u workspace 14, focus output DP1
 bindsym $mod+i workspace 15, focus output DP1
+bindsym $mod+o workspace 16, focus output DP1
 
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace 1
@@ -157,6 +159,7 @@ bindsym $mod+Shift+plus move container to workspace 12
 bindsym $mod+Shift+y move container to workspace 13
 bindsym $mod+Shift+u move container to workspace 14
 bindsym $mod+Shift+i move container to workspace 15
+bindsym $mod+Shift+o move container to workspace 16
 
 bindsym $mod+BackSpace exec screen_switch
 
@@ -190,9 +193,9 @@ bindsym Mod1+F4 kill
 bindsym Print exec scrot
 bindsym $mod+p exec scrot
 
-bindsym XF86AudioRaiseVolume exec amixer sset 'Master' 5%+
-bindsym XF86AudioLowerVolume exec amixer sset 'Master' 5%-
-bindsym XF86AudioMute exec amixer -q sset Master togglebindsym $mod+Escape exec pactl set-sink-mute 0 toggle
+bindsym XF86AudioRaiseVolume exec pactl set-sink-volume 0 +5%
+bindsym XF86AudioLowerVolume exec pactl set-sink-volume 0 -5%
+bindsym XF86AudioMute exec pactl set-sink-mute 0 toggle
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
@@ -243,14 +246,15 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 ### Nasty hack
 exec dbus-update-activation-environment --all
 
-exec --no-startup-id xrandr --output eDP1 --off --output DP1 --off --output DP2 --off --output HDMI1 --off --output HDMI2 --primary --mode 2560x1440 --pos 0x0 --rotate normal --output VIRTUAL1 --off
+# exec --no-startup-id xrandr --output eDP1 --off --output DP1 --off --output DP2 --off --output HDMI1 --off --output HDMI2 --primary --mode 2560x1440 --pos 0x0 --rotate normal --output VIRTUAL1 --off
 
 bindsym F14 exec /home/tgrining/bin/set_keyboard
 # exec --no-startup-id xcape -e "Shift_R=F14" -t 150
 # exec --no-startup-id xcape -e "Shift_L=F14" -t 150
 
-bindsym $mod+bracketleft exec amixer sset 'Master' 5%-
-bindsym $mod+bracketright exec amixer sset 'Master' 5%+
+bindsym $mod+bracketleft exec pactl set-sink-volume 0 -10%
+bindsym $mod+bracketright exec pactl set-sink-volume 0 +10%
+bindsym $mod+Escape exec pactl set-sink-mute 0 toggle
 
 # exec_always --no-startup-id setxkbmap -layout pl
 # exec_always --no-startup-id xmodmap -e "keycode 135 = Super_L"

@@ -55,7 +55,7 @@ font-2 = "Ubuntu Mono:size=12"
 
 modules-left = bspwm i3 xwindow
 modules-center = xkeyboard 
-modules-right = xbacklight volume wlan battery temperature date powermenu
+modules-right = xbacklight volume eth wlan battery temperature date powermenu
 
 tray-position = right
 tray-padding = 2
@@ -217,7 +217,7 @@ ramp-signal-foreground = ${colors.foreground-alt}
 
 [module/eth]
 type = internal/network
-interface = eth0
+interface = enp9s0
 interval = 3.0
 
 format-connected-underline = #55aa55

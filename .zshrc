@@ -127,7 +127,7 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 source /etc/profile.d/vte.sh
 
 source /home/tgrining/.local/bin/virtualenvwrapper.sh
-export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
+export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"  # sure this won't impact performance of lsp?
 export PYTHONPATH="${PYTHONPATH}:$HOME"
 export VIRTUALENVWRAPPER_PYTHON=`which python3`
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
@@ -150,14 +150,13 @@ alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | re
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
 alias vi='vim'
-alias supen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py su pen'
-alias suink='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py su ink'
-alias sppen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py sp'
-alias siink='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py si'
-alias lpen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py lp'
-alias link='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py li'
+alias supen='cd ~/pypen && cd dpypen && workon pypen && supen'
+alias suink='cd ~/pypen && cd dpypen && workon pypen && suink'
+# alias sppen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py sp'
+# alias siink='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py si'
+# alias lpen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py lp'
+# alias link='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py li'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
-export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
 alias py3clean='find . -name \*.pyc -delete'
 export PYTHONBREAKPOINT=pdb.set_trace
 
@@ -254,3 +253,5 @@ function kepshc() {
 function kepsh() {
     k exec $1 --stdin --tty /bin/sh
 }
+
+export NEXTCLOUD_FOLDER_NAME="Nextcloud2"
