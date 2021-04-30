@@ -1,3 +1,10 @@
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
@@ -9,7 +16,7 @@ export ZSH="$HOME/.oh-my-zsh"
 # See https://github.com/robbyrussell/oh-my-zsh/wiki/Themes
 # ZSH_THEME="robbyrussell"
 # ZSH_THEME="mod-agnoster"
-ZSH_THEME="powerlevel9k/powerlevel9k"
+# ZSH_THEME="powerlevel9k/powerlevel9k"
 # POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv context dir vcs)
 POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(ssh root_indicator background_jobs virtualenv vcs dir)
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status time battery)
@@ -72,23 +79,20 @@ DISABLE_UPDATE_PROMPT=true
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-    command-not-found
-    docker
-    docker-compose
-    fast-syntax-highlighting
-    git
-    jira
-    history
-    pip
-    python
-    redis-cli
-    sudo
-    virtualenvwrapper
+  command-not-found
+  fast-syntax-highlighting
+  git
+  # helm
+  pip
+  python
+  sudo
+  virtualenvwrapper
 )
 
-JIRA_URL="https://jira.rdpnts.com"
-
 source $ZSH/oh-my-zsh.sh
+
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ~/.zsh/cache
 
 # User configuration
 
@@ -119,57 +123,44 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-[ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
+# [ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
+source /etc/profile.d/vte.sh
 
-source /usr/local/bin/virtualenvwrapper.sh
-export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"
+source /home/tgrining/.local/bin/virtualenvwrapper.sh
+export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"  # sure this won't impact performance of lsp?
 export PYTHONPATH="${PYTHONPATH}:$HOME"
-export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3.7
+export VIRTUALENVWRAPPER_PYTHON=`which python3`
 export VIRTUAL_ENV_DISABLE_PROMPT=1 #not needed anymore with agnoster
 
 alias cd..='cd ..'
 #LC_NUMERIC="en_US.UTF-8"
-alias p3='ipython3'
+alias p3='ipython'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 alias ee="emacsclient -c"
 export EDITOR="emacsclient -c"
-export VISUAL="emacsclient -t"
-bindkey -e
-alias cal='ncal -M -b -3'
+export VISUAL="emacsclient -c"
+# alias cal='ncal -C'
+alias cal='cal -m'
 alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -nauto -sxk ""'
-alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3.7 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
+alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | rev`'
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
 alias vi='vim'
-alias tox3='tox -e py36'
-alias tox8='tox -e flake8'
-alias pens='cd ~/Dropbox/pens/pypen'
+alias supen='cd ~/pypen && cd dpypen && workon pypen && supen'
+alias suink='cd ~/pypen && cd dpypen && workon pypen && suink'
+# alias sppen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py sp'
+# alias siink='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py si'
+# alias lpen='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py lp'
+# alias link='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py li'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
-alias pip_install='pip install -r requirements/flake8.txt --pre'
-alias pip_uninstall='pip uninstall crwcommon crwtestutils crwamazoncommon crwebaycommon -y'
-alias pip_r='pip_uninstall && pip_install'
-# alias flake8='flake8 --ignore=D100,D101,D102,D103,D107'
+alias py3clean='find . -name \*.pyc -delete'
 export PYTHONBREAKPOINT=pdb.set_trace
-alias localtestutils='pip uninstall crwtestutils -y && pip install -e ../crwtestutils'
-alias localcommon='pip uninstall crwcommon -y && pip install -e ../crwcommon'
-alias localamazon='pip uninstall crwamazoncommon -y && pip install -e ../crwamazoncommon'
-alias localebay='pip uninstall crwebaycommon -y && pip install -e ../crwebaycommon'
-alias localrpapiconn='pip uninstall rpapiconn -y && pip install -e ../rpapiconn'
-# alias black='black --target-version py37 --line-length 120 --skip-string-normalization'
-alias maintenance_test='python $HOME/rptools/rptools/monitor_test_helper.py'
-alias maintenance='python $HOME/rptools/rptools/monitor_test_runner.py'
-
-alias pypy='$HOME/Programs/pypy3.6-v7.1.1-linux64/bin/pypy3'
-
-alias pytest='pytest --disable-warnings'
 
 export PATH_TO_HTML=/tmp
-export RP_CONFIG_SERVER_URL=http://bots-config.dev.redpoints.com
-# export RP_REDIS_HOST=redis.dev.redpoints.com
 
 cd `pwd`
 
@@ -188,7 +179,79 @@ dbus-update-activation-environment --all
 export FC="gfortran"
 export CXX="g++"
 export CC="gcc"
-PATH="$PATH:/home/grining/.gem/ruby/2.5.0/bin"
-PATH="$PATH:/root/.gem/ruby/2.5.0/bin"
 
-PATH="$PATH:/home/grining/bin"
+PATH="$PATH:/home/tgrining/bin"
+source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+
+
+###################
+# Legartis-specific
+###################
+
+alias npmplease="rm -rf node_modules/ && rm -f package-lock.json && npm install"
+
+# source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
+
+function dsr() {
+        CONTAINER_NAME=$1
+        if [ -z "$CONTAINER_NAME" ]; then
+                echo "Name must not be empty"
+        else
+                echo
+                echo "Searching containers with name=$1..."
+                docker ps -a --filter="name=$CONTAINER_NAME"
+                echo
+                echo "Stopping containers..."
+                docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
+                echo
+                echo "Removing containers..."
+                docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker rm {}
+                #docker stop $(docker ps -a -q --filter="name=$CONTAINER_NAME")
+        fi
+}
+
+alias oclogin='oc login -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
+alias ocloginexoscale='oc login https://console.ch-gva-2.exo.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.ch-gva-2.exo.appuio.ch'
+alias oclogincloudscale='oc login https://console.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
+
+alias legartis_fake_start='docker start legartis-postgres && docker start legartis-redis'
+
+alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
+
+alias lm='lmigrate ds && lmigrate as && lmigrate ss && lmigrate rs && lmigrate ws && lmigrate os && lmigrate ml && lmigrate ps && lmigrate us && lmigrate qs'
+
+export PYTHONPATH="${PYTHONPATH}:/home/tgrining/machine-learning/"
+
+alias k='kubectl'
+
+alias ap='ansible-playbook'
+
+alias run_containers='ansible-playbook $HOME/legartis/deployments/container-manager/run-containers.yml'
+alias pycharm_inspect='/opt/pycharm-professional/bin/pycharm.sh inspect /home/tgrining/legartis /home/tgrining/legartis/.idea/inspectionProfiles/profiles_settings.xml /home/tgrining/inspection_results -v2 -format plain'
+alias venv='source ~/.virtualenvs/legartis/bin/activate'
+
+
+function klp() {
+    kubectl logs $1 $2 -f
+}
+function kdp() {
+    kubectl describe pod $1
+}
+function kepc() {
+   k exec $1 --stdin --tty -c $2 /bin/bash
+}
+function kep() {
+    k exec $1 --stdin --tty /bin/bash
+}
+function kepshc() {
+    k exec $1 --stdin --tty -c $2 /bin/sh
+}
+function kepsh() {
+    k exec $1 --stdin --tty /bin/sh
+}
+
+export NEXTCLOUD_FOLDER_NAME="Nextcloud2"

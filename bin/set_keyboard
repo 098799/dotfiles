@@ -1,0 +1,15 @@
+#!/usr/bin/bash
+
+current_mode=`setxkbmap -print | grep "pc+" | cut -d "+" -f 2`
+
+case $current_mode in
+    "pl"*)
+        setxkbmap -layout ----------layer-mode----------
+        ;;
+    "mode"*)
+        setxkbmap -layout pl
+        ;;
+    *)
+        setxkbmap -layout pl
+        ;;
+esac

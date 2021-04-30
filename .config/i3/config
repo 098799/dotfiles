@@ -28,37 +28,11 @@ font pango:Ubuntu Mono 10
 # X core fonts rendering does not support right-to-left and this being a bitmap
 # font, it doesn’t scale on retina/hidpi displays.
 
-bar {
-    status_command i3status --config ~/.config/i3status/config
-    # mode hide
-    position top
-    font -misc-fixed-medium-r-normal--13-120-75-75-C-70-iso10646-1
-    font pango:Ubuntu 12
-    strip_workspace_numbers yes
-    separator_symbol "  |  "
-    colors {
-        background #073642
-        statusline #fdf6e3
-        separator #859900
-
-        focused_workspace  #859900 #859900 #fdf6e3
-        active_workspace   #073642 #073642 #fdf6e3
-        inactive_workspace #073642 #073642 #fdf6e3
-        urgent_workspace   #d33682 #d33682 #fdf6e3
-        binding_mode       #d33682 #d33682 #fdf6e3
-    }
-}
-
-# client.focused #859900 #859900 #fdf6e3 #6c71c4
-# client.focused_inactive #073642 #073642 #eee8d5 #6c71c4
-# client.unfocused #073642 #073642 #93a1a1 #586e75
-# client.urgent #d33682 #d33682 #fdf6e3 #dc322f
-
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
 # start a terminal
-bindsym $mod+Return exec i3-sensible-terminal
+# bindsym $mod+Return exec i3-sensible-terminal
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -105,19 +79,19 @@ bindsym $mod+g layout stacked
 bindsym $mod+e layout toggle split
 bindsym $mod+t floating toggle
 
+set $path /home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
+
 # was $mod1+w
-bindsym $mod+d exec rofi -show run -lines 6 -font "Ubuntu 25"  # -eh 1 -width 60 -padding 405 -bw 0
+bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25"
 # was $mod1+d
-bindsym $mod+z exec termite
+bindsym $mod+z exec gnome-terminal
+bindsym $mod1+z exec emacsclient -c --eval '(eshell)'
 # was $mod1+s
-bindsym $mod+s exec google-chrome-stable
+bindsym $mod+s exec firefox
 # was $mod1+r
 bindsym $mod+x exec emacsclient -c
 # was $mod1+q
-bindsym $mod+q exec nemo --no-desktop
-
-bindsym $mod1+z exec emacsclient -c --eval '(eshell)'
-
+bindsym $mod+q exec thunar
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle
@@ -125,69 +99,73 @@ bindsym $mod+Shift+space floating toggle
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
 
+focus_follows_mouse no
+
 # focus the parent container
 #bindsym $mod+a focus parent
 
 # focus the child container
 #bindsym $mod+d focus child
 
-exec_always --no-startup-id ~/.config/i3/create_config.sh
-
-set $big_monitor HDMI-1
-set $laptop_monitor eDP-1
-set $small_monitor DP-2-2-2
-
-exec_always --no-startup-id ~/.config/i3/layout.sh
-
-# set_from_resource $small_monitor xrandr | grep " connected" | grep "^DP-" | cut -d" " -f1
-
 #my monitor binding
-workspace 1 output $big_monitor
-workspace 2 output $big_monitor
-workspace 3 output $big_monitor
-workspace 4 output $big_monitor
-workspace 5 output $big_monitor
-workspace 6 output $big_monitor
-workspace 7 output $small_monitor
-workspace 8 output $small_monitor
-workspace 9 output $small_monitor
-workspace 10 output $small_monitor
-workspace 11 output $laptop_monitor
-workspace 12 output $laptop_monitor
+workspace 1 output HDMI2
+workspace 2 output HDMI2
+workspace 3 output HDMI2
+workspace 4 output HDMI2
+workspace 5 output HDMI2
+workspace 6 output HDMI2
+workspace 7 output HDMI2
+workspace 8 output HDMI2
+workspace 9 output HDMI2
+workspace 10 output DP1
+workspace 11 output DP1
+workspace 12 output DP1
+workspace 13 output DP1
+workspace 14 output DP1
+workspace 15 output DP1
+workspace 16 output DP1
 
 # switch to workspace
-bindsym $mod+1 workspace 1, focus output $big_monitor
-bindsym $mod+2 workspace 2, focus output $big_monitor
-bindsym $mod+3 workspace 3, focus output $big_monitor
-bindsym $mod+4 workspace 4, focus output $big_monitor
-bindsym $mod+5 workspace 5, focus output $big_monitor
-bindsym $mod+6 workspace 6, focus output $big_monitor
-bindsym $mod+7 workspace 7, focus output $small_monitor
-bindsym $mod+8 workspace 8, focus output $small_monitor
-bindsym $mod+9 workspace 9, focus output $small_monitor
-bindsym $mod+0 workspace 10, focus output $small_monitor
-bindsym $mod+p workspace 11, focus output $laptop_monitor
-bindsym $mod+o workspace 12, focus output $laptop_monitor
-bindsym $mod+Tab workspace back_and_forth
+bindsym $mod+1 workspace 1, focus output HDMI2
+bindsym $mod+2 workspace 2, focus output HDMI2
+bindsym $mod+3 workspace 3, focus output HDMI2
+bindsym $mod+4 workspace 4, focus output HDMI2
+bindsym $mod+5 workspace 5, focus output HDMI2
+bindsym $mod+6 workspace 6, focus output HDMI2
+bindsym $mod+7 workspace 7, focus output HDMI2
+bindsym $mod+8 workspace 8, focus output HDMI2
+bindsym $mod+9 workspace 9, focus output HDMI2
+bindsym $mod+0 workspace 10, focus output DP1
+bindsym $mod+minus workspace 11, focus output DP1
+bindsym $mod+plus workspace 12, focus output DP1
+bindsym $mod+y workspace 13, focus output DP1
+bindsym $mod+u workspace 14, focus output DP1
+bindsym $mod+i workspace 15, focus output DP1
+bindsym $mod+o workspace 16, focus output DP1
 
 # move focused container to workspace
-bindsym $mod+Shift+1 move container to workspace 1
-bindsym $mod+Shift+2 move container to workspace 2
-bindsym $mod+Shift+3 move container to workspace 3
-bindsym $mod+Shift+4 move container to workspace 4
-bindsym $mod+Shift+5 move container to workspace 5
+bindsym $mod+Shift+1 move container to workspace 1
+bindsym $mod+Shift+2 move container to workspace 2
+bindsym $mod+Shift+3 move container to workspace 3
+bindsym $mod+Shift+4 move container to workspace 4
+bindsym $mod+Shift+5 move container to workspace 5
 bindsym $mod+Shift+6 move container to workspace 6
 bindsym $mod+Shift+7 move container to workspace 7
-bindsym $mod+Shift+8 move container to workspace 8
-bindsym $mod+Shift+9 move container to workspace 9
-bindsym $mod+Shift+0 move container to workspace 10
-bindsym $mod+Shift+p move container to workspace 11
-bindsym $mod+Shift+o move container to workspace 12
+bindsym $mod+Shift+8 move container to workspace 8
+bindsym $mod+Shift+9 move container to workspace 9
+bindsym $mod+Shift+0 move container to workspace 10
+bindsym $mod+Shift+minus move container to workspace 11
+bindsym $mod+Shift+plus move container to workspace 12
+bindsym $mod+Shift+y move container to workspace 13
+bindsym $mod+Shift+u move container to workspace 14
+bindsym $mod+Shift+i move container to workspace 15
+bindsym $mod+Shift+o move container to workspace 16
+
+bindsym $mod+BackSpace exec screen_switch
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
 # restart i3 inplace (preserves your layout/session, can be used to upgrade i3)
-bindsym $mod+Shift+w exec ./config/i3/create_config.sh
 bindsym $mod+Shift+r restart
 # exit i3 (logs you out of your X session)
 bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -b 'Yes, exit i3' 'i3-msg exit'"
@@ -206,17 +184,18 @@ mode "resize" {
         bindsym Escape mode "default"
 }
 
-# exec_always --no-startup-id $HOME/.config/polybar/launch.sh
-exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
-#exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
+exec_always --no-startup-id $HOME/.config/polybar/launch.sh
+# exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
+exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
 
-bindsym Ctrl+$mod+$mod1+l exec i3lock -c 000000
+bindsym Ctrl+$mod1+l exec i3lock -c 000000
 bindsym Mod1+F4 kill
 bindsym Print exec scrot
+bindsym $mod+p exec scrot
 
-bindsym XF86AudioRaiseVolume exec amixer -q sset Master 5%+
-bindsym XF86AudioLowerVolume exec amixer -q sset Master 5%-
-bindsym XF86AudioMute exec amixer set Master toggle
+bindsym XF86AudioRaiseVolume exec pactl set-sink-volume 0 +5%
+bindsym XF86AudioLowerVolume exec pactl set-sink-volume 0 -5%
+bindsym XF86AudioMute exec pactl set-sink-mute 0 toggle
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
@@ -240,7 +219,7 @@ bindsym $mod1+Control+Left workspace prev
 
 exec --no-startup-id nm-applet
 exec emacs --daemon
-exec --no-startup-id /usr/lib/gnome-settings-daemon/gsd-xsettings
+# exec --no-startup-id /usr/lib/gnome-settings-daemon/gsd-xsettings
 # exec gnome-settings-daemon
 # exec gnome-keyring-daemon
 
@@ -267,6 +246,15 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 ### Nasty hack
 exec dbus-update-activation-environment --all
 
-exec_always --no-startup-id setxkbmap -layout pl -option caps:escape
+# exec --no-startup-id xrandr --output eDP1 --off --output DP1 --off --output DP2 --off --output HDMI1 --off --output HDMI2 --primary --mode 2560x1440 --pos 0x0 --rotate normal --output VIRTUAL1 --off
 
-exec_always --no-startup-id xmodmap -e "keycode 135 = Super_L"
+bindsym F14 exec /home/tgrining/bin/set_keyboard
+# exec --no-startup-id xcape -e "Shift_R=F14" -t 150
+# exec --no-startup-id xcape -e "Shift_L=F14" -t 150
+
+bindsym $mod+bracketleft exec pactl set-sink-volume 0 -10%
+bindsym $mod+bracketright exec pactl set-sink-volume 0 +10%
+bindsym $mod+Escape exec pactl set-sink-mute 0 toggle
+
+# exec_always --no-startup-id setxkbmap -layout pl
+# exec_always --no-startup-id xmodmap -e "keycode 135 = Super_L"
