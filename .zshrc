@@ -1,8 +1,20 @@
+[[ $TERM == "dumb" ]] && unsetopt zle && PS1='$ ' && return
+
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+if [[ "$TERM" == "dumb" ]]
+then
+    unsetopt zle
+    unsetopt prompt_cr
+    unsetopt prompt_subst
+    unfunction precmd
+    unfunction preexec
+    PS1='$ '
 fi
 
 # If you come from bash you might have to change your $PATH.
@@ -158,21 +170,11 @@ alias suink='cd ~/pypen && cd dpypen && workon pypen && suink'
 # alias link='cd ~/pypen && cd pypen && ~/.virtualenvs/pypen/bin/python ~/pypen/pypen/pypen.py li'
 alias ranger='ranger --choosedir=/tmp/.rangerdir; LASTDIR=`cat /tmp/.rangerdir`; cd "$LASTDIR"'
 alias py3clean='find . -name \*.pyc -delete'
-export PYTHONBREAKPOINT=pdb.set_trace
+export PYTHONBREAKPOINT=ipdb.set_trace
 
 export PATH_TO_HTML=/tmp
 
 cd `pwd`
-
-if [[ "$TERM" == "dumb" ]]
-then
-    unsetopt zle
-    unsetopt prompt_cr
-    unsetopt prompt_subst
-    unfunction precmd
-    unfunction preexec
-    PS1='$ '
-fi
 
 dbus-update-activation-environment --all
 
@@ -181,7 +183,7 @@ export CXX="g++"
 export CC="gcc"
 
 PATH="$PATH:/home/tgrining/bin"
-source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+# source /home/tgrining/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -192,37 +194,9 @@ source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 # Legartis-specific
 ###################
 
-alias npmplease="rm -rf node_modules/ && rm -f package-lock.json && npm install"
-
-# source $HOME/legartis/services/util/scripts/bash_init_scripts.sh
-
-function dsr() {
-        CONTAINER_NAME=$1
-        if [ -z "$CONTAINER_NAME" ]; then
-                echo "Name must not be empty"
-        else
-                echo
-                echo "Searching containers with name=$1..."
-                docker ps -a --filter="name=$CONTAINER_NAME"
-                echo
-                echo "Stopping containers..."
-                docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
-                echo
-                echo "Removing containers..."
-                docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker rm {}
-                #docker stop $(docker ps -a -q --filter="name=$CONTAINER_NAME")
-        fi
-}
-
 alias oclogin='oc login -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
 alias ocloginexoscale='oc login https://console.ch-gva-2.exo.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.ch-gva-2.exo.appuio.ch'
 alias oclogincloudscale='oc login https://console.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
-
-alias legartis_fake_start='docker start legartis-postgres && docker start legartis-redis'
-
-alias legartis_start='dsr legartis && cd ~/legartis/ && cd services/backend/annotation-service/annotation_service/annotation_service && python manage.py run_containers && cd ~/legartis/'
-
-alias lm='lmigrate ds && lmigrate as && lmigrate ss && lmigrate rs && lmigrate ws && lmigrate os && lmigrate ml && lmigrate ps && lmigrate us && lmigrate qs'
 
 export PYTHONPATH="${PYTHONPATH}:/home/tgrining/machine-learning/"
 
@@ -230,28 +204,95 @@ alias k='kubectl'
 
 alias ap='ansible-playbook'
 
-alias run_containers='ansible-playbook $HOME/legartis/deployments/container-manager/run-containers.yml'
 alias pycharm_inspect='/opt/pycharm-professional/bin/pycharm.sh inspect /home/tgrining/legartis /home/tgrining/legartis/.idea/inspectionProfiles/profiles_settings.xml /home/tgrining/inspection_results -v2 -format plain'
-alias venv='source ~/.virtualenvs/legartis/bin/activate'
+
+function kcp() {
+    k cp $1 $2
+}
 
 
 function klp() {
     kubectl logs $1 $2 -f
 }
+
 function kdp() {
     kubectl describe pod $1
 }
+
 function kepc() {
-   k exec $1 --stdin --tty -c $2 /bin/bash
-}
-function kep() {
-    k exec $1 --stdin --tty /bin/bash
-}
-function kepshc() {
-    k exec $1 --stdin --tty -c $2 /bin/sh
-}
-function kepsh() {
-    k exec $1 --stdin --tty /bin/sh
+        k exec $1 --stdin --tty -c $2 -- /bin/bash
 }
 
-export NEXTCLOUD_FOLDER_NAME="Nextcloud2"
+function kep() {
+    k exec $1 --stdin --tty -- /bin/bash
+}
+
+
+function kepshc() {
+    k exec $1 --stdin --tty -c $2 -- /bin/sh
+}
+
+function kepsh() {
+    k exec $1 --stdin --tty -- /bin/sh
+}
+
+
+
+function dl() {
+    docker logs $1 -f
+}
+
+function de() {
+    docker exec -it $1 bash
+}
+
+function ds() {
+    CONTAINER_NAME=$1
+    if [ -z "$CONTAINER_NAME" ]; then
+        echo "Name must not be empty"
+    else
+        echo
+        echo "Searching containers with name=$1..."
+        docker ps -a --filter="name=$CONTAINER_NAME"
+        echo
+        echo "Stopping containers..."
+        docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
+    fi
+}
+
+function dsr() {
+    CONTAINER_NAME=$1
+    if [ -z "$CONTAINER_NAME" ]; then
+        echo "Name must not be empty"
+    else
+        echo
+        echo "Searching containers with name=$1..."
+        docker ps -a --filter="name=$CONTAINER_NAME"
+        echo
+        echo "Stopping containers..."
+        docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
+        echo
+        echo "Removing containers..."
+        docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker rm {}
+        #docker stop $(docker ps -a -q --filter="name=$CONTAINER_NAME")
+    fi
+}
+
+function dps() {
+    CONTAINER_NAME=$1
+    if [ -z "$CONTAINER_NAME" ]; then
+        docker ps --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
+    else
+        docker ps -f "name=$1" --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
+    fi
+}
+
+function dpsa() {
+    CONTAINER_NAME=$1
+    if [ -z "$CONTAINER_NAME" ]; then
+        docker ps -a --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
+    else
+        docker ps -a -f "name=$1" --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
+    fi
+}
+source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
