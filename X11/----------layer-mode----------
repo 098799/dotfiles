@@ -55,6 +55,8 @@ xkb_symbols "basic" {
 
     key <SPCE>	{ [     space,      space, nobreakspace, nobreakspace ]	};
 
+    key  <INS> {	[  End		]	};
+
     //    key <BKSP> {	[ Delete	]	};
 
     include "kpdl(comma)"

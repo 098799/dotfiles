@@ -15,8 +15,12 @@ xkb_symbols "pc105" {
     include "pc(editing)"
     include "keypad(x11)"
 
-    key <BKSP> {	[ BackSpace, BackSpace	]	};
-
+    // key <BKSP> {	[ BackSpace, Delete	]	};
+    key <BKSP> { 
+            symbols[Group1] = [ BackSpace, Delete], 
+            actions[Group1] = [ NoAction(), RedirectKey(keycode=<DELE>, clearmods=Shift) ]
+    };
+    
     key  <TAB> {	[ Tab,	ISO_Left_Tab	]	};
     key <RTRN> {	[ Return		]	};
 
@@ -74,10 +78,12 @@ xkb_symbols "editing" {
 	type= "PC_CONTROL_LEVEL2",
 	symbols[Group1]= [ Pause, Break ]
     };
-    key  <INS> {	[  Insert		]	};
+    // key  <INS> {	[  Insert		]	};
+    key  <INS> {	[  Home		]	};
     key <HOME> {	[  Home			]	};
     key <PGUP> {	[  Prior		]	};
-    key <DELE> {	[  Delete		]	};
+    // key <DELE> {	[  Delete		]	};
+    key <DELE> {	[  End		]	};
     key  <END> {	[  End			]	};
     key <PGDN> {	[  Next			]	};
 
