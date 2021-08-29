@@ -1,4 +1,6 @@
-echo -e "$HOME/.screenlayout/main.sh
+echo -e "$HOME/bin/dark_theme
+$HOME/bin/light_theme
+$HOME/.screenlayout/main.sh
 $HOME/.screenlayout/laptop.sh
 $HOME/.screenlayout/meeting.sh
 $HOME/.screenlayout/work_main.sh
