@@ -1,0 +1,2 @@
+python dotfiles/alacritty/combiner.py dark
+emacsclient -c --eval "(progn (save-buffers-kill-terminal)(load-theme 'solarized-dark t))"
