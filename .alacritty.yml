@@ -24,9 +24,9 @@ colors:
     background: '0xfdf6e3'
     foreground: '0x586e75'
 cursor:
+  blink_interval: 600
   style:
     blinking: Always
-  blink_interval: 600
   unfocused_hollow: true
 dynamic_title: true
 env:
@@ -45,6 +45,9 @@ font:
     family: UbuntuMono
     style: Regular
   size: 12.0
+mouse_bindings:
+  - { mouse: Middle, action: PasteSelection }
+  - { mouse: Right, action: CopySelection }
 hints:
   alphabet: jfkdls;ahgurieowpq
   enabled:
