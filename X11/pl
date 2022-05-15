@@ -26,6 +26,7 @@ xkb_symbols "basic" {
     key <AD05>	{ [         t,          T,       ssharp,    trademark ]	};
     key <AD08>	{ [         i,          I,   rightarrow,        U2194 ]	};
     key <AD09>	{ [         o,          O,       oacute,       Oacute ]	};
+    key <AD07>  { [         u,          U,	udiaeresis,     cent    ] };
 
     key <AC01>	{ [         a,          A,      aogonek,      Aogonek ]	};
     key <AC02>	{ [         s,          S,       sacute,       Sacute ]	};
@@ -60,7 +61,7 @@ xkb_symbols "legacy" {
     name[Group1]="Polish (legacy)";
 
     key <AD03>	{ [         e,          E,      eogonek,      Eogonek ]	};
-    key <AD07>  { [         u,          U,	EuroSign,     cent    ] };
+    key <AD07>  { [         u,          U,	udiaeresis,     cent    ] };
     key <AD09>	{ [         o,          O,       oacute,       Oacute ]	};
 
     key <AC01>	{ [         a,          A,      aogonek,      Aogonek ]	};
@@ -258,7 +259,7 @@ xkb_symbols "szl" {
     key <AD02>  { [         w,          W ] };
     key <AD03>	{ [         e,          E,      atilde,      Atilde ]	};
     key <AD09>	{ [         o,          O,       ocircumflex,       Ocircumflex ]	};
-    key <AD07>  { [         u,          U,       omacron,       Omacron ]        };
+    key <AD07>  { [         u,          U,       udiaeresis,       Omacron ]        };
     key <AD10>	{ [         p,          P,       otilde,       Otilde ]	};
 
     key <AC01>	{ [         a,          A,      U014F,      U014E ]	};
@@ -287,7 +288,7 @@ xkb_symbols "csb" {
     key <AD03>	{ [         e,          E,      eacute,      Eacute ]	};
     key <AD04>	{ [         r,           R,      ediaeresis,      Ediaeresis ]	};
     key <AD06>      { [         y,          Y,      EuroSign,         cent ]        };
-    key <AD07>	{ [          u,          U,       ugrave,       Ugrave ]	};
+    key <AD07>	{ [          u,          U,       udiaeresis,       Ugrave ]	};
     key <AD08>	{ [         i,            I,       ograve,       Ograve ]	};
     key <AD09>	{ [         o,          O,       oacute,       Oacute ]	};
     key <AD10>	{ [         p,          P,       ocircumflex,       Ocircumflex ]	};

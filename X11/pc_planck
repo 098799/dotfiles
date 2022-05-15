@@ -1,8 +1,7 @@
 default partial alphanumeric_keys modifier_keys
 xkb_symbols "pc105" {
 
-    // key <ESC>  {	[ Escape		]	};
-    key <ESC>	{ [     grave, asciitilde,      notsign,    logicalor ]	};
+    key <ESC>  {	[ Escape		]	};
 
     // The extra key on many European keyboards:
     key <LSGT> {	[ less, greater, bar, brokenbar ] };

@@ -44,10 +44,7 @@ font:
   normal:
     family: UbuntuMono
     style: Regular
-  size: 12.0
-mouse_bindings:
-  - { mouse: Middle, action: PasteSelection }
-  - { mouse: Right, action: CopySelection }
+  size: 14
 hints:
   alphabet: jfkdls;ahgurieowpq
   enabled:
@@ -90,6 +87,11 @@ key_bindings:
   key: L
   mods: Control|Shift
 live_config_reload: true
+mouse_bindings:
+- action: PasteSelection
+  mouse: Middle
+- action: CopySelection
+  mouse: Right
 scrolling:
   history: 100000
 window:
