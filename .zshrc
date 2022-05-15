@@ -99,6 +99,8 @@ plugins=(
   python
   sudo
   virtualenvwrapper
+  colorize
+  rsync
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -138,6 +140,8 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 # [ -f /etc/profile.d/vte-2.91.sh ] && source /etc/profile.d/vte-2.91.sh
 source /etc/profile.d/vte.sh
 
+alias watch="watch "
+
 source /home/tgrining/.local/bin/virtualenvwrapper.sh
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs"  # sure this won't impact performance of lsp?
 export PYTHONPATH="${PYTHONPATH}:$HOME"
@@ -150,8 +154,8 @@ alias p3='ipython'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 alias ee="emacsclient -c"
-export EDITOR="emacsclient -c"
-export VISUAL="emacsclient -c"
+export EDITOR="emacsclient -t"
+export VISUAL="emacsclient -t"
 # alias cal='ncal -C'
 alias cal='cal -m'
 alias sl='ls' #no trains for me
@@ -206,13 +210,83 @@ alias ap='ansible-playbook'
 
 alias pycharm_inspect='/opt/pycharm-professional/bin/pycharm.sh inspect /home/tgrining/legartis /home/tgrining/legartis/.idea/inspectionProfiles/profiles_settings.xml /home/tgrining/inspection_results -v2 -format plain'
 
-function kcp() {
-    k cp $1 $2
+alias kgp="k get pods"
+alias kgn="k get namespaces"
+
+alias document="cd ~/legartis/ && cd services/backend/document_service/document_service/"
+alias pythia="cd ~/legartis/ && cd services/backend/pythia_service/pythia_service/"
+alias annotation="cd ~/legartis/ && cd services/backend/annotation_service/annotation_service/"
+alias cdpt="cd ~/legartis/ && cd services/backend/pythia_service/pythia_service/provision_classification/"
+alias cdpd="cd ~/legartis/ && cd services/backend/pythia_service/pythia_service/document/"
+
+alias ashell="~/.virtualenvs/legartis/bin/python -m annotation_service.manage shell_plus"
+alias pshell="~/.virtualenvs/legartis/bin/python -m pythia_service.manage shell_plus"
+alias dshell="~/.virtualenvs/legartis/bin/python -m document_service.manage shell_plus"
+
+function ked() {
+    doccano_pod=$(kgp | cut -f "1" -d " " | grep "doccano");
+    k exec $doccano_pod --stdin --tty -- python -m manage shell
 }
 
+function ke() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    service=$(echo $service_pod | cut -f "1" -d "-")
+    k exec $service_pod --stdin --tty -- python -m "$service"_service.manage shell_plus
+}
+
+function migrate_openshift_all() {
+    project=$(oc project | cut -d " " -f "3")
+    read "?You are currently on the $project project, are you sure you want to apply migrations there? [y/n] " response
+    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]];
+    then
+        for service in annotation document ml ontology pythia user workflow
+        do
+            migrate_openshift $service
+        done
+    else
+        echo "Aborted!"
+    fi
+}
+
+function migrate_openshift() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    service=$(echo $service_pod | cut -f "1" -d "-")
+    k exec $service_pod --stdin --tty -- python -m "$service"_service.manage migrate
+    k exec $service_pod --stdin --tty -- python -m "$service"_service.manage sync_oidc
+}
+
+# Copy files across pods without any intermediate download (untested)
+function kcp() {
+    k exec $1 -- tar czf - $2 | k exec -i $3 -- tar xzf - -C $4
+}
 
 function klp() {
-    kubectl logs $1 $2 -f
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    kubectl logs $service_pod ${@:2}  # all argument except the first
+}
+
+function klr() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    kubectl logs $service_pod ${@:2} | log_reader # all argument except the first
+}
+
+function kl() {
+    kubectl logs $@
+}
+
+function klf() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    kubectl logs -f $service_pod ${@:2}  # all argument except the first
+}
+
+function kli() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    kubectl logs $service_pod ${@:2} -c init  # all argument except the first
+}
+
+function klif() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    kubectl logs -f $service_pod ${@:2} -c init  # all argument except the first
 }
 
 function kdp() {
@@ -227,7 +301,6 @@ function kep() {
     k exec $1 --stdin --tty -- /bin/bash
 }
 
-
 function kepshc() {
     k exec $1 --stdin --tty -c $2 -- /bin/sh
 }
@@ -235,8 +308,6 @@ function kepshc() {
 function kepsh() {
     k exec $1 --stdin --tty -- /bin/sh
 }
-
-
 
 function dl() {
     docker logs $1 -f
@@ -295,4 +366,7 @@ function dpsa() {
         docker ps -a -f "name=$1" --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
     fi
 }
+
 source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
+
+ANSIBLE_COW_SELECTION=random
