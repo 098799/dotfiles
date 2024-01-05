@@ -101,9 +101,12 @@ plugins=(
   virtualenvwrapper
   colorize
   rsync
+  z
 )
 
 source $ZSH/oh-my-zsh.sh
+
+source ~/Programs/z/z.sh
 
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ~/.zsh/cache
@@ -154,14 +157,14 @@ alias p3='ipython'
 alias mdview='google-chrome-stable'
 alias e="emacsclient -t"
 alias ee="emacsclient -c"
-export EDITOR="emacsclient -t"
-export VISUAL="emacsclient -t"
+export EDITOR="emacsclient -c"
+export VISUAL="emacsclient -c"
 # alias cal='ncal -C'
 alias cal='cal -m'
 alias sl='ls' #no trains for me
 alias LS='ls'
 alias pyt='pytest -nauto -sxk ""'
-alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
+# alias mkvirtualenv='mkvirtualenv --python=/usr/bin/python3 -a `pwd` `pwd | rev | cut -f 1 -d "/" | rev`'
 alias rmvirtualenv='deactivate && rmvirtualenv `pwd | rev | cut -f 1 -d "/" | rev`'
 alias refvirtualenv='rmvirtualenv && mkvirtualenv'
 alias ll='ls -alh'
@@ -198,76 +201,83 @@ PATH="$PATH:/home/tgrining/bin"
 # Legartis-specific
 ###################
 
-alias oclogin='oc login -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
-alias ocloginexoscale='oc login https://console.ch-gva-2.exo.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.ch-gva-2.exo.appuio.ch'
-alias oclogincloudscale='oc login https://console.appuio.ch -u legr-tgrinig1 && oc whoami -t | docker login --username "$(oc whoami)" --password-stdin registry.appuio.ch'
-
-export PYTHONPATH="${PYTHONPATH}:/home/tgrining/machine-learning/"
-
 alias k='kubectl'
+export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 
 alias ap='ansible-playbook'
 
-alias pycharm_inspect='/opt/pycharm-professional/bin/pycharm.sh inspect /home/tgrining/legartis /home/tgrining/legartis/.idea/inspectionProfiles/profiles_settings.xml /home/tgrining/inspection_results -v2 -format plain'
-
+alias kg="k get"
 alias kgp="k get pods"
-alias kgn="k get namespaces"
+alias kgpi="k get pods -n inference-models"
+alias kgpl="k get pods -n legartis-prod"
+alias kgna="k get namespaces"
+alias kgno="k get nodes"
+
+alias knsl="kubie ns legartis-prod"
+alias knsi="kubie ns inference-models"
+
+alias kd="k describe"
+alias kdp="k describe pod"
+alias kdna="k describe namespaces"
+alias kdno="k describe nodes"
 
 alias document="cd ~/legartis/ && cd services/backend/document_service/document_service/"
+alias workflow="cd ~/legartis/ && cd services/backend/workflow_service/workflow_service/"
+alias ontology="cd ~/legartis/ && cd services/backend/ontology_service/ontology_service/"
+alias e2e="cd ~/legartis/ && cd services/backend/e2e/e2e/"
 alias pythia="cd ~/legartis/ && cd services/backend/pythia_service/pythia_service/"
 alias annotation="cd ~/legartis/ && cd services/backend/annotation_service/annotation_service/"
+alias user="cd ~/legartis/ && cd services/backend/user_service/user_service/"
 alias cdpt="cd ~/legartis/ && cd services/backend/pythia_service/pythia_service/provision_classification/"
 alias cdpd="cd ~/legartis/ && cd services/backend/pythia_service/pythia_service/document/"
 
-alias ashell="~/.virtualenvs/legartis/bin/python -m annotation_service.manage shell_plus"
 alias pshell="~/.virtualenvs/legartis/bin/python -m pythia_service.manage shell_plus"
+alias pdbshell="~/.virtualenvs/legartis/bin/python -m pythia_service.manage dbshell"
 alias dshell="~/.virtualenvs/legartis/bin/python -m document_service.manage shell_plus"
-
-function ked() {
-    doccano_pod=$(kgp | cut -f "1" -d " " | grep "doccano");
-    k exec $doccano_pod --stdin --tty -- python -m manage shell
-}
+alias oshell="~/.virtualenvs/legartis/bin/python -m ontology_service.manage shell_plus"
+alias wshell="~/.virtualenvs/legartis/bin/python -m workflow_service.manage shell_plus"
+alias ushell="~/.virtualenvs/legartis/bin/python -m user_service.manage shell_plus"
 
 function ke() {
-    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | head "-$2" | tail -1)
     service=$(echo $service_pod | cut -f "1" -d "-")
     k exec $service_pod --stdin --tty -- python -m "$service"_service.manage shell_plus
 }
 
-function migrate_openshift_all() {
-    project=$(oc project | cut -d " " -f "3")
-    read "?You are currently on the $project project, are you sure you want to apply migrations there? [y/n] " response
-    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]];
-    then
-        for service in annotation document ml ontology pythia user workflow
-        do
-            migrate_openshift $service
-        done
-    else
-        echo "Aborted!"
-    fi
+function kep() {
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | head "-$2" | tail -1)
+    k exec $service_pod --stdin --tty -- /bin/bash
 }
 
-function migrate_openshift() {
-    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
-    service=$(echo $service_pod | cut -f "1" -d "-")
-    k exec $service_pod --stdin --tty -- python -m "$service"_service.manage migrate
-    k exec $service_pod --stdin --tty -- python -m "$service"_service.manage sync_oidc
-}
+# function migrate_openshift_all() {
+#     project=$(oc project | cut -d " " -f "3")
+#     read "?You are currently on the $project project, are you sure you want to apply migrations there? [y/n] " response
+#     if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]];
+#     then
+#         for service in annotation document ml ontology pythia user workflow
+#         do
+#             migrate_openshift $service
+#         done
+#     else
+#         echo "Aborted!"
+#     fi
+# }
 
-# Copy files across pods without any intermediate download (untested)
-function kcp() {
-    k exec $1 -- tar czf - $2 | k exec -i $3 -- tar xzf - -C $4
-}
+# function migrate_openshift() {
+#     service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
+#     service=$(echo $service_pod | cut -f "1" -d "-")
+#     k exec $service_pod --stdin --tty -- python -m "$service"_service.manage migrate
+#     k exec $service_pod --stdin --tty -- python -m "$service"_service.manage sync_oidc
+# }
 
 function klp() {
-    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
-    kubectl logs $service_pod ${@:2}  # all argument except the first
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | head "-$2" | tail -1)
+    kubectl logs $service_pod
 }
 
 function klr() {
-    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
-    kubectl logs $service_pod ${@:2} | log_reader # all argument except the first
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | head "-$2" | tail -1)
+    kubectl logs $service_pod | log_reader
 }
 
 function kl() {
@@ -275,30 +285,22 @@ function kl() {
 }
 
 function klf() {
-    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
-    kubectl logs -f $service_pod ${@:2}  # all argument except the first
+    service_pod=$(kgp | cut -f "1" -d " " | grep $1 | head "-$2" | tail -1)
+    kubectl logs -f $service_pod ${@:3}  # all argument except the first two
 }
 
 function kli() {
     service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
-    kubectl logs $service_pod ${@:2} -c init  # all argument except the first
+    kubectl logs $service_pod ${@:3} -c init  # all argument except the first two
 }
 
 function klif() {
     service_pod=$(kgp | cut -f "1" -d " " | grep $1 | tail -1)
-    kubectl logs -f $service_pod ${@:2} -c init  # all argument except the first
-}
-
-function kdp() {
-    kubectl describe pod $1
+    kubectl logs -f $service_pod ${@:3} -c init  # all argument except the first two
 }
 
 function kepc() {
         k exec $1 --stdin --tty -c $2 -- /bin/bash
-}
-
-function kep() {
-    k exec $1 --stdin --tty -- /bin/bash
 }
 
 function kepshc() {
@@ -317,56 +319,12 @@ function de() {
     docker exec -it $1 bash
 }
 
-function ds() {
-    CONTAINER_NAME=$1
-    if [ -z "$CONTAINER_NAME" ]; then
-        echo "Name must not be empty"
-    else
-        echo
-        echo "Searching containers with name=$1..."
-        docker ps -a --filter="name=$CONTAINER_NAME"
-        echo
-        echo "Stopping containers..."
-        docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
-    fi
-}
-
-function dsr() {
-    CONTAINER_NAME=$1
-    if [ -z "$CONTAINER_NAME" ]; then
-        echo "Name must not be empty"
-    else
-        echo
-        echo "Searching containers with name=$1..."
-        docker ps -a --filter="name=$CONTAINER_NAME"
-        echo
-        echo "Stopping containers..."
-        docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker stop {}
-        echo
-        echo "Removing containers..."
-        docker ps -aq --filter="name=$CONTAINER_NAME" | awk '{print $1 }' | xargs -I {} docker rm {}
-        #docker stop $(docker ps -a -q --filter="name=$CONTAINER_NAME")
-    fi
-}
-
-function dps() {
-    CONTAINER_NAME=$1
-    if [ -z "$CONTAINER_NAME" ]; then
-        docker ps --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
-    else
-        docker ps -f "name=$1" --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
-    fi
-}
-
-function dpsa() {
-    CONTAINER_NAME=$1
-    if [ -z "$CONTAINER_NAME" ]; then
-        docker ps -a --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
-    else
-        docker ps -a -f "name=$1" --format 'table {{ .Command }}\t{{.RunningFor}}\t{{ .Status }}\t{{.Names}}\t{{.ID}}'
-    fi
-}
-
 source /usr/share/zsh-theme-powerlevel10k/powerlevel10k.zsh-theme
 
 ANSIBLE_COW_SELECTION=random
+
+[ -f "/home/tgrining/.ghcup/env" ] && source "/home/tgrining/.ghcup/env" # ghcup-env
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+export PYTHONSTARTUP="/home/tgrining/dotfiles/pythonstartup.py"
