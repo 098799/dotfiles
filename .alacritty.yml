@@ -1,28 +1,25 @@
 colors:
   bright:
-    black: '0x002b36'
-    blue: '0x839496'
-    cyan: '0x93a1a1'
-    green: '0x586e75'
-    magenta: '0x6c71c4'
-    red: '0xcb4b16'
-    white: '0xfdf6e3'
-    yellow: '0x657b83'
-  cursor:
-    cursor: '0x859900'
-    text: '0x002b36'
+    black: '0x2d5b69'
+    blue: '0x58a3ff'
+    cyan: '0x53d6c7'
+    green: '0x84c747'
+    magenta: '0xff84cd'
+    red: '0xff665c'
+    white: '0xcad8d9'
+    yellow: '0xebc13d'
   normal:
-    black: '0x073642'
-    blue: '0x268bd2'
-    cyan: '0x2aa198'
-    green: '0x859900'
-    magenta: '0xd33682'
-    red: '0xdc322f'
-    white: '0xeee8d5'
-    yellow: '0xb58900'
+    black: '0x184956'
+    blue: '0x4695f7'
+    cyan: '0x41c7b9'
+    green: '0x75b938'
+    magenta: '0xf275be'
+    red: '0xfa5750'
+    white: '0x72898f'
+    yellow: '0xdbb32d'
   primary:
-    background: '0xfdf6e3'
-    foreground: '0x586e75'
+    background: '0x103c48'
+    foreground: '0xadbcbc'
 cursor:
   blink_interval: 600
   style:
@@ -98,7 +95,7 @@ window:
   class:
     general: Alacritty
     instance: Alacritty
-  gtk_theme_variant: light
+  decorations_theme_variant: Light
   padding:
     x: 1
     y: 1
