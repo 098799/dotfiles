@@ -1,55 +1,60 @@
 #!/bin/bash
-# Dotfiles installation script
-# Run from ~/dotfiles directory
+# Dotfiles installation script using GNU Stow
+#
+# NEW MACHINE SETUP:
+# 1. Install dependencies:
+#      sudo pacman -S stow git zsh alacritty i3 rofi
+#
+# 2. Clone dotfiles:
+#      git clone <your-repo-url> ~/dotfiles
+#
+# 3. Run this script:
+#      cd ~/dotfiles && ./install.sh
+#
+# 4. Optional: Install oh-my-zsh, powerlevel10k, etc.
 
 set -e
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$DOTFILES_DIR"
 
 echo "Installing dotfiles from: $DOTFILES_DIR"
 
-# Remove existing symlinks/files
-echo "Removing old symlinks..."
+# Check for stow
+if ! command -v stow &> /dev/null; then
+    echo "Error: stow not installed. Run: sudo pacman -S stow"
+    exit 1
+fi
+
+# Remove conflicting files/symlinks that would block stow
+echo "Cleaning up existing files..."
 rm -f ~/.zshrc ~/.gitconfig ~/.gitignore_global ~/.alacritty.toml
-rm -f ~/scripts
-rm -rf ~/.config/i3blocks ~/.config/rofi ~/.screenlayout
+rm -f ~/scripts ~/.screenlayout
 rm -f ~/.config/i3/config
+rm -rf ~/.config/i3blocks ~/.config/rofi
+
+# Remove i3 helper files if they exist (stow will recreate as symlinks)
+rm -f ~/.config/i3/{CURRENT_MONITOR,alternating_layouts.py,create_config.sh,layout.sh} 2>/dev/null || true
 
 # Create necessary directories
 mkdir -p ~/.config/i3
 
-# Create new symlinks
-echo "Creating symlinks..."
+# Core packages (always install)
+echo "Stowing core packages..."
+stow -v -t ~ zsh git alacritty-pkg i3-pkg
 
-# Zsh
-ln -sf "$DOTFILES_DIR/zsh/.zshrc" ~/.zshrc
+# Optional packages (uncomment as needed)
+# stow -v -t ~ emacs
+# stow -v -t ~ vim
+# stow -v -t ~ bash
+# stow -v -t ~ bin-pkg   # Note: may conflict with existing ~/bin
 
-# Git
-ln -sf "$DOTFILES_DIR/git/.gitconfig" ~/.gitconfig
-ln -sf "$DOTFILES_DIR/git/.gitignore_global" ~/.gitignore_global
-
-# Alacritty
-ln -sf "$DOTFILES_DIR/alacritty-pkg/.alacritty.toml" ~/.alacritty.toml
-
-# i3 and related
-ln -sf "$DOTFILES_DIR/i3-pkg/.config/i3/config" ~/.config/i3/config
-ln -sf "$DOTFILES_DIR/i3-pkg/.config/i3blocks" ~/.config/i3blocks
-ln -sf "$DOTFILES_DIR/i3-pkg/.config/rofi" ~/.config/rofi
-ln -sf "$DOTFILES_DIR/i3-pkg/.screenlayout" ~/.screenlayout
-ln -sf "$DOTFILES_DIR/i3-pkg/scripts" ~/scripts
-
-# Optional packages (uncomment as needed):
-# ln -sf "$DOTFILES_DIR/emacs/.emacs" ~/.emacs
-# ln -sf "$DOTFILES_DIR/emacs/.emacs.d" ~/.emacs.d
-# ln -sf "$DOTFILES_DIR/vim/.vimrc" ~/.vimrc
-# ln -sf "$DOTFILES_DIR/vim/.vim" ~/.vim
-# ln -sf "$DOTFILES_DIR/bash/.bashrc" ~/.bashrc
-# ln -sf "$DOTFILES_DIR/bash/.bash_aliases" ~/.bash_aliases
-
-echo "Done! Symlinks created:"
 echo ""
-for link in ~/.zshrc ~/.gitconfig ~/.gitignore_global ~/.alacritty.toml ~/scripts ~/.config/i3blocks ~/.config/rofi ~/.config/i3/config ~/.screenlayout; do
-    if [ -L "$link" ]; then
-        echo "  $link -> $(readlink "$link")"
-    fi
-done
+echo "Done! Installed packages:"
+echo "  - zsh        : ~/.zshrc"
+echo "  - git        : ~/.gitconfig, ~/.gitignore_global"
+echo "  - alacritty  : ~/.alacritty.toml"
+echo "  - i3         : ~/.config/i3/, i3blocks, rofi, scripts, screenlayout"
+echo ""
+echo "To add more packages:  stow -t ~ <package>"
+echo "To remove a package:   stow -D -t ~ <package>"
