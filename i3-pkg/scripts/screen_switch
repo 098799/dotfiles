@@ -1,0 +1,6 @@
+#!/bin/bash
+echo -e "$HOME/bin/dark_theme
+$HOME/bin/light_theme
+$HOME/.screenlayout/laptop.sh
+$HOME/.screenlayout/narrow.sh
+$HOME/.screenlayout/wide.sh" | rofi -dmenu -lines 5 -font "Ubuntu 25" | sh

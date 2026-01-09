@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(readlink:*)",
+      "Bash(git mv:*)",
+      "Bash(git reset:*)",
+      "Bash(i3:*)",
+      "Bash(echo:*)",
+      "Bash(stow --version:*)",
+      "Bash(sudo pacman:*)",
+      "Bash(stow:*)"
+    ]
+  }
+}
