@@ -1,7 +1,8 @@
+#!/bin/bash
 echo -e "$HOME/bin/dark_theme
 $HOME/bin/light_theme
 $HOME/.screenlayout/main.sh
 $HOME/.screenlayout/laptop.sh
 $HOME/.screenlayout/meeting.sh
 $HOME/.screenlayout/work_main.sh
-$HOME/.screenlayout/double.sh" | rofi -dmenu -lines 5 -font "Ubuntu 25" | sh
+$HOME/.screenlayout/double.sh" | rofi -dmenu -lines 7 -font "Ubuntu 25" | sh

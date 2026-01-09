@@ -119,7 +119,7 @@ bindsym $mod+e layout toggle split
 # bindsym $mod+t floating toggle  # planck move...
 bindsym $mod+Shift+e floating toggle
 
-set $PATH /home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
+set $PATH $HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:$HOME/bin
 
 # was $mod1+w
 bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25" -terminal gnome-terminal
@@ -333,7 +333,7 @@ default_floating_border normal
 # bindsym $mod1+Control+Left workspace prev
 
 exec --no-startup-id nm-applet
-exec /home/tgrining/Programs/emacs/src/emacs --daemon
+exec $HOME/Programs/emacs/src/emacs --daemon
 exec autokey-gtk
 exec thunar --daemon
 exec syncthing
@@ -362,7 +362,7 @@ for_window [window_type="menu"] floating enable
 ### Nasty hack
 exec dbus-update-activation-environment --all
 
-bindsym F14 exec /home/tgrining/bin/set_keyboard
+bindsym F14 exec $HOME/bin/set_keyboard
 # exec --no-startup-id xcape -e "Shift_R=F14" -t 150
 # exec --no-startup-id xcape -e "Shift_L=F14" -t 150
 

@@ -1,0 +1,115 @@
+[user]
+	email = tomek.grining@gmail.com
+	name = Tomasz Grining
+
+[core]
+	excludesfile = ~/.gitignore_global
+
+[push]
+	default = simple
+
+[pull]
+	rebase = true
+
+[diff]
+	tool = difftastic
+
+[difftool]
+	prompt = false
+
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+
+[github]
+	user = 098799
+
+[gitlab "git.legartis.ai/api/v4"]
+	user = git.legartis.ai/api/v4.user
+
+[credential]
+	helper = store
+
+[alias]
+	# Log
+	l   = log
+	ls  = log --oneline --color --decorate
+	lsa = log --oneline --color --decorate --all
+	lh  = !git ll | head
+	ll  = log --oneline --graph --color --decorate
+	lla = log --oneline --graph --color --decorate --all
+
+	# Add
+	a   = add
+	ai  = add --interactive
+	ap  = add -p
+
+	# Commit
+	am  = commit --amend
+	c   = commit -m
+	cm  = commit -m
+
+	# Branch
+	b   = branch
+	bD  = branch -D
+	br  = branch -a
+	bl  = blame --color-by-age
+
+	# Checkout
+	ch  = checkout
+	cb  = checkout -b
+	cbr = "!f() { git checkout -b $1 origin/$1; }; f"
+	cr  = checkout -t -b
+
+	# Diff
+	d   = diff HEAD
+	dc  = diff HEAD --compact-summary
+	d0  = diff HEAD~0
+	d1  = diff HEAD~1
+	d2  = diff HEAD~2
+	d3  = diff HEAD~3
+	d4  = diff HEAD~4
+	d5  = diff HEAD~5
+	dc0 = diff HEAD~0 --compact-summary
+	dc1 = diff HEAD~1 --compact-summary
+	dc2 = diff HEAD~2 --compact-summary
+	dc3 = diff HEAD~3 --compact-summary
+	dc4 = diff HEAD~4 --compact-summary
+	dc5 = diff HEAD~5 --compact-summary
+	dft = difftool
+
+	# Fetch/Pull/Push
+	f   = fetch
+	fa  = fetch --all
+	F   = pull
+	p   = push
+	pf  = push origin --force-with-lease
+	puo = !git push --set-upstream origin `git symbolic-ref --short HEAD`
+
+	# Rebase
+	r   = rebase
+	ri  = rebase --interactive
+	rim = rebase --interactive origin/master
+
+	# Restore/Reset
+	re  = restore --staged
+	res = checkout -- .
+
+	# Status
+	s   = status -sb
+	sb  = status -sb
+	st  = status
+
+	# Stash
+	ss  = stash save
+	sl  = stash list
+	sp  = stash pop
+
+	# Other
+	sh  = show
+	m   = merge
+	ref = remote update origin --prune
+	suo = !git branch --set-upstream-to=origin/`git symbolic-ref --short HEAD`
+	mr  = !sh -c 'git fetch $1 merge-requests/$2/head:mr-$1-$2 && git checkout mr-$1-$2' -
