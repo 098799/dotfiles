@@ -94,3 +94,9 @@ try:
     from rich.pretty import pprint
 except ImportError:
     pass
+
+
+try:
+    from wat import wat
+except ImportError:
+    pass
