@@ -32,29 +32,23 @@ client.urgent #d33682 #d33682 #fdf6e3 #dc322f
 bar {
     status_command i3blocks
     position top
-    font pango:Ubuntu Mono 16
+    font pango:Terminess Nerd Font 14
+    tray_output primary
+    tray_padding 4
+    strip_workspace_numbers yes
+
     colors {
-        # dark mode
-        background #073642
-        statusline #888888
-        separator #888888
+        # Solarized Dark theme
+        background #002b36
+        statusline #93a1a1
+        separator  #586e75
 
-        focused_workspace  #859900 #859900 #ffffff
-        active_workspace   #859900 #859900 #ffffff
-        inactive_workspace #073642 #073642 #888888
-        urgent_workspace   #d33682 #d33682 #ffffff
-        binding_mode       #2f343a #900000 #ffffff
-
-        ## light mode
-        # background #EEEEEE
-        # statusline #888888
-        # separator #666666
-
-        # focused_workspace  #859900 #859900 #ffffff
-        # active_workspace   #859900 #859900 #ffffff
-        # inactive_workspace #EEEEEE #EEEEEE #888888
-        # urgent_workspace   #d33682 #d33682 #ffffff
-        # binding_mode       #2f343a #900000 #ffffff
+        # border    bg        text
+        focused_workspace  #859900 #859900 #fdf6e3
+        active_workspace   #268bd2 #268bd2 #fdf6e3
+        inactive_workspace #002b36 #002b36 #657b83
+        urgent_workspace   #dc322f #dc322f #fdf6e3
+        binding_mode       #cb4b16 #cb4b16 #fdf6e3
     }
 }
 
@@ -125,7 +119,7 @@ bindsym $mod+e layout toggle split
 # bindsym $mod+t floating toggle  # planck move...
 bindsym $mod+Shift+e floating toggle
 
-set $path /home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
+set $PATH /home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:/home/tgrining/bin
 
 # was $mod1+w
 bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25" -terminal gnome-terminal
@@ -134,11 +128,13 @@ bindsym $mod+d exec rofi -show run -modi drun -lines 6 -font "Ubuntu 25" -termin
 bindsym $mod+z exec alacritty
 # bindsym $mod1+z exec emacsclient -c --eval '(eshell)'
 # was $mod1+s
-bindsym $mod+s exec firefox
+# bindsym $mod+s exec google-chrome-beta --new-window google.com
 # was $mod1+r
 bindsym $mod+x exec emacsclient -c
 # was $mod1+q
 bindsym $mod+q exec thunar
+# Linear issue tracker TUI
+# bindsym $mod+s exec alacritty -e /home/tgrining/bin/linear
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle
@@ -214,19 +210,19 @@ workspace consumers output DP-2
 workspace 1 output DP-2
 workspace 2 output DP-2
 workspace 3 output DP-2
-workspace 4 output DP-1
-workspace 5 output DP-1
+workspace 4 output DP-2
+workspace 5 output DP-2
 workspace 6 output DP-2
 workspace 7 output DP-2
 workspace 8 output DP-2
-workspace 9 output DP-1
-workspace 10 output DP-1
-workspace chrome output DP-2
-workspace slack output DP-2
-workspace firefox output DP-2
-workspace chatgpt output DP-2
-workspace whatsapp output DP-2
-workspace 11 output DP-2
+workspace 9 output DP-2
+workspace 10 output DP-2
+workspace chrome output DP-1
+workspace slack output DP-1
+workspace firefox output DP-1
+workspace 12 output DP-1
+workspace whatsapp output DP-1
+workspace 11 output DP-1
 
 # switch to workspace
 bindsym $mod+r workspace services, focus output DP-2
@@ -234,19 +230,19 @@ bindsym $mod+t workspace consumers, focus output DP-2
 bindsym $mod+y workspace 1, focus output DP-2
 bindsym $mod+u workspace 2, focus output DP-2
 bindsym $mod+i workspace 3, focus output DP-2
-bindsym $mod+o workspace 4, focus output DP-1
-bindsym $mod+p workspace 5, focus output DP-1
+bindsym $mod+o workspace 4, focus output DP-2
+bindsym $mod+p workspace 5, focus output DP-2
 bindsym $mod+$mod1+Shift+y workspace 6, focus output DP-2
 bindsym $mod+$mod1+Shift+u workspace 7, focus output DP-2
 bindsym $mod+$mod1+Shift+i workspace 8, focus output DP-2
-bindsym $mod+$mod1+Shift+o workspace 9, focus output DP-1
-bindsym $mod+$mod1+Shift+p workspace 10, focus output DP-1
-bindsym $mod+g workspace chrome, focus output DP-2
-bindsym $mod+h workspace slack, focus output DP-2
-bindsym $mod+slash workspace firefox, focus output DP-2
-bindsym $mod+m workspace chatgpt, focus output DP-2
-bindsym $mod+comma workspace whatsapp, focus output DP-2
-bindsym $mod+period workspace 11, focus output DP-2
+bindsym $mod+$mod1+Shift+o workspace 9, focus output DP-2
+bindsym $mod+$mod1+Shift+p workspace 10, focus output DP-2
+bindsym $mod+g workspace chrome, focus output DP-1
+bindsym $mod+h workspace slack, focus output DP-1
+bindsym $mod+slash workspace firefox, focus output DP-1
+bindsym $mod+m workspace 12, focus output DP-1
+bindsym $mod+comma workspace whatsapp, focus output DP-1
+bindsym $mod+period workspace 11, focus output DP-1
 
 # move focused container to workspace
 bindsym $mod+Shift+r move container to workspace services
@@ -259,11 +255,11 @@ bindsym $mod+Shift+p move container to workspace 5
 bindsym $mod+Shift+g move container to workspace chrome
 bindsym $mod+Shift+h move container to workspace slack
 bindsym $mod+Shift+slash move container to workspace firefox
-bindsym $mod+Shift+m move container to workspace chatgpt
+bindsym $mod+Shift+m move container to workspace 12
 bindsym $mod+Shift+comma move container to workspace whatsapp
 bindsym $mod+Shift+period move container to workspace 11
 
-bindsym $mod+BackSpace exec screen_switch
+bindsym $mod+BackSpace exec --no-startup-id ~/scripts/screen_switch
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
@@ -290,13 +286,18 @@ mode "resize" {
 # exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
 exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
 
+# lock screen settings
 # bindsym Ctrl+$mod1+l exec i3lock -c 000000
 bindsym Ctrl+$mod1+l exec --no-startup-id blurlock
+exec --no-startup-id xautolock -time 10 -locker blurlock
+
 bindsym Mod1+F4 kill
 bindsym Print exec escrotum
 # bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -l style=dash,width=3,color="red" -s
-bindsym $mod+$mod1+Shift+k --release exec --no-startup-id escrotum
-bindsym $mod+$mod1+Shift+j --release exec --no-startup-id escrotum -s
+bindsym $mod+$mod1+Shift+k --release exec --no-startup-id scrot
+bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -s
+bindsym $mod+$mod1+Shift+l --release exec --no-startup-id record-desktop
+bindsym $mod+$mod1+Shift+semicolon --release exec --no-startup-id record-window
 # bindsym $mod+m --release exec --no-startup-id scrot
 
 bindsym $mod+b workspace back_and_forth
@@ -304,9 +305,11 @@ bindsym $mod+n workspace back_and_forth
 # bindsym $mod+space workspace back_and_forth
 bindsym $mod+Shift+b move container to workspace back_and_forth; workspace back_and_forth
 
-bindsym XF86AudioRaiseVolume exec pactl set-sink-volume 0 +5%
-bindsym XF86AudioLowerVolume exec pactl set-sink-volume 0 -5%
-bindsym XF86AudioMute exec pactl set-sink-mute 0 toggle
+# Volume controls with i3blocks signal refresh
+bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5% && pkill -RTMIN+10 i3blocks
+bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -5% && pkill -RTMIN+10 i3blocks
+bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && pkill -RTMIN+10 i3blocks
+bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && pkill -RTMIN+11 i3blocks
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
@@ -318,7 +321,7 @@ bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 # gaps inner $gaps_inner
 # gaps outer $gaps_outer
 
-default_border pixel 5
+default_border pixel 10
 default_floating_border normal
 
 # bindsym $mod+p       gaps inner all set 0
@@ -330,7 +333,7 @@ default_floating_border normal
 # bindsym $mod1+Control+Left workspace prev
 
 exec --no-startup-id nm-applet
-exec /home/tgrining/Programs/emacs/src/emacs -Q --daemon
+exec /home/tgrining/Programs/emacs/src/emacs --daemon
 exec autokey-gtk
 exec thunar --daemon
 exec syncthing
@@ -364,14 +367,14 @@ bindsym F14 exec /home/tgrining/bin/set_keyboard
 # exec --no-startup-id xcape -e "Shift_L=F14" -t 150
 
 exec --no-startup-id volumeicon
-# exec --no-startup-id volumeicon
 
-bindsym $mod+bracketleft exec pactl set-sink-volume 0 -10%
-bindsym $mod+bracketright exec pactl set-sink-volume 0 +10%
+# Custom volume controls with i3blocks refresh
+bindsym $mod+bracketleft exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -10% && pkill -RTMIN+10 i3blocks
+bindsym $mod+bracketright exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +10% && pkill -RTMIN+10 i3blocks
+bindsym $mod+Escape exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && pkill -RTMIN+10 i3blocks
 
-bindsym $mod+Escape exec pactl set-sink-mute 0 toggle
-
-bindsym $mod+space exec amixer -D pulse set Capture 1+ toggle
+# Microphone mute toggle with i3blocks refresh
+bindsym $mod+space exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && pkill -RTMIN+11 i3blocks
 # bindsym $mod+space exec pactl set-source-mute 0 toggle
 
 # exec_always --no-startup-id setxkbmap -layout pl

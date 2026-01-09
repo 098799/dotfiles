@@ -1,0 +1,112 @@
+# i3blocks config file
+# Material Design Icons theme
+
+# Global properties
+separator_block_width=15
+markup=pango
+
+#---------------------------------------------------------------------------
+# Claude Usage
+#---------------------------------------------------------------------------
+
+[claude]
+command=~/scripts/claude-usage.sh
+interval=60
+
+#---------------------------------------------------------------------------
+# Services
+#---------------------------------------------------------------------------
+
+[svc-ontology]
+command=~/scripts/service-ontology.sh
+interval=10
+signal=1
+
+[svc-consumer]
+command=~/scripts/service-consumer.sh
+interval=10
+signal=2
+
+[svc-frontend]
+command=~/scripts/service-frontend.sh
+interval=3
+signal=3
+
+[svc-user]
+command=~/scripts/service-user.sh
+interval=10
+signal=4
+
+#---------------------------------------------------------------------------
+# System Resources
+#---------------------------------------------------------------------------
+
+[cpu]
+command=~/scripts/cpu.sh
+interval=5
+
+[memory]
+command=~/scripts/memory.sh
+interval=10
+
+[disk]
+command=~/scripts/disk.sh
+interval=60
+
+[updates]
+command=~/scripts/updates.sh
+interval=3600
+
+#---------------------------------------------------------------------------
+# Network & Connectivity
+#---------------------------------------------------------------------------
+
+[network]
+command=~/scripts/network.sh
+interval=10
+
+[vpn]
+command=~/scripts/vpn.sh
+interval=10
+
+[bluetooth]
+command=~/scripts/bluetooth.sh
+interval=5
+
+#---------------------------------------------------------------------------
+# Audio & Battery
+#---------------------------------------------------------------------------
+
+[volume]
+command=~/scripts/volume.sh
+interval=1
+signal=10
+
+[mic]
+command=~/scripts/mic.sh
+interval=1
+signal=11
+
+[battery]
+command=~/scripts/battery.sh
+interval=30
+
+#---------------------------------------------------------------------------
+# Tools
+#---------------------------------------------------------------------------
+
+[screenshot]
+command=~/scripts/screenshot.sh
+interval=once
+
+#---------------------------------------------------------------------------
+# Time
+#---------------------------------------------------------------------------
+
+[uptime]
+command=~/scripts/uptime.sh
+interval=60
+
+[datetime]
+command=~/scripts/datetime.sh
+interval=30
