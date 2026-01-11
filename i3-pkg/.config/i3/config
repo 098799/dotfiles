@@ -381,3 +381,5 @@ bindsym $mod+space exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ t
 # exec_always --no-startup-id xmodmap -e "keycode 135 = Super_L"
 
 exec --no-startup-id bluetoothctl power on
+exec --no-startup-id gammastep
+exec --no-startup-id espanso service start

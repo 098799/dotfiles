@@ -1,0 +1,30 @@
+#!/bin/bash
+# Float laptop input devices when Planck keyboard is connected
+
+# Check if Planck is connected
+if ! xinput list | grep -q "Drop Planck"; then
+    echo "Planck not connected, doing nothing"
+    exit 0
+fi
+
+echo "Planck detected, floating laptop inputs..."
+
+# Devices to float
+devices=(
+    "SynPS/2 Synaptics TouchPad"
+    "TPPS/2 IBM TrackPoint"
+    "AT Translated Set 2 keyboard"
+    "ThinkPad Extra Buttons"
+)
+
+for device in "${devices[@]}"; do
+    id=$(xinput list | grep "$device" | grep -oP 'id=\K\d+')
+    if [ -n "$id" ]; then
+        xinput float "$id"
+        echo "Floated: $device (id=$id)"
+    else
+        echo "Not found: $device"
+    fi
+done
+
+echo "Done"

@@ -1,0 +1,33 @@
+#!/bin/bash
+# Reattach laptop input devices
+
+echo "Reattaching laptop inputs..."
+
+# Devices to reattach
+devices=(
+    "SynPS/2 Synaptics TouchPad"
+    "TPPS/2 IBM TrackPoint"
+    "AT Translated Set 2 keyboard"
+    "ThinkPad Extra Buttons"
+)
+
+# Get master pointer and keyboard IDs
+master_pointer=$(xinput list | grep "Virtual core pointer" | grep -oP 'id=\K\d+')
+master_keyboard=$(xinput list | grep "Virtual core keyboard" | grep -oP 'id=\K\d+')
+
+for device in "${devices[@]}"; do
+    id=$(xinput list | grep "$device" | grep -oP 'id=\K\d+')
+    if [ -n "$id" ]; then
+        # Pointer devices attach to master pointer, keyboards to master keyboard
+        if [[ "$device" == *"TouchPad"* ]] || [[ "$device" == *"TrackPoint"* ]]; then
+            xinput reattach "$id" "$master_pointer"
+        else
+            xinput reattach "$id" "$master_keyboard"
+        fi
+        echo "Reattached: $device (id=$id)"
+    else
+        echo "Not found: $device"
+    fi
+done
+
+echo "Done"
