@@ -1,8 +1,10 @@
 #!/bin/bash
-echo -e "$HOME/bin/dark_theme
-$HOME/bin/light_theme
+echo -e "$HOME/bin/dark-gruv
+$HOME/bin/light-gruv
+$HOME/bin/dark-sele
+$HOME/bin/light-sele
 $HOME/.screenlayout/laptop.sh
 $HOME/.screenlayout/narrow.sh
 $HOME/.screenlayout/wide.sh
 $HOME/scripts/float-laptop-inputs
-$HOME/scripts/reattach-laptop-inputs" | rofi -dmenu -lines 7 -font "Ubuntu 25" | sh
+$HOME/scripts/reattach-laptop-inputs" | rofi -dmenu -lines 9 -font "Ubuntu 25" | sh

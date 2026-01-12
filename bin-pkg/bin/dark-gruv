@@ -1,0 +1,3 @@
+#!/bin/bash
+~/.virtualenvs/legartis/bin/python ~/dotfiles/alacritty/combiner.py dark gruvbox
+emacsclient -e "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme 'doom-gruvbox t))"
