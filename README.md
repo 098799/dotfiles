@@ -14,6 +14,20 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 | `vim` | `.vimrc`, `.vim/` |
 | `bash` | `.bashrc`, `.bash_aliases` |
 | `bin-pkg` | `~/bin/` helper scripts |
+| `alacritty` | Color schemes (gruvbox, selenized) and theme switcher |
+
+## Theme Scripts
+
+The `bin-pkg` includes theme switching scripts that update both Alacritty and Emacs:
+
+| Script | Alacritty | Emacs |
+|--------|-----------|-------|
+| `dark-gruv` | gruvbox-dark | doom-gruvbox |
+| `light-gruv` | gruvbox-light | doom-gruvbox-light |
+| `dark-sele` | selenized-dark | doom-solarized-dark |
+| `light-sele` | selenized-light | doom-solarized-light |
+
+Access via `$mod+BackSpace` (rofi menu) or run directly from `~/bin/`.
 
 ## New Machine Setup
 
