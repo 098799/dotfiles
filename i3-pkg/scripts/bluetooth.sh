@@ -6,7 +6,7 @@
 case $BLOCK_BUTTON in
     3)
         eval $(xdotool getmouselocation --shell)
-        ACTION=$(echo -e "bluetoothctl\npower on\npower off\nnuke_bt\nrestart logid" | rofi -dmenu -p "bt" -theme-str "window {width: 150px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: 5;}")
+        ACTION=$(echo -e "bluetoothctl\npower on\npower off\nnuke_bt\nrestart logid" | rofi -dmenu -p "bt" -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: 5;}")
         case $ACTION in
             bluetoothctl) alacritty -e bluetoothctl & ;;
             "power on") bluetoothctl power on 2>/dev/null ;;

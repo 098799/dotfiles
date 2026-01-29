@@ -15,8 +15,10 @@ size = 14
 alphabet = "jfkdls;ahgurieowpq"
 [[hints.enabled]]
 command = "xdg-open"
+hyperlinks = true
 post_processing = true
-regex = "(ipfs:|ipns:|magnet:|mailto:|gemini://|gopher://|https://|http://|news:|file:|git://|ssh://|ftp://)[^x00-x1fx7f-x9f<>\"\\s{-}\\^⟨⟩`]+"
+persist = false
+regex = '(https?://|file://|mailto:)[^\x00-\x1f\x7f-\x9f<>"\s{-}\^⟨⟩`]+'
 
 [hints.enabled.binding]
 key = "U"
@@ -24,14 +26,6 @@ mods = "Control|Shift"
 [hints.enabled.mouse]
 enabled = true
 mods = "None"
-[[hints.enabled]]
-command = "Copy"
-post_processing = false
-regex = "[a-z0-9_-]+"
-
-[hints.enabled.binding]
-key = "Y"
-mods = "Control|Shift"
 
 [keyboard]
 [[keyboard.bindings]]
@@ -261,29 +255,25 @@ x = 1
 y = 1
 
 [colors.primary]
-background = "0x002b36"
-foreground = "0x839496"
-
-[colors.cursor]
-text = "0x002b36"
-cursor = "0x859900"
+background = "#282828"
+foreground = "#ebdbb2"
 
 [colors.normal]
-black = "0x073642"
-red = "0xdc322f"
-green = "0x859900"
-yellow = "0xb58900"
-blue = "0x268bd2"
-magenta = "0xd33682"
-cyan = "0x2aa198"
-white = "0xeee8d5"
+black = "#282828"
+red = "#cc241d"
+green = "#98971a"
+yellow = "#d79921"
+blue = "#458588"
+magenta = "#b16286"
+cyan = "#689d6a"
+white = "#a89984"
 
 [colors.bright]
-black = "0x002b36"
-red = "0xcb4b16"
-green = "0x586e75"
-yellow = "0x657b83"
-blue = "0x839496"
-magenta = "0x6c71c4"
-cyan = "0x93a1a1"
-white = "0xfdf6e3"
+black = "#928374"
+red = "#fb4934"
+green = "#b8bb26"
+yellow = "#fabd2f"
+blue = "#83a598"
+magenta = "#d3869b"
+cyan = "#8ec07c"
+white = "#ebdbb2"

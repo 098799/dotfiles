@@ -1,5 +1,10 @@
 /* Solarized Dark theme for rofi */
 
+configuration {
+    me-select-entry: "";
+    me-accept-entry: "MousePrimary";
+}
+
 * {
     /* Solarized Dark colors */
     base03: #002b36;

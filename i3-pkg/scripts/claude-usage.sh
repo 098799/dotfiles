@@ -61,23 +61,26 @@ fi
 # Round usage to integer
 USAGE_INT=$(printf "%.0f" "$USAGE")
 
-# Color based on whether on track (5 hour window)
-# Calculate expected usage based on time elapsed
+# Color based on usage rate (5 hour window)
+# Red if using at 2x rate, yellow if 1.5x rate
 if [[ -n "$RESETS" ]] && [[ $DIFF -gt 0 ]]; then
-    # Time remaining as percentage of 5 hours
-    TIME_REMAINING_PCT=$((DIFF * 100 / 18000))
-    # Expected usage = 100 - time remaining percentage
-    EXPECTED_USAGE=$((100 - TIME_REMAINING_PCT))
+    # Time elapsed as percentage of 5 hours
+    TIME_ELAPSED_PCT=$((100 - (DIFF * 100 / 18000)))
 
-    # Compare actual vs expected
-    DIFF_FROM_EXPECTED=$((USAGE_INT - EXPECTED_USAGE))
+    if [[ $TIME_ELAPSED_PCT -gt 0 ]]; then
+        # Rate = how fast we're using vs sustainable rate
+        # rate of 1.0 = on track, 2.0 = twice as fast
+        RATE=$(echo "scale=2; $USAGE / $TIME_ELAPSED_PCT" | bc)
 
-    if [[ $DIFF_FROM_EXPECTED -le 0 ]]; then
-        COLOR="#859900"  # green - on track or ahead
-    elif [[ $DIFF_FROM_EXPECTED -le 15 ]]; then
-        COLOR="#b58900"  # yellow - slightly behind
+        if (( $(echo "$RATE > 1.0" | bc -l) )); then
+            COLOR="#dc322f"  # red - will exceed quota
+        elif (( $(echo "$RATE > 0.67" | bc -l) )); then
+            COLOR="#b58900"  # yellow - on track to use most
+        else
+            COLOR="#859900"  # green - plenty of buffer
+        fi
     else
-        COLOR="#dc322f"  # red - way behind
+        COLOR="#859900"  # green - just started
     fi
 else
     # Fallback if no reset time

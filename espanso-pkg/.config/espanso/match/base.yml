@@ -1,0 +1,162 @@
+matches:
+  # === Personal ===
+  - trigger: ":email"
+    replace: "tomek.grining@gmail.com"
+  - trigger: ":name"
+    replace: "Tomasz Grining"
+  - trigger: ":sig"
+    replace: |
+      Best regards,
+      Tomasz
+
+  # === Dates & Time ===
+  - trigger: ":date"
+    replace: "{{date}}"
+    vars:
+      - name: date
+        type: date
+        params:
+          format: "%Y-%m-%d"
+  - trigger: ":time"
+    replace: "{{time}}"
+    vars:
+      - name: time
+        type: date
+        params:
+          format: "%H:%M"
+  - trigger: ":now"
+    replace: "{{now}}"
+    vars:
+      - name: now
+        type: date
+        params:
+          format: "%Y-%m-%d %H:%M"
+  - trigger: ":ts"
+    replace: "{{ts}}"
+    vars:
+      - name: ts
+        type: date
+        params:
+          format: "%Y%m%d%H%M%S"
+
+  # === Python ===
+  - trigger: ":pdb"
+    replace: "import ipdb; ipdb.set_trace()"
+  - trigger: ":bp"
+    replace: "breakpoint()"
+  - trigger: ":ifmain"
+    replace: |
+      if __name__ == "__main__":
+          main()
+  - trigger: ":logd"
+    replace: 'logger.debug(f"")'
+  - trigger: ":logi"
+    replace: 'logger.info(f"")'
+  - trigger: ":loge"
+    replace: 'logger.error(f"")'
+
+  # === Kubernetes ===
+  - trigger: ":kgp"
+    replace: "kubectl get pods"
+  - trigger: ":kgpa"
+    replace: "kubectl get pods -A"
+  - trigger: ":klog"
+    replace: "kubectl logs -f "
+  - trigger: ":kexec"
+    replace: "kubectl exec -it  -- /bin/bash"
+
+  # === Git ===
+  - trigger: ":gca"
+    replace: "git commit --amend"
+  - trigger: ":gpf"
+    replace: "git push --force-with-lease"
+  - trigger: ":gpr"
+    replace: "git pull --rebase"
+
+  # === Responses ===
+  - trigger: ":lgtm"
+    replace: "Looks good to me!"
+  - trigger: ":thx"
+    replace: "Thanks!"
+  - trigger: ":ty"
+    replace: "Thank you!"
+  - trigger: ":np"
+    replace: "No problem!"
+  - trigger: ":wip"
+    replace: "Work in progress"
+  - trigger: ":afaik"
+    replace: "as far as I know"
+  - trigger: ":imo"
+    replace: "in my opinion"
+  - trigger: ":ptal"
+    replace: "Please take a look"
+  - trigger: ":sgtm"
+    replace: "Sounds good to me"
+
+  # === Dynamic ===
+  - trigger: ":uuid"
+    replace: "{{uuid}}"
+    vars:
+      - name: uuid
+        type: shell
+        params:
+          cmd: "uuidgen"
+  - trigger: ":randpw"
+    replace: "{{pw}}"
+    vars:
+      - name: pw
+        type: shell
+        params:
+          cmd: "openssl rand -base64 16 | tr -d '='"
+  - trigger: ":ip"
+    replace: "{{ip}}"
+    vars:
+      - name: ip
+        type: shell
+        params:
+          cmd: "curl -s ifconfig.me"
+  - trigger: ":lip"
+    replace: "{{ip}}"
+    vars:
+      - name: ip
+        type: shell
+        params:
+          cmd: "ip -4 addr show | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}' | grep -v 127.0.0.1 | head -1"
+  - trigger: ":epoch"
+    replace: "{{epoch}}"
+    vars:
+      - name: epoch
+        type: shell
+        params:
+          cmd: "date +%s"
+  # === Symbols ===
+  - trigger: ":shrug"
+    replace: "¯\\_(ツ)_/¯"
+  - trigger: ":tableflip"
+    replace: "(╯°□°)╯︵ ┻━┻"
+  - trigger: ":check"
+    replace: "✓"
+  - trigger: ":xx"
+    replace: "✗"
+  - trigger: ":arrow"
+    replace: "→"
+
+  # === Polish characters (when not on PL keyboard) ===
+  - trigger: ":ao"
+    replace: "ą"
+  - trigger: ":eo"
+    replace: "ę"
+  - trigger: ":lo"
+    replace: "ł"
+  - trigger: ":zo"
+    replace: "ż"
+  - trigger: ":zz"
+    replace: "ź"
+  - trigger: ":so"
+    replace: "ś"
+  - trigger: ":co"
+    replace: "ć"
+  - trigger: ":nn"
+    replace: "ń"
+  - trigger: ":oo"
+    replace: "ó"

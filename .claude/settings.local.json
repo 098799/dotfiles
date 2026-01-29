@@ -10,7 +10,27 @@
       "Bash(stow --version:*)",
       "Bash(sudo pacman:*)",
       "Bash(stow:*)",
-      "Bash(xrandr:*)"
+      "Bash(xrandr:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git pull:*)",
+      "Bash(swapon:*)",
+      "Bash(sudo fallocate:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(sudo mkswap:*)",
+      "Bash(sudo swapon:*)",
+      "Bash(sudo tee:*)",
+      "Bash(xargs:*)",
+      "Bash(sudo sed:*)",
+      "Bash(sudo systemctl daemon-reload:*)",
+      "Bash(~/.legartis.env)",
+      "Bash(sudo cp:*)",
+      "Bash(ln:*)",
+      "Bash(alacritty:*)",
+      "Bash(for svc in ontology ontology_consumer user frontend)",
+      "Bash(do sudo cat /etc/systemd/system/$svc.service)",
+      "Bash(sudo systemctl:*)",
+      "Bash(sudo loginctl enable-linger:*)",
+      "Bash(sudo cat:*)"
     ]
   }
 }

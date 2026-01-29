@@ -1,0 +1,2 @@
+# Sensitive files (synced via Syncthing, not git)
+i3-pkg/.config/claude-cookies
