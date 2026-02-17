@@ -1,19 +1,64 @@
 #!/bin/bash
 # Claude.ai usage script for i3blocks
-# Requires cookies in ~/.config/claude-cookies
-# Right-click: open usage page
+# Supports multiple accounts with rofi switcher
+# Right-click: rofi menu to switch account (also switches Claude Code credentials)
 
+CONFIG_DIR="$HOME/.config"
+ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
+CLAUDE_CREDS="$HOME/.claude/.credentials.json"
+
+# Get current account (default to work)
+if [[ -f "$ACCOUNT_FILE" ]]; then
+    ACCOUNT=$(cat "$ACCOUNT_FILE" | tr -d '[:space:]')
+else
+    ACCOUNT="work"
+fi
+
+COOKIE_FILE="$CONFIG_DIR/claude-cookies-$ACCOUNT"
+CACHE_FILE="/tmp/.claude_usage_cache_$ACCOUNT"
+
+# Handle click
 case $BLOCK_BUTTON in
-    3) xdg-open "https://claude.ai/settings/usage" & ;;
+    3)
+        eval $(xdotool getmouselocation --shell)
+        # Pre-select current account
+        if [[ "$ACCOUNT" == "work" ]]; then
+            SELECTED=1
+        else
+            SELECTED=0
+        fi
+        CHOICE=$(echo -e "private\nwork" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: 2;}")
+        if [[ -n "$CHOICE" && "$CHOICE" != "$ACCOUNT" ]]; then
+            echo "$CHOICE" > "$ACCOUNT_FILE"
+            # Clear cache to force refresh
+            rm -f /tmp/.claude_usage_cache_* 2>/dev/null || true
+            # Switch Claude Code credentials
+            CREDS_FILE="$HOME/.claude/.credentials-$CHOICE.json"
+            if [[ -f "$CREDS_FILE" ]]; then
+                # Backup current credentials if not already backed up
+                if [[ ! -f "$HOME/.claude/.credentials-$ACCOUNT.json" ]]; then
+                    cp "$CLAUDE_CREDS" "$HOME/.claude/.credentials-$ACCOUNT.json"
+                fi
+                cp "$CREDS_FILE" "$CLAUDE_CREDS"
+            fi
+            ACCOUNT="$CHOICE"
+            COOKIE_FILE="$CONFIG_DIR/claude-cookies-$ACCOUNT"
+            CACHE_FILE="/tmp/.claude_usage_cache_$ACCOUNT"
+        fi
+        ;;
 esac
-
-COOKIE_FILE="$HOME/.config/claude-cookies"
-CACHE_FILE="/tmp/.claude_usage_cache"
-ORG_ID="4fc6cf12-57d2-4884-bdb6-4677435c1f0e"
 
 # Check for cookie file
 if [[ ! -f "$COOKIE_FILE" ]]; then
     echo "<span background='#073642' foreground='#657b83'> 󰚩 No cookies </span>"
+    echo "󰚩"
+    exit 0
+fi
+
+# Parse ORG_ID from cookie file
+ORG_ID=$(grep -oP '^# ORG_ID=\K.*' "$COOKIE_FILE")
+if [[ -z "$ORG_ID" ]]; then
+    echo "<span background='#073642' foreground='#657b83'> 󰚩 No ORG_ID </span>"
     echo "󰚩"
     exit 0
 fi
@@ -62,14 +107,10 @@ fi
 USAGE_INT=$(printf "%.0f" "$USAGE")
 
 # Color based on usage rate (5 hour window)
-# Red if using at 2x rate, yellow if 1.5x rate
 if [[ -n "$RESETS" ]] && [[ $DIFF -gt 0 ]]; then
-    # Time elapsed as percentage of 5 hours
     TIME_ELAPSED_PCT=$((100 - (DIFF * 100 / 18000)))
 
     if [[ $TIME_ELAPSED_PCT -gt 0 ]]; then
-        # Rate = how fast we're using vs sustainable rate
-        # rate of 1.0 = on track, 2.0 = twice as fast
         RATE=$(echo "scale=2; $USAGE / $TIME_ELAPSED_PCT" | bc)
 
         if (( $(echo "$RATE > 1.0" | bc -l) )); then
@@ -83,7 +124,6 @@ if [[ -n "$RESETS" ]] && [[ $DIFF -gt 0 ]]; then
         COLOR="#859900"  # green - just started
     fi
 else
-    # Fallback if no reset time
     if [[ $USAGE_INT -ge 80 ]]; then
         COLOR="#dc322f"
     elif [[ $USAGE_INT -ge 50 ]]; then
@@ -93,5 +133,12 @@ else
     fi
 fi
 
-echo "<span background='#073642' foreground='$COLOR'> 󰚩 ${USAGE_INT}% (${RESET_STR}) </span>"
-echo "󰚩 ${USAGE_INT}%"
+# Account label (W for work, P for private)
+if [[ "$ACCOUNT" == "work" ]]; then
+    LABEL="W"
+else
+    LABEL="P"
+fi
+
+echo "<span background='#073642' foreground='$COLOR'> 󰚩 $LABEL ${USAGE_INT}% (${RESET_STR}) </span>"
+echo "󰚩 $LABEL ${USAGE_INT}%"

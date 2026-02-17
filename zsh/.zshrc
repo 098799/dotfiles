@@ -130,15 +130,9 @@ alias kdno="k describe nodes"
 alias o1="cd ~/legartis/ && cd services/backend/ontology_service/"
 alias o2="cd ~/legartis2/ && cd services/backend/ontology_service/"
 alias o3="cd ~/legartis3/ && cd services/backend/ontology_service/"
-alias u1="cd ~/legartis/ && cd services/backend/user_service/"
-alias u2="cd ~/legartis2/ && cd services/backend/user_service/"
-alias u3="cd ~/legartis3/ && cd services/backend/user_service/"
 alias e2e="cd ~/legartis/ && cd services/backend/e2e/e2e/"
 
 # Django shell shortcuts
-alias pshell="~/.virtualenvs/legartis/bin/python -m pythia_service.manage shell_plus"
-alias pdbshell="~/.virtualenvs/legartis/bin/python -m pythia_service.manage dbshell"
-alias dshell="~/.virtualenvs/legartis/bin/python -m document_service.manage shell_plus"
 alias oshell0="~/.virtualenvs/legartis0/bin/python -m ontology_service.manage shell_plus"
 alias oshell="~/.virtualenvs/legartis/bin/python -m ontology_service.manage shell_plus"
 alias oshell2="~/.virtualenvs/legartis2/bin/python -m ontology_service.manage shell_plus"
@@ -147,8 +141,6 @@ alias oshell4="~/.virtualenvs/legartis4/bin/python -m ontology_service.manage sh
 alias oshell5="~/.virtualenvs/legartis5/bin/python -m ontology_service.manage shell_plus"
 alias oshell6="~/.virtualenvs/legartis6/bin/python -m ontology_service.manage shell_plus"
 alias oshell7="~/.virtualenvs/legartis7/bin/python -m ontology_service.manage shell_plus"
-alias wshell="~/.virtualenvs/legartis/bin/python -m workflow_service.manage shell_plus"
-alias ushell="~/.virtualenvs/legartis/bin/python -m user_service.manage shell_plus"
 
 # Ansible
 alias ap='ansible-playbook'

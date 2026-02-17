@@ -32,11 +32,6 @@ command=~/scripts/service-frontend.sh
 interval=3
 signal=3
 
-[svc-user]
-command=~/scripts/service-user.sh
-interval=10
-signal=4
-
 #---------------------------------------------------------------------------
 # System Resources
 #---------------------------------------------------------------------------
