@@ -25,7 +25,7 @@ STATUS=$(systemctl --user is-active "$SERVICE" 2>/dev/null)
 if [[ "$STATUS" == "active" ]]; then
     # Check logs since service started for errors
     START_TIME=$(systemctl --user show $SERVICE --property=ActiveEnterTimestamp --value)
-    if journalctl --user -u $SERVICE --since "$START_TIME" --no-pager 2>/dev/null | grep -qiE "UNKNOWN_TOPIC"; then
+    if journalctl --user -u $SERVICE --since "$START_TIME" --no-pager 2>/dev/null | grep -qiE "UNKNOWN_TOPIC|TypeError|Exception|Traceback|Error:|CRITICAL|FATAL"; then
         echo "󰒋 os"
         echo "󰒋"
         echo "#b58900"  # yellow - has errors
@@ -34,8 +34,12 @@ if [[ "$STATUS" == "active" ]]; then
         echo "󰒋"
         echo "#859900"  # green - healthy
     fi
+elif [[ "$STATUS" == "failed" ]]; then
+    echo "󰒋 os"
+    echo "󰒋"
+    echo "#b58900"  # yellow - crashed/failed
 else
     echo "󰒋 os"
     echo "󰒋"
-    echo "#dc322f"
+    echo "#dc322f"  # red - stopped
 fi
