@@ -41,13 +41,14 @@ mkdir -p ~/.config/i3
 
 # Core packages (always install)
 echo "Stowing core packages..."
-stow -v -t ~ zsh git alacritty-pkg i3-pkg
+stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
 
 # Optional packages (uncomment as needed)
 # stow -v -t ~ emacs
 # stow -v -t ~ vim
 # stow -v -t ~ bash
-# stow -v -t ~ bin-pkg   # Note: may conflict with existing ~/bin
+# stow -v -t ~ espanso-pkg
+# stow -v -t ~ logid-pkg
 
 echo ""
 echo "Done! Installed packages:"
@@ -55,6 +56,13 @@ echo "  - zsh        : ~/.zshrc"
 echo "  - git        : ~/.gitconfig, ~/.gitignore_global"
 echo "  - alacritty  : ~/.alacritty.toml"
 echo "  - i3         : ~/.config/i3/, i3blocks, rofi, scripts, screenlayout"
+echo "  - bin        : ~/bin/ (theme scripts, utilities)"
+echo ""
+echo "Optional packages (install manually):"
+echo "  - espanso    : stow -t ~ espanso-pkg"
+echo "  - logid      : stow -t ~ logid-pkg"
+echo "  - emacs      : stow -t ~ emacs"
+echo "  - vim        : stow -t ~ vim"
 echo ""
 echo "To add more packages:  stow -t ~ <package>"
 echo "To remove a package:   stow -D -t ~ <package>"

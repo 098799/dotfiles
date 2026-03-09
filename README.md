@@ -10,10 +10,12 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 | `git` | `.gitconfig`, `.gitignore_global` |
 | `alacritty-pkg` | `.alacritty.toml` |
 | `i3-pkg` | i3 config, i3blocks, rofi, screenlayout, scripts |
+| `bin-pkg` | `~/bin/` helper scripts (theme switching) |
+| `espanso-pkg` | Text expansion config |
+| `logid-pkg` | Logitech mouse (logid) config |
 | `emacs` | `.emacs`, `.emacs.d/` |
 | `vim` | `.vimrc`, `.vim/` |
 | `bash` | `.bashrc`, `.bash_aliases` |
-| `bin-pkg` | `~/bin/` helper scripts |
 | `alacritty` | Color schemes (gruvbox, selenized) and theme switcher |
 
 ## Theme Scripts
@@ -49,6 +51,7 @@ git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$
 
 # 6. Install fast-syntax-highlighting
 git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/fast-syntax-highlighting
+
 ```
 
 ## Stow Usage
@@ -64,7 +67,7 @@ stow -D -t ~ <package>
 stow -n -v -t ~ <package>
 
 # Reinstall all core packages
-stow -t ~ zsh git alacritty-pkg i3-pkg
+stow -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
 ```
 
 ## Structure
@@ -85,10 +88,12 @@ stow -t ~ zsh git alacritty-pkg i3-pkg
 │   │   └── rofi/
 │   ├── .screenlayout/
 │   └── scripts/
+├── bin-pkg/
+├── espanso-pkg/
+├── logid-pkg/
 ├── emacs/
 ├── vim/
 ├── bash/
-├── bin-pkg/
 └── install.sh
 ```
 
