@@ -1,9 +1,9 @@
 #!/bin/bash
-# User service status for i3blocks
+# OnlyOffice add-in service status for i3blocks
 # Left-click: restart, Right-click: menu
 
-SERVICE="user"
-SIGNAL=4
+SERVICE="onlyoffice"
+SIGNAL=5
 
 case $BLOCK_BUTTON in
     1) i3-msg -q "exec alacritty -e bash -c 'journalctl --user -u $SERVICE -f'"
@@ -23,19 +23,19 @@ esac
 STATUS=$(systemctl --user is-active "$SERVICE" 2>/dev/null)
 
 if [[ "$STATUS" == "active" ]]; then
-    # Check logs since service started for errors
-    START_TIME=$(systemctl --user show $SERVICE --property=ActiveEnterTimestamp --value)
-    if journalctl --user -u $SERVICE --since "$START_TIME" --no-pager 2>/dev/null | grep -qiE "UNKNOWN_TOPIC"; then
-        echo "󰒋 us"
+    # Check last log line for build status
+    LAST_LOG=$(journalctl --user -u $SERVICE -n 1 --no-pager 2>/dev/null)
+    if echo "$LAST_LOG" | grep -qiE "compiling|building|bundling"; then
+        echo "󰒋 oo"
         echo "󰒋"
-        echo "#b58900"  # yellow - has errors
+        echo "#b58900"  # yellow - building
     else
-        echo "󰒋 us"
+        echo "󰒋 oo"
         echo "󰒋"
-        echo "#859900"  # green - healthy
+        echo "#859900"  # green - ready
     fi
 else
-    echo "󰒋 us"
+    echo "󰒋 oo"
     echo "󰒋"
     echo "#dc322f"
 fi

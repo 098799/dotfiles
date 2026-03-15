@@ -262,7 +262,8 @@ klif() {
 [ -f "$HOME/.ghcup/env" ] && source "$HOME/.ghcup/env"
 
 # FZF
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+source /usr/share/fzf/key-bindings.zsh
+source /usr/share/fzf/completion.zsh
 
 # Google Cloud SDK
 if [ -f "$HOME/Programs/google-cloud-sdk/path.zsh.inc" ]; then
@@ -285,3 +286,4 @@ _fix_cursor() {
 precmd_functions+=(_fix_cursor)
 
 source ~/.profile
+export PATH=~/.npm-global/bin:$PATH

@@ -33,7 +33,7 @@ bar {
     status_command i3blocks
     position top
     font pango:Terminess Nerd Font 14
-    tray_output DP-2
+    tray_output primary
     tray_padding 4
     strip_workspace_numbers yes
 

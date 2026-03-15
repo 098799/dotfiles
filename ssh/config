@@ -1,0 +1,207 @@
+Host *
+ ServerAliveInterval 30
+
+# legartis
+Host legr01
+  HostName 138.201.138.77
+  User root
+  Port 2222
+
+Host legr03
+  HostName 94.130.75.156
+  User root
+  Port 2222
+
+Host legr04
+  HostName db.legartis.ai
+  User root
+  Port 2222
+
+Host legr05
+  HostName 194.182.163.168
+  User root
+  Port 2222
+
+Host legr06
+  HostName 194.182.161.193
+  User root
+  Port 2222
+
+Host simplebackups_exoscale
+  HostName 91.92.152.46
+  User root
+  Port 22
+
+Host github.com
+  Hostname github.com
+  User 098799
+  IdentityFile ~/.ssh/id_rsa_old
+
+Host tiger
+  Hostname tiger.chem.uw.edu.pl
+  User grining
+  Port 222
+
+Host 236
+  Hostname 155.158.107.236
+  User tomek
+  Port 22
+
+Host plgdansk
+  Hostname ui.grid.task.gda.pl
+  User plggrining
+  Port 22
+
+Host zeus
+  Hostname ui.grid.cyfronet.pl
+  User plggrining
+  Port 22
+
+Host kodkod
+  Hostname localhost
+  User grining
+  Port 9504
+
+Host ntig
+  Hostname localhost
+  User grining
+  Port 9505
+
+Host dodek
+  Hostname dodek.chem.uw.edu.pl
+  User grining
+  Port 22
+
+Host tania
+  Hostname tania.chem.uw.edu.pl
+  User grining
+  Port 22
+
+Host prom
+  Hostname prometheus.cyfronet.pl
+  User plggrining
+  Port 22
+
+Host ml
+  Hostname 194.182.165.108
+  User tomek
+  Port 22
+
+Host ubuntu-ml
+  Hostname 194.182.165.108
+  User ubuntu
+  Port 22
+
+Host arena
+  Hostname 85.217.161.55
+  User ubuntu
+  Port 22
+
+Host bikram_arena
+  Hostname 85.217.161.55
+  User bikram
+  Port 22
+
+Host master_thesis
+  Hostname 85.217.160.9
+  User ubuntu
+  Port 22
+
+Host hetzner
+  Hostname 116.203.133.96
+  User root
+  Port 22
+
+Host tower
+  Hostname 65.109.4.244
+  User root
+  Port 22
+
+Host p340
+  Hostname p340.local
+  User tgrining
+  Port 22
+
+Host remember_to_turn_me_off
+  Hostname 89.145.167.137
+  User ubuntu
+  Port 22
+
+Host automation
+  Hostname 65.108.87.104
+  User root
+  Port 22
+
+Host annotation_machine
+  Hostname 194.182.161.183
+  User ubuntu
+  Port 22
+
+Host glanos
+  HostName 159.100.242.77
+  User root
+  Port 22
+
+Host bae_llm
+  HostName 135.181.197.232
+  User root
+  Port 22
+
+Host glanos_sftp
+  HostName customers-sftp.glanos.de
+  Port 1793
+  User legartis
+  # Password "5HC#2CykZqV5"
+
+Host tower_editor
+  HostName 188.245.155.9
+  User root
+  Port 22
+
+Host infobikram
+  HostName 195.15.241.238
+  User ubuntu
+  Port 22
+
+Host t470
+  HostName 192.168.1.151
+  User tgrining
+  Port 22
+
+Host internal
+  HostName 159.100.250.97
+  User ubuntu
+  Port 22
+
+Host personalrecht
+  HostName 91.92.140.235
+  User ubuntu
+  Port 22
+
+Host gitlab-runner
+  HostName 195.15.241.9
+  User debian
+  Port 22
+
+Host gitlab-runner-2
+  HostName 195.15.241.253
+  User debian
+  Port 22
+
+Host infra-wireguard-prod-instance
+  HostName 159.100.242.185
+  User ubuntu
+  Port 22
+
+Host cc-remote
+  HostName 151.145.201.160
+  User ubuntu
+  Port 22
+
+Host bae-tries-linux
+  HostName 95.216.219.59
+  User root
+  Port 22
+Host git.legartis.ai
+    IdentityFile ~/.ssh/id_legartis_remote
+    IdentitiesOnly yes

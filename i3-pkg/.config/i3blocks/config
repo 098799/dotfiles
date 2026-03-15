@@ -14,23 +14,12 @@ command=~/scripts/claude-usage.sh
 interval=60
 
 #---------------------------------------------------------------------------
-# Services
+# Slots
 #---------------------------------------------------------------------------
 
-[svc-ontology]
-command=~/scripts/service-ontology.sh
+[slots]
+command=~/scripts/slots.sh
 interval=10
-signal=1
-
-[svc-consumer]
-command=~/scripts/service-consumer.sh
-interval=10
-signal=2
-
-[svc-frontend]
-command=~/scripts/service-frontend.sh
-interval=3
-signal=3
 
 #---------------------------------------------------------------------------
 # System Resources

@@ -6,5 +6,6 @@ $HOME/bin/light-sele
 $HOME/.screenlayout/laptop.sh
 $HOME/.screenlayout/narrow.sh
 $HOME/.screenlayout/wide.sh
+$HOME/.screenlayout/home.sh
 $HOME/scripts/float-laptop-inputs
-$HOME/scripts/reattach-laptop-inputs" | rofi -dmenu -lines 9 -font "Ubuntu 25" | sh
+$HOME/scripts/reattach-laptop-inputs" | rofi -dmenu -lines 10 -font "Ubuntu 25" | sh
