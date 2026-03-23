@@ -5,230 +5,14 @@ live_config_reload = true
 blink_interval = 600
 unfocused_hollow = true
 
+[cursor.style]
+blinking = "Always"
+
 [env]
 TERM = "alacritty"
 
 [font]
-size = 14
-
-[hints]
-alphabet = "jfkdls;ahgurieowpq"
-[[hints.enabled]]
-command = "xdg-open"
-hyperlinks = true
-post_processing = true
-persist = false
-regex = '(https?://|file://|mailto:)[^\x00-\x1f\x7f-\x9f<>"\s{-}\^⟨⟩`]+'
-
-[hints.enabled.binding]
-key = "U"
-mods = "Control|Shift"
-[hints.enabled.mouse]
-enabled = true
-mods = "None"
-
-[keyboard]
-[[keyboard.bindings]]
-action = "Paste"
-key = "V"
-mods = "Control|Shift"
-
-[[keyboard.bindings]]
-action = "Copy"
-key = "C"
-mods = "Control|Shift"
-
-[[keyboard.bindings]]
-action = "ResetFontSize"
-key = "Key0"
-mods = "Control"
-
-[[keyboard.bindings]]
-action = "IncreaseFontSize"
-key = "Plus"
-mods = "Control"
-
-[[keyboard.bindings]]
-action = "DecreaseFontSize"
-key = "Minus"
-mods = "Control"
-
-[[keyboard.bindings]]
-action = "ScrollPageDown"
-key = "K"
-mods = "Control|Shift"
-
-[[keyboard.bindings]]
-action = "ScrollPageUp"
-key = "L"
-mods = "Control|Shift"
-
-[[keyboard.bindings]]
-action = "ToggleViMode"
-key = "Space"
-mods = "Alt"
-
-[[keyboard.bindings]]
-action = "ToggleViMode"
-key = "G"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ToggleViMode"
-key = "Escape"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Left"
-key = "U"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Down"
-key = "I"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Up"
-key = "O"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Right"
-key = "P"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SemanticLeft"
-key = "J"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SemanticRight"
-key = ";"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ScrollHalfPageDown"
-key = "K"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ScrollHalfPageUp"
-key = "L"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "FirstOccupied"
-key = "H"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Last"
-key = "'"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "First"
-key = ","
-mods = "Shift"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Last"
-key = "."
-mods = "Shift"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ToggleNormalSelection"
-key = "Space"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ToggleSemanticSelection"
-key = "V"
-mods = "Alt"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ToggleSemanticSelection"
-key = "S"
-mods = "Alt"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ToggleLineSelection"
-key = "V"
-mods = "Shift"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "ToggleBlockSelection"
-key = "V"
-mods = "Control"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Copy"
-key = "C"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "Copy"
-key = "Y"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SearchForward"
-key = "S"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SearchForward"
-key = "/"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SearchBackward"
-key = "/"
-mods = "Shift"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SearchNext"
-key = "N"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "SearchPrevious"
-key = "N"
-mods = "Shift"
-mode = "Vi|~Search"
-
-[[keyboard.bindings]]
-action = "CenterAroundViCursor"
-key = "M"
-mode = "Vi|~Search"
-
-[mouse]
-[[mouse.bindings]]
-action = "PasteSelection"
-mouse = "Middle"
-
-[[mouse.bindings]]
-action = "CopySelection"
-mouse = "Right"
-
-[scrolling]
-history = 100000
-
-[window]
-decorations_theme_variant = "Dark"
-title = "Alacritty"
-
-[cursor.style]
-blinking = "Always"
+size = 24
 
 [font.bold]
 family = "UbuntuMono"
@@ -245,6 +29,76 @@ style = "Italic"
 [font.normal]
 family = "UbuntuMono"
 style = "Regular"
+
+[hints]
+alphabet = "jfkdls;ahgurieowpq"
+
+[[hints.enabled]]
+command = "xdg-open"
+hyperlinks = true
+post_processing = true
+persist = false
+regex = "(https?://|file://|mailto:)[^\\x00-\\x1f\\x7f-\\x9f<>\"\\s{-}\\^⟨⟩`]+"
+
+[hints.enabled.binding]
+key = "U"
+mods = "Control|Shift"
+
+[hints.enabled.mouse]
+enabled = true
+mods = "None"
+
+[keyboard]
+bindings = [
+    { action = "Paste", key = "V", mods = "Control|Shift" },
+    { action = "Copy", key = "C", mods = "Control|Shift" },
+    { action = "ResetFontSize", key = "Key0", mods = "Control" },
+    { action = "IncreaseFontSize", key = "Plus", mods = "Control" },
+    { action = "DecreaseFontSize", key = "Minus", mods = "Control" },
+    { action = "ScrollPageDown", key = "K", mods = "Control|Shift" },
+    { action = "ScrollPageUp", key = "L", mods = "Control|Shift" },
+    { action = "ToggleViMode", key = "Space", mods = "Alt" },
+    { action = "ToggleViMode", key = "G", mode = "Vi|~Search" },
+    { action = "ToggleViMode", key = "Escape", mode = "Vi|~Search" },
+    { action = "Left", key = "U", mode = "Vi|~Search" },
+    { action = "Down", key = "I", mode = "Vi|~Search" },
+    { action = "Up", key = "O", mode = "Vi|~Search" },
+    { action = "Right", key = "P", mode = "Vi|~Search" },
+    { action = "SemanticLeft", key = "J", mode = "Vi|~Search" },
+    { action = "SemanticRight", key = ";", mode = "Vi|~Search" },
+    { action = "ScrollHalfPageDown", key = "K", mode = "Vi|~Search" },
+    { action = "ScrollHalfPageUp", key = "L", mode = "Vi|~Search" },
+    { action = "FirstOccupied", key = "H", mode = "Vi|~Search" },
+    { action = "Last", key = "'", mode = "Vi|~Search" },
+    { action = "First", key = ",", mods = "Shift", mode = "Vi|~Search" },
+    { action = "Last", key = ".", mods = "Shift", mode = "Vi|~Search" },
+    { action = "ToggleNormalSelection", key = "Space", mode = "Vi|~Search" },
+    { action = "ToggleSemanticSelection", key = "V", mods = "Alt", mode = "Vi|~Search" },
+    { action = "ToggleSemanticSelection", key = "S", mods = "Alt", mode = "Vi|~Search" },
+    { action = "ToggleLineSelection", key = "V", mods = "Shift", mode = "Vi|~Search" },
+    { action = "ToggleBlockSelection", key = "V", mods = "Control", mode = "Vi|~Search" },
+    { action = "Copy", key = "C", mode = "Vi|~Search" },
+    { action = "Copy", key = "Y", mode = "Vi|~Search" },
+    { action = "SearchForward", key = "S", mode = "Vi|~Search" },
+    { action = "SearchForward", key = "/", mode = "Vi|~Search" },
+    { action = "SearchBackward", key = "/", mods = "Shift", mode = "Vi|~Search" },
+    { action = "SearchNext", key = "N", mode = "Vi|~Search" },
+    { action = "SearchPrevious", key = "N", mods = "Shift", mode = "Vi|~Search" },
+    { action = "CenterAroundViCursor", key = "M", mode = "Vi|~Search" },
+]
+
+[mouse]
+bindings = [
+    { action = "PasteSelection", mouse = "Middle" },
+    { action = "CopySelection", mouse = "Right" },
+]
+
+[scrolling]
+history = 100000
+
+[window]
+decorations_theme_variant = "Dark"
+title = "Alacritty"
 
 [window.class]
 general = "Alacritty"

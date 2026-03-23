@@ -286,10 +286,11 @@ mode "resize" {
 # exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
 exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
 
-# lock screen settings
-# bindsym Ctrl+$mod1+l exec i3lock -c 000000
-bindsym Ctrl+$mod1+l exec --no-startup-id blurlock
-exec --no-startup-id xautolock -time 10 -locker blurlock
+# lock screen settings (xsecurelock with fingerprint support)
+# SIGUSR2 immediately opens auth prompt so fingerprint works without keypress
+set $lock_env XSECURELOCK_NO_PAM_RHOST=1 XSECURELOCK_SAVER=saver_blank
+bindsym Ctrl+$mod1+l exec --no-startup-id "env $lock_env xsecurelock & sleep 0.3 && pkill -x -USR2 xsecurelock"
+exec --no-startup-id xss-lock -- env XSECURELOCK_NO_PAM_RHOST=1 XSECURELOCK_SAVER=saver_blank xsecurelock
 
 bindsym Mod1+F4 kill
 bindsym Print exec --no-startup-id scrot -s

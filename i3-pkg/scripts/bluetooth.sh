@@ -18,7 +18,7 @@ case $BLOCK_BUTTON in
 esac
 
 # Check if bluetooth is powered on
-POWERED=$(bluetoothctl show 2>/dev/null | grep "Powered:" | awk '{print $2}')
+POWERED=$(echo "show" | timeout 2 bluetoothctl 2>/dev/null | grep "Powered:" | awk '{print $2}')
 
 if [[ "$POWERED" != "yes" ]]; then
     echo "󰂲 Off"
@@ -28,7 +28,7 @@ if [[ "$POWERED" != "yes" ]]; then
 fi
 
 # Get connected devices
-CONNECTED=$(bluetoothctl devices Connected 2>/dev/null | head -1 | cut -d' ' -f3-)
+CONNECTED=$(echo "devices Connected" | timeout 2 bluetoothctl 2>/dev/null | grep "^Device" | head -1 | cut -d' ' -f3-)
 
 if [[ -n "$CONNECTED" ]]; then
     # Shorten MX Master to MXM3

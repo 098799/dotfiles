@@ -14,6 +14,14 @@ else
     ACCOUNT="work"
 fi
 
+# Keep active account's backup in sync (tokens get refreshed by Claude Code)
+if [[ -f "$CLAUDE_CREDS" ]]; then
+    BACKUP="$HOME/.claude/.credentials-$ACCOUNT.json"
+    if ! cmp -s "$CLAUDE_CREDS" "$BACKUP" 2>/dev/null; then
+        cp "$CLAUDE_CREDS" "$BACKUP"
+    fi
+fi
+
 # Handle click
 case $BLOCK_BUTTON in
     3)
@@ -36,6 +44,8 @@ case $BLOCK_BUTTON in
                 cp "$CLAUDE_CREDS" "$HOME/.claude/.credentials-$ACCOUNT.json"
                 cp "$CREDS_FILE" "$CLAUDE_CREDS"
             fi
+            # Kill chrome-native-host processes so the plugin reconnects with new creds
+            pkill -f 'claude.*--chrome-native-host' 2>/dev/null || true
             ACCOUNT="$CHOICE"
         fi
         ;;

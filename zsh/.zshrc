@@ -126,21 +126,67 @@ alias kdp="k describe pod"
 alias kdna="k describe namespaces"
 alias kdno="k describe nodes"
 
-# Service directory shortcuts
-alias o1="cd ~/legartis/ && cd services/backend/ontology_service/"
-alias o2="cd ~/legartis2/ && cd services/backend/ontology_service/"
-alias o3="cd ~/legartis3/ && cd services/backend/ontology_service/"
-alias e2e="cd ~/legartis/ && cd services/backend/e2e/e2e/"
+# === legartis-env helpers ===
+# Resolves paths: no arg / "" → ~/legartis/ + ~/.virtualenvs/legartis/
+#                  N          → ~/legartisN/ + ~/.virtualenvs/legartisN/
+# Sources slot.env when available so DB connections hit the right postgres.
 
-# Django shell shortcuts
-alias oshell0="~/.virtualenvs/legartis0/bin/python -m ontology_service.manage shell_plus"
-alias oshell="~/.virtualenvs/legartis/bin/python -m ontology_service.manage shell_plus"
-alias oshell2="~/.virtualenvs/legartis2/bin/python -m ontology_service.manage shell_plus"
-alias oshell3="~/.virtualenvs/legartis3/bin/python -m ontology_service.manage shell_plus"
-alias oshell4="~/.virtualenvs/legartis4/bin/python -m ontology_service.manage shell_plus"
-alias oshell5="~/.virtualenvs/legartis5/bin/python -m ontology_service.manage shell_plus"
-alias oshell6="~/.virtualenvs/legartis6/bin/python -m ontology_service.manage shell_plus"
-alias oshell7="~/.virtualenvs/legartis7/bin/python -m ontology_service.manage shell_plus"
+_legartis_slot_env() {
+  local slot="$1"
+  local envfile="$HOME/.legartis/slots/${slot}/slot.env"
+  [[ -n "$slot" && -f "$envfile" ]] && set -a && source "$envfile" && set +a
+}
+
+_legartis_dir()  { echo "$HOME/legartis${1:+$1}"; }
+_legartis_venv() { echo "$HOME/.virtualenvs/legartis${1:+$1}"; }
+
+# cd into ontology service dir for a slot
+o() { cd "$(_legartis_dir "$1")/services/backend/ontology_service/"; }
+
+# Django shell_plus (runs in subshell to not leak env vars)
+oshell() {
+  local slot="$1"; shift
+  ( _legartis_slot_env "$slot"
+    "$(_legartis_venv "$slot")/bin/python" -m ontology_service.manage shell_plus "$@" )
+}
+
+# Ontology service tests
+otest() {
+  local slot="$1"; shift
+  _legartis_slot_env "$slot"
+  cd "$(_legartis_dir "$slot")/services/backend/ontology_service/"
+  PYTEST_RUN=True "$(_legartis_venv "$slot")/bin/pytest" \
+    "-o=python_files=tests.py *_tests.py *_itests.py test_*.py" \
+    --reuse-db --no-migrations --disable-pytest-warnings \
+    --ds=ontology_service.configuration.settings \
+    -m "not isolateme" -W "ignore" -n 4 "$@"
+}
+
+# E2E tests
+etest() {
+  local slot="$1"; shift
+  _legartis_slot_env "$slot"
+  "$(_legartis_venv "$slot")/bin/pytest" \
+    --disable-pytest-warnings -o="python_files=test_*.py" -W "ignore" "$@"
+}
+
+# Run a Python script with slot env + slot venv (runs in subshell)
+# Usage: sh <slot> <script> [args...]  e.g. sh 4 scripts_2026/backfill_risk_levels.py
+lpy() {
+  local slot="$1"; shift
+  ( _legartis_slot_env "$slot"
+    "$(_legartis_venv "$slot")/bin/python" "$@" )
+}
+
+# Numbered shortcuts — e.g. oshell4, otest4, etest4, o4, lpy4
+for _n in 0 1 2 3 4 5 6 7; do
+  eval "oshell${_n}() { oshell ${_n} \"\$@\"; }"
+  eval "otest${_n}()  { otest ${_n} \"\$@\"; }"
+  eval "etest${_n}()  { etest ${_n} \"\$@\"; }"
+  eval "o${_n}()      { o ${_n}; }"
+  eval "lpy${_n}()    { lpy ${_n} \"\$@\"; }"
+done
+unset _n
 
 # Ansible
 alias ap='ansible-playbook'

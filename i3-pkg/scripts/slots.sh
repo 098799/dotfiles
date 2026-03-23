@@ -6,7 +6,7 @@
 # Colors: solarized palette
 
 case $BLOCK_BUTTON in
-    1) alacritty -e bash -c "legartis-env status; read -p 'Press enter to close...'" & ;;
+    1) alacritty -e bash -c "$HOME/bin/legartis-env status; read -p 'Press enter to close...'" & ;;
 esac
 
 docker_names=$(docker ps --format '{{.Names}}' 2>/dev/null)
@@ -69,6 +69,9 @@ for slot in $(seq 0 8); do
     else
         cs="<span color='$DIM'>-</span>"
     fi
+
+    # Skip slots with no activity (---)
+    [[ "$d" == "false" && "$t" == "false" && -z "$c" ]] && continue
 
     output="${output} <span color='${slot_color}'>${slot}</span>:${ds}${ts}${cs}"
     short="${short} ${slot}:$(${d} && echo D || echo -)$(${t} && echo T || echo -)${c:-"-"}"

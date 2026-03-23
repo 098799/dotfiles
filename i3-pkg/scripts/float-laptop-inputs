@@ -14,6 +14,7 @@ devices=(
     "SynPS/2 Synaptics TouchPad"
     "TPPS/2 IBM TrackPoint"
     "AT Translated Set 2 keyboard"
+    "TPPS/2 Elan TrackPoint"
     "ThinkPad Extra Buttons"
 )
 
