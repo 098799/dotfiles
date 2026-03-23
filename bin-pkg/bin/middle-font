@@ -1,0 +1,3 @@
+#!/bin/bash
+sed -i 's/^size = .*/size = 16/' ~/dotfiles/alacritty-pkg/.alacritty.toml
+emacsclient -e '(middle-font)'
