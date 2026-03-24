@@ -61,10 +61,6 @@ interval=5
 command=~/scripts/bt-headphones.sh
 interval=5
 
-[bt-mouse]
-command=~/scripts/bt-mouse.sh
-interval=5
-
 #---------------------------------------------------------------------------
 # Audio & Battery
 #---------------------------------------------------------------------------

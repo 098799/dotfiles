@@ -16,7 +16,7 @@ if [[ -n "$WIFI_IF" ]] && [[ -d "/sys/class/net/$WIFI_IF/wireless" ]]; then
     STATE=$(cat /sys/class/net/$WIFI_IF/operstate 2>/dev/null)
     if [[ "$STATE" == "up" ]]; then
         # Get SSID
-        SSID=$(iwgetid -r 2>/dev/null || echo "WiFi")
+        SSID=$(iwgetid -r 2>/dev/null || nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2 || echo "WiFi")
         # Get signal quality
         QUALITY=$(iw dev $WIFI_IF link 2>/dev/null | grep 'signal' | awk '{print $2}')
         echo "󰖩 $SSID"
