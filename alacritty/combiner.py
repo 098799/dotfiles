@@ -10,7 +10,7 @@ import tomli_w
 import yaml
 
 dotfiles_dir = os.path.expanduser("~/dotfiles")
-alacritty_toml = f"{dotfiles_dir}/alacritty-pkg/.alacritty.toml"
+alacritty_toml = f"{dotfiles_dir}/alacritty-pkg/.config/alacritty/alacritty.toml"
 
 with open(alacritty_toml, "rb") as infile:
     main_config = tomllib.load(infile)

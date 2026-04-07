@@ -184,6 +184,11 @@ Host gitlab-runner
   Port 22
 
 Host gitlab-runner-2
+  HostName 195.15.207.121
+  User debian
+  Port 22
+
+Host gitlab-runner-3
   HostName 195.15.241.253
   User debian
   Port 22
@@ -202,6 +207,17 @@ Host bae-tries-linux
   HostName 95.216.219.59
   User root
   Port 22
+
 Host git.legartis.ai
-    IdentityFile ~/.ssh/id_legartis_remote
-    IdentitiesOnly yes
+  IdentityFile ~/.ssh/id_legartis_remote
+  IdentitiesOnly yes
+
+# --- claude-vps managed block ---
+Host claude-vps
+    HostName 49.13.17.163
+    User root
+    IdentityFile /home/tgrining/.local/state/claude-vps/id_ed25519
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+# --- end claude-vps ---

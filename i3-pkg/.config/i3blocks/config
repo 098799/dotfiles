@@ -75,6 +75,16 @@ command=~/scripts/mic.sh
 interval=1
 signal=11
 
+[cpu-boost]
+command=~/scripts/cpu-boost.sh
+interval=30
+signal=13
+
+[power-profile]
+command=~/scripts/power-profile.sh
+interval=30
+signal=12
+
 [battery]
 command=~/scripts/battery.sh
 interval=30

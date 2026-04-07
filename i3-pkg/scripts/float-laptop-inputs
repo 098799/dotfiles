@@ -1,18 +1,16 @@
 #!/bin/bash
 # Float laptop input devices when Planck keyboard is connected
 
-# Check if Planck is connected
-if ! xinput list | grep -q "Drop Planck"; then
-    echo "Planck not connected, doing nothing"
+# Check if an external keyboard is connected
+if ! xinput list | grep -qE "Drop Planck|foostan Corne"; then
+    echo "No external keyboard connected, doing nothing"
     exit 0
 fi
 
-echo "Planck detected, floating laptop inputs..."
+echo "External keyboard detected, floating laptop inputs..."
 
-# Devices to float
+# Devices to float (keeping touchpad active intentionally)
 devices=(
-    "SynPS/2 Synaptics TouchPad"
-    "TPPS/2 IBM TrackPoint"
     "AT Translated Set 2 keyboard"
     "TPPS/2 Elan TrackPoint"
     "ThinkPad Extra Buttons"

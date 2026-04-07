@@ -8,7 +8,7 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 |---------|----------|
 | `zsh` | `.zshrc` |
 | `git` | `.gitconfig`, `.gitignore_global` |
-| `alacritty-pkg` | `.alacritty.toml` |
+| `alacritty-pkg` | `.config/alacritty/alacritty.toml` |
 | `i3-pkg` | i3 config, i3blocks, rofi, screenlayout, scripts |
 | `bin-pkg` | `~/bin/` helper scripts (theme switching) |
 | `espanso-pkg` | Text expansion config |
@@ -80,7 +80,7 @@ stow -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
 │   ├── .gitconfig
 │   └── .gitignore_global
 ├── alacritty-pkg/
-│   └── .alacritty.toml
+│   └── .config/alacritty/alacritty.toml
 ├── i3-pkg/
 │   ├── .config/
 │   │   ├── i3/

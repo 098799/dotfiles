@@ -3,7 +3,7 @@ import sys
 
 import toml
 
-alacritty_toml = os.path.expanduser("~/dotfiles/alacritty-pkg/.alacritty.toml")
+alacritty_toml = os.path.expanduser("~/dotfiles/alacritty-pkg/.config/alacritty/alacritty.toml")
 
 with open(alacritty_toml, "r") as infile:
     main_config = toml.load(infile)

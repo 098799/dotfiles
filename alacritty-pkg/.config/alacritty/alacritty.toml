@@ -12,7 +12,7 @@ blinking = "Always"
 TERM = "alacritty"
 
 [font]
-size = 24
+size = 16
 
 [font.bold]
 family = "UbuntuMono"

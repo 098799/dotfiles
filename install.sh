@@ -28,7 +28,7 @@ fi
 
 # Remove conflicting files/symlinks that would block stow
 echo "Cleaning up existing files..."
-rm -f ~/.zshrc ~/.gitconfig ~/.gitignore_global ~/.alacritty.toml
+rm -f ~/.zshrc ~/.gitconfig ~/.gitignore_global ~/.config/alacritty/alacritty.toml
 rm -f ~/scripts ~/.screenlayout
 rm -f ~/.config/i3/config
 rm -rf ~/.config/i3blocks ~/.config/rofi
@@ -54,7 +54,7 @@ echo ""
 echo "Done! Installed packages:"
 echo "  - zsh        : ~/.zshrc"
 echo "  - git        : ~/.gitconfig, ~/.gitignore_global"
-echo "  - alacritty  : ~/.alacritty.toml"
+echo "  - alacritty  : ~/.config/alacritty/alacritty.toml"
 echo "  - i3         : ~/.config/i3/, i3blocks, rofi, scripts, screenlayout"
 echo "  - bin        : ~/bin/ (theme scripts, utilities)"
 echo ""

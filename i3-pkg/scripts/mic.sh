@@ -11,11 +11,11 @@ esac
 MUTED=$(pactl get-source-mute @DEFAULT_SOURCE@ | grep -Po '(?<=Mute: )\w+')
 
 if [[ "$MUTED" == "yes" ]]; then
-    echo "󰍭 OFF"
+    echo "󰍭"
     echo "󰍭"
     echo "#dc322f"
 else
-    echo "󰍬 ON"
+    echo "󰍬"
     echo "󰍬"
     echo "#859900"
 fi
