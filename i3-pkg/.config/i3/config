@@ -205,7 +205,7 @@ focus_follows_mouse no
 # bindsym $mod+Shift+o move container to workspace 16
 
 #my monitor binding
-workspace services output DP-2
+workspace cmon output DP-2
 workspace 0 output DP-2
 workspace 1 output DP-2
 workspace 2 output DP-2
@@ -225,7 +225,7 @@ workspace 7 output DP-1
 workspace 8 output DP-1
 
 # switch to workspace
-bindsym $mod+r workspace services, focus output DP-2
+bindsym $mod+r workspace cmon, focus output DP-2
 bindsym $mod+t workspace 0, focus output DP-2
 bindsym $mod+y workspace 1, focus output DP-2
 bindsym $mod+u workspace 2, focus output DP-2
@@ -245,7 +245,7 @@ bindsym $mod+comma workspace 7, focus output DP-1
 bindsym $mod+period workspace 8, focus output DP-1
 
 # move focused container to workspace
-bindsym $mod+Shift+r move container to workspace services
+bindsym $mod+Shift+r move container to workspace cmon
 bindsym $mod+Shift+t move container to workspace 0
 bindsym $mod+Shift+y move container to workspace 1
 bindsym $mod+Shift+u move container to workspace 2
