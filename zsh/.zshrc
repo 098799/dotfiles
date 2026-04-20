@@ -42,9 +42,9 @@ zstyle ':completion:*' cache-path ~/.zsh/cache
 [ -f /etc/profile.d/vte.sh ] && source /etc/profile.d/vte.sh
 
 # Virtualenvwrapper
+export VIRTUALENVWRAPPER_PYTHON=/usr/bin/python3
 source "$HOME/.local/bin/virtualenvwrapper.sh"
 export PYTHONPATH="${PYTHONPATH}:$HOME/.virtualenvs:$HOME"
-export VIRTUALENVWRAPPER_PYTHON=$(which python3)
 export VIRTUAL_ENV_DISABLE_PROMPT=1
 
 # Editor configuration
@@ -157,9 +157,9 @@ otest() {
   cd "$(_legartis_dir "$slot")/services/backend/ontology_service/"
   PYTEST_RUN=True "$(_legartis_venv "$slot")/bin/pytest" \
     "-o=python_files=tests.py *_tests.py *_itests.py test_*.py" \
-    --reuse-db --no-migrations --disable-pytest-warnings \
+    --create-db --no-migrations --disable-pytest-warnings \
     --ds=ontology_service.configuration.settings \
-    -m "not isolateme" -W "ignore" -n 4 "$@"
+    -m "not isolateme" -W "ignore" -n 8 "$@"
 }
 
 # E2E tests
@@ -333,3 +333,10 @@ precmd_functions+=(_fix_cursor)
 
 source ~/.profile
 export PATH=~/.npm-global/bin:$PATH
+
+# bun completions
+[ -s "/home/tgrining/.bun/_bun" ] && source "/home/tgrining/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"

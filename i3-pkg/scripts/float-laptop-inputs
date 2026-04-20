@@ -2,7 +2,7 @@
 # Float laptop input devices when Planck keyboard is connected
 
 # Check if an external keyboard is connected
-if ! xinput list | grep -qE "Drop Planck|foostan Corne"; then
+if ! xinput list | grep -qE "Drop Planck|OLKB Planck|foostan Corne"; then
     echo "No external keyboard connected, doing nothing"
     exit 0
 fi

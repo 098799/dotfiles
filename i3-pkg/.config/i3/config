@@ -17,40 +17,8 @@ set $mod1 Mod1
 font pango:Ubuntu Mono 10
 #font pango:monospace 8
 
-# dark mode
-client.focused #859900 #859900 #fdf6e3 #6c71c4
-client.focused_inactive #073642 #073642 #eee8d5 #6c71c4
-client.unfocused #073642 #073642 #93a1a1 #586e75
-client.urgent #d33682 #d33682 #fdf6e3 #dc322f
-
-## light mode
-# client.focused #859900 #859900 #fdf6e3 #6c71c4
-# client.focused_inactive #EEEEEE #EEEEEE #888888 #EEEEEE
-# client.unfocused #EEEEEE #EEEEEE #888888 #292d2e
-# client.urgent #d33682 #d33682 #fdf6e3 #dc322f
-
-bar {
-    status_command i3blocks
-    position top
-    font pango:Terminess Nerd Font 14
-    tray_output primary
-    tray_padding 4
-    strip_workspace_numbers yes
-
-    colors {
-        # Solarized Dark theme
-        background #002b36
-        statusline #93a1a1
-        separator  #586e75
-
-        # border    bg        text
-        focused_workspace  #859900 #859900 #fdf6e3
-        active_workspace   #268bd2 #268bd2 #fdf6e3
-        inactive_workspace #002b36 #002b36 #657b83
-        urgent_workspace   #dc322f #dc322f #fdf6e3
-        binding_mode       #cb4b16 #cb4b16 #fdf6e3
-    }
-}
+# Colors, client.* and the bar{} block — picked by ~/.config/i3/colors.d/current.conf (managed by `theme` script)
+include ~/.config/i3/colors.d/current.conf
 
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
@@ -217,9 +185,9 @@ workspace 7 output DP-2
 workspace 8 output DP-2
 workspace 9 output DP-2
 workspace 10 output DP-2
-workspace chrome output DP-1
+workspace work output DP-1
 workspace slack output DP-1
-workspace firefox output DP-1
+workspace priv output DP-1
 workspace 6 output DP-1
 workspace 7 output DP-1
 workspace 8 output DP-1
@@ -237,9 +205,9 @@ bindsym $mod+$mod1+Shift+u workspace 7, focus output DP-2
 bindsym $mod+$mod1+Shift+i workspace 8, focus output DP-2
 bindsym $mod+$mod1+Shift+o workspace 9, focus output DP-2
 bindsym $mod+$mod1+Shift+p workspace 10, focus output DP-2
-bindsym $mod+g workspace chrome, focus output DP-1
+bindsym $mod+g workspace work, focus output DP-1
 bindsym $mod+h workspace slack, focus output DP-1
-bindsym $mod+slash workspace firefox, focus output DP-1
+bindsym $mod+slash workspace priv, focus output DP-1
 bindsym $mod+m workspace 6, focus output DP-1
 bindsym $mod+comma workspace 7, focus output DP-1
 bindsym $mod+period workspace 8, focus output DP-1
@@ -252,9 +220,9 @@ bindsym $mod+Shift+u move container to workspace 2
 bindsym $mod+Shift+i move container to workspace 3
 bindsym $mod+Shift+o move container to workspace 4
 bindsym $mod+Shift+p move container to workspace 5
-bindsym $mod+Shift+g move container to workspace chrome
+bindsym $mod+Shift+g move container to workspace work
 bindsym $mod+Shift+h move container to workspace slack
-bindsym $mod+Shift+slash move container to workspace firefox
+bindsym $mod+Shift+slash move container to workspace priv
 bindsym $mod+Shift+m move container to workspace 6
 bindsym $mod+Shift+comma move container to workspace 7
 bindsym $mod+Shift+period move container to workspace 8
@@ -284,7 +252,7 @@ mode "resize" {
 
 # exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 # exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
-exec_always --no-startup-id feh --bg-scale ~/Pictures/wallpaper.png
+exec_always --no-startup-id feh --bg-scale ~/Pictures/legartis-escher.png
 
 # lock screen settings (xsecurelock with fingerprint support)
 # SIGUSR2 immediately opens auth prompt so fingerprint works without keypress
@@ -337,6 +305,7 @@ exec --no-startup-id nm-applet
 exec $HOME/Programs/emacs/src/emacs --daemon
 exec autokey-gtk
 exec thunar --daemon
+exec --no-startup-id xsettingsd
 exec syncthing
 exec nextcloud
 

@@ -1,0 +1,79 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+    echo "usage: theme <light|dark> <gruvbox|selenized>" >&2
+    exit 2
+}
+
+[[ $# -eq 2 ]] || usage
+mode=$1
+palette=$2
+
+case $mode in light | dark) ;; *) usage ;; esac
+case $palette in gruvbox | selenized) ;; *) usage ;; esac
+
+case $palette:$mode in
+    gruvbox:light) emacs_theme=doom-gruvbox-light ;;
+    gruvbox:dark) emacs_theme=doom-gruvbox ;;
+    selenized:light) emacs_theme=doom-solarized-light ;;
+    selenized:dark) emacs_theme=doom-solarized-dark ;;
+esac
+
+uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette"
+
+if command -v gsettings >/dev/null; then
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode"
+fi
+
+case $mode in
+    dark)
+        gtk_name=Adapta-Nokto-Eta-Maia
+        prefer_dark_ini=true
+        prefer_dark_xs=1
+        ;;
+    light)
+        gtk_name=Adapta-Eta-Maia
+        prefer_dark_ini=false
+        prefer_dark_xs=0
+        ;;
+esac
+
+gtk3_ini=$HOME/.config/gtk-3.0/settings.ini
+gtkrc2=$HOME/.gtkrc-2.0
+if [[ -f $gtk3_ini ]]; then
+    sed -i -E \
+        -e "s|^gtk-theme-name=.*|gtk-theme-name=$gtk_name|" \
+        -e "s|^gtk-application-prefer-dark-theme=.*|gtk-application-prefer-dark-theme=$prefer_dark_ini|" \
+        "$gtk3_ini"
+fi
+if [[ -f $gtkrc2 ]]; then
+    sed -i -E "s|^gtk-theme-name=.*|gtk-theme-name=\"$gtk_name\"|" "$gtkrc2"
+fi
+
+xs_conf=$HOME/.config/xsettingsd/xsettingsd.conf
+if [[ -f $xs_conf ]]; then
+    sed -i -E \
+        -e "s|^Net/ThemeName .*|Net/ThemeName \"$gtk_name\"|" \
+        -e "s|^Gtk/ApplicationPreferDarkTheme .*|Gtk/ApplicationPreferDarkTheme $prefer_dark_xs|" \
+        "$xs_conf"
+    pkill -HUP -x xsettingsd || true
+fi
+
+claude_settings=$HOME/.claude/settings.json
+if [[ -f $claude_settings ]]; then
+    tmp=$(mktemp)
+    jq --arg t "$mode" '.theme = $t' "$claude_settings" >"$tmp" && mv "$tmp" "$claude_settings"
+fi
+
+i3_colors_dir=$HOME/.config/i3/colors.d
+if [[ -d $i3_colors_dir ]]; then
+    ln -sf "$palette-$mode.conf" "$i3_colors_dir/current.conf"
+    if i3-msg -t get_version >/dev/null 2>&1; then
+        i3-msg reload >/dev/null
+    fi
+fi
+
+if emacsclient -e t >/dev/null 2>&1; then
+    emacsclient -n -e "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme '$emacs_theme t))" >/dev/null
+fi

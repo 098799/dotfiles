@@ -1,3 +1,2 @@
 #!/bin/bash
-uv run ~/dotfiles/alacritty/combiner.py light gruvbox
-emacsclient -e "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme 'doom-gruvbox-light t))"
+exec "$(dirname "$(readlink -f "$0")")/theme" light gruvbox

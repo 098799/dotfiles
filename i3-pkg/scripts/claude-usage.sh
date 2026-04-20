@@ -173,5 +173,5 @@ fi
 W_SPAN=$(format_account "W" "$W_USAGE" "$W_COLOR" "$W_RESET" "$W_ACTIVE")
 P_SPAN=$(format_account "P" "$P_USAGE" "$P_COLOR" "$P_RESET" "$P_ACTIVE")
 
-echo "<span background='#073642'> 󰚩 ${W_SPAN} ${P_SPAN} </span>"
+echo " 󰚩 ${W_SPAN} ${P_SPAN} "
 echo "󰚩 W:${W_USAGE}% P:${P_USAGE}%"
