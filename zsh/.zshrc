@@ -178,13 +178,23 @@ lpy() {
     "$(_legartis_venv "$slot")/bin/python" "$@" )
 }
 
-# Numbered shortcuts — e.g. oshell4, otest4, etest4, o4, lpy4
+# Deploy keycloak-configuration-staging from the Nth slot worktree.
+# Wraps the canonical `pnpm run devops:deploy:keycloak-conf:staging` (vault OIDC login included).
+# Usage: keycloak <slot> [extra cdktn args]  e.g. keycloak 0 --auto-approve
+keycloak() {
+  local slot="$1"; shift
+  ( cd "$(_legartis_dir "$slot")/deployments/cdktf" \
+      && pnpm run deploy:branch-roles:with-login "$@" )
+}
+
+# Numbered shortcuts — e.g. oshell4, otest4, etest4, o4, lpy4, keycloak4
 for _n in 0 1 2 3 4 5 6 7; do
-  eval "oshell${_n}() { oshell ${_n} \"\$@\"; }"
-  eval "otest${_n}()  { otest ${_n} \"\$@\"; }"
-  eval "etest${_n}()  { etest ${_n} \"\$@\"; }"
-  eval "o${_n}()      { o ${_n}; }"
-  eval "lpy${_n}()    { lpy ${_n} \"\$@\"; }"
+  eval "oshell${_n}()   { oshell ${_n} \"\$@\"; }"
+  eval "otest${_n}()    { otest ${_n} \"\$@\"; }"
+  eval "etest${_n}()    { etest ${_n} \"\$@\"; }"
+  eval "o${_n}()        { o ${_n}; }"
+  eval "lpy${_n}()      { lpy ${_n} \"\$@\"; }"
+  eval "keycloak${_n}() { keycloak ${_n} \"\$@\"; }"
 done
 unset _n
 
@@ -319,11 +329,11 @@ if [ -f "$HOME/Programs/google-cloud-sdk/completion.zsh.inc" ]; then
     source "$HOME/Programs/google-cloud-sdk/completion.zsh.inc"
 fi
 
-# # NVM
-# source /usr/share/nvm/init-nvm.sh
-# export NVM_DIR="$HOME/.nvm"
-# [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
-# [ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
+# NVM
+source /usr/share/nvm/init-nvm.sh
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && source "$NVM_DIR/bash_completion"
 
 # Force block cursor (for terminal emulators)
 _fix_cursor() {
