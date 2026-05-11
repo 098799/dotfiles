@@ -43,6 +43,13 @@ mkdir -p ~/.config/i3
 echo "Stowing core packages..."
 stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
 
+# Seed the i3 active palette symlink if it's missing — i3's `include` silently
+# no-ops on a missing file, which would drop the bar{} block and client.*
+# colors. The `theme` script overwrites this symlink on demand.
+if [[ ! -e ~/.config/i3/active-palette.conf ]]; then
+    ln -sf colors.d/gruvbox-dark.conf ~/.config/i3/active-palette.conf
+fi
+
 # Optional packages (uncomment as needed)
 # stow -v -t ~ emacs
 # stow -v -t ~ vim

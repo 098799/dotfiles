@@ -68,7 +68,7 @@ fi
 
 i3_colors_dir=$HOME/.config/i3/colors.d
 if [[ -d $i3_colors_dir ]]; then
-    ln -sf "$palette-$mode.conf" "$i3_colors_dir/current.conf"
+    ln -sf "colors.d/$palette-$mode.conf" "$HOME/.config/i3/active-palette.conf"
     if i3-msg -t get_version >/dev/null 2>&1; then
         i3-msg reload >/dev/null
     fi

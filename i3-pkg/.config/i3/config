@@ -17,8 +17,9 @@ set $mod1 Mod1
 font pango:Ubuntu Mono 10
 #font pango:monospace 8
 
-# Colors, client.* and the bar{} block — picked by ~/.config/i3/colors.d/current.conf (managed by `theme` script)
-include ~/.config/i3/colors.d/current.conf
+# Colors, client.* and the bar{} block — picked by ~/.config/i3/active-palette.conf
+# (symlink into colors.d/, managed by `theme` script; default seeded by install.sh)
+include ~/.config/i3/active-palette.conf
 
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
