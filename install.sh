@@ -33,9 +33,6 @@ rm -f ~/scripts ~/.screenlayout
 rm -f ~/.config/i3/config
 rm -rf ~/.config/i3blocks ~/.config/rofi
 
-# Remove i3 helper files if they exist (stow will recreate as symlinks)
-rm -f ~/.config/i3/{CURRENT_MONITOR,alternating_layouts.py,create_config.sh,layout.sh} 2>/dev/null || true
-
 # Create necessary directories
 mkdir -p ~/.config/i3
 
