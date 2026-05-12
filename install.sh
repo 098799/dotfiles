@@ -47,6 +47,16 @@ if [[ ! -e ~/.config/i3/active-palette.conf ]]; then
     ln -sf colors.d/gruvbox-dark.conf ~/.config/i3/active-palette.conf
 fi
 
+# Seed alacritty runtime overlays — the stowed alacritty.toml imports them via
+# general.import. Missing imports log errors and leave fallbacks active, so seed
+# defaults to keep things quiet. Theme + {big,middle,small,huge}-font rewrite these.
+if [[ ! -e ~/.config/alacritty/active-palette.toml ]]; then
+    uv run alacritty/combiner.py dark gruvbox
+fi
+if [[ ! -e ~/.config/alacritty/active-font.toml ]]; then
+    printf '[font]\nsize = 16\n' > ~/.config/alacritty/active-font.toml
+fi
+
 # Optional packages (uncomment as needed)
 # stow -v -t ~ emacs
 # stow -v -t ~ vim
