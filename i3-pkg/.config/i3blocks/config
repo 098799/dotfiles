@@ -61,6 +61,10 @@ interval=5
 command=~/scripts/bt-headphones.sh
 interval=5
 
+[bt-keyboard]
+command=~/scripts/bt-keyboard.sh
+interval=5
+
 #---------------------------------------------------------------------------
 # Audio & Battery
 #---------------------------------------------------------------------------
