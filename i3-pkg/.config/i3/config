@@ -104,6 +104,8 @@ bindsym $mod+x exec emacsclient -c
 bindsym $mod+q exec thunar
 # Linear issue tracker TUI
 # bindsym $mod+s exec alacritty -e /home/tgrining/bin/linear
+# cmon monitor TUI (terminal closes when cmon exits)
+bindsym $mod+s exec env PATH=/home/tgrining/bin:/home/tgrining/.local/bin:$PATH alacritty -e /home/tgrining/bin/cmon
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle
@@ -253,13 +255,20 @@ mode "resize" {
 
 # exec_always --no-startup-id $HOME/.config/polybar/launch.sh
 # exec_always --no-startup-id xsetroot -add "#444444" -add "#404040" -gradient 0
-exec_always --no-startup-id feh --bg-scale ~/Pictures/legartis-escher.png
+# Re-apply the last-saved theme (wallpaper + all app colors) on login.
+# `exec` (not exec_always) so it runs once at startup, never on reload.
+exec --no-startup-id $HOME/bin/theme-restore
+# Re-stretch the wallpaper to the current monitor layout on every reload.
+# `theme` writes ~/.fehbg (feh --bg-scale <current wallpaper>); replaying it
+# only touches the X root, so it's safe in exec_always (no reload loop) and
+# restores the pre-theme-system "mod+Shift+c re-stretches" behavior.
+exec_always --no-startup-id sh -c '[ -x "$HOME/.fehbg" ] && "$HOME/.fehbg"'
 
 # lock screen settings (xsecurelock with fingerprint support)
-# SIGUSR2 immediately opens auth prompt so fingerprint works without keypress
-set $lock_env XSECURELOCK_NO_PAM_RHOST=1 XSECURELOCK_SAVER=saver_blank
-bindsym Ctrl+$mod1+l exec --no-startup-id "env $lock_env xsecurelock & sleep 0.3 && pkill -x -USR2 xsecurelock"
-exec --no-startup-id xss-lock -- env XSECURELOCK_NO_PAM_RHOST=1 XSECURELOCK_SAVER=saver_blank xsecurelock
+# ~/bin/lockscreen wraps xsecurelock: shows the current wallpaper (dimmed) as
+# the saver and SIGUSR2s the locker so the fingerprint prompt arms immediately.
+bindsym Ctrl+$mod1+l exec --no-startup-id $HOME/bin/lockscreen
+exec --no-startup-id xss-lock -- $HOME/bin/lockscreen
 
 bindsym Mod1+F4 kill
 bindsym Print exec --no-startup-id scrot -s
@@ -268,6 +277,7 @@ bindsym $mod+$mod1+Shift+k --release exec --no-startup-id scrot
 bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -s
 bindsym $mod+$mod1+Shift+l --release exec --no-startup-id record-desktop
 bindsym $mod+$mod1+Shift+semicolon --release exec --no-startup-id record-window
+bindsym $mod+$mod1+Shift+c --release exec --no-startup-id $HOME/bin/autoclick
 # bindsym $mod+m --release exec --no-startup-id scrot
 
 bindsym $mod+b workspace back_and_forth

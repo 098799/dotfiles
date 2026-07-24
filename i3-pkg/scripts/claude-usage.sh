@@ -1,17 +1,23 @@
 #!/bin/bash
 # Claude.ai usage script for i3blocks
-# Shows both work and private usage, emphasises the active account
+# Shows usage for every configured account, emphasises the active one
 # Right-click: rofi menu to switch account (also switches Claude Code credentials)
 
 CONFIG_DIR="$HOME/.config"
 ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
 
-# Get current account (default to work)
+# Configured accounts, in display order. Add a new account by appending its
+# name here and giving it a single-char label below + a claude-cookies-<name>
+# file in $CONFIG_DIR (with a "# ORG_ID=..." line) for usage display.
+ACCOUNTS=(work private builder)
+declare -A LABELS=([work]=W [private]=P [builder]=B)
+
+# Get current account (default to first configured)
 if [[ -f "$ACCOUNT_FILE" ]]; then
     ACCOUNT=$(cat "$ACCOUNT_FILE" | tr -d '[:space:]')
 else
-    ACCOUNT="work"
+    ACCOUNT="${ACCOUNTS[0]}"
 fi
 
 # Keep active account's backup in sync (tokens get refreshed by Claude Code)
@@ -26,13 +32,16 @@ fi
 case $BLOCK_BUTTON in
     3)
         eval $(xdotool getmouselocation --shell)
-        # Pre-select current account
-        if [[ "$ACCOUNT" == "work" ]]; then
-            SELECTED=1
-        else
-            SELECTED=0
-        fi
-        CHOICE=$(echo -e "private\nwork" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: 2;}")
+        # Pre-select current account (find its index in ACCOUNTS)
+        SELECTED=0
+        for i in "${!ACCOUNTS[@]}"; do
+            if [[ "${ACCOUNTS[$i]}" == "$ACCOUNT" ]]; then
+                SELECTED=$i
+                break
+            fi
+        done
+        MENU=$(printf '%s\n' "${ACCOUNTS[@]}")
+        CHOICE=$(echo "$MENU" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: ${#ACCOUNTS[@]};}")
         if [[ -n "$CHOICE" && "$CHOICE" != "$ACCOUNT" ]]; then
             echo "$CHOICE" > "$ACCOUNT_FILE"
             # Clear cache to force refresh
@@ -144,10 +153,6 @@ fetch_usage() {
     echo "$usage_int $color $reset_str"
 }
 
-# Fetch both accounts
-read W_USAGE W_COLOR W_RESET <<< "$(fetch_usage work)"
-read P_USAGE P_COLOR P_RESET <<< "$(fetch_usage private)"
-
 # Build display for each account
 format_account() {
     local label="$1" usage="$2" color="$3" reset="$4" is_active="$5"
@@ -164,14 +169,16 @@ format_account() {
     fi
 }
 
-if [[ "$ACCOUNT" == "work" ]]; then
-    W_ACTIVE=1; P_ACTIVE=0
-else
-    W_ACTIVE=0; P_ACTIVE=1
-fi
+# Fetch + render every configured account
+SPANS=""
+SHORT=""
+for acct in "${ACCOUNTS[@]}"; do
+    read U C R <<< "$(fetch_usage "$acct")"
+    label="${LABELS[$acct]:-${acct:0:1}}"
+    [[ "$acct" == "$ACCOUNT" ]] && active=1 || active=0
+    SPANS="${SPANS}$(format_account "$label" "$U" "$C" "$R" "$active") "
+    SHORT="${SHORT}${label}:${U}% "
+done
 
-W_SPAN=$(format_account "W" "$W_USAGE" "$W_COLOR" "$W_RESET" "$W_ACTIVE")
-P_SPAN=$(format_account "P" "$P_USAGE" "$P_COLOR" "$P_RESET" "$P_ACTIVE")
-
-echo " 󰚩 ${W_SPAN} ${P_SPAN} "
-echo "󰚩 W:${W_USAGE}% P:${P_USAGE}%"
+echo " 󰚩 ${SPANS}"
+echo "󰚩 ${SHORT}"

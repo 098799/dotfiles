@@ -1,0 +1,8 @@
+#!/bin/bash
+# Flip light<->dark, keeping the current palette (or the one passed as $1).
+set -euo pipefail
+state=$HOME/.config/theme/state
+read -r mode palette < "$state" 2>/dev/null || { mode=dark; palette=gruvbox; }
+[[ ${1:-} ]] && palette=$1
+case $mode in dark) mode=light ;; *) mode=dark ;; esac
+exec "$(dirname "$(readlink -f "$0")")/theme" "$mode" "$palette"

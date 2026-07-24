@@ -36,3 +36,5 @@ node_modules/
 *.o
 *.so
 *.dylib
+
+**/.claude/settings.local.json

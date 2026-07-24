@@ -1,0 +1,34 @@
+#!/bin/sh
+# Lock the screen with xsecurelock, showing the *current* wallpaper (softly
+# dimmed) as the saver instead of a black screen. Used by both the manual
+# keybind and xss-lock, so the behaviour is identical either way.
+#
+# Fingerprint: xsecurelock's PAM auth (authproto_pam) drives the reader. We
+# SIGUSR2 the locker right after start so the auth prompt is armed immediately
+# — the fingerprint scan then works without a keypress. The saver choice is
+# completely independent of auth, so the reader is unaffected.
+
+# Current wallpaper, as written by `theme` into ~/.fehbg (last image path on
+# the feh line). Fall back to a plain black saver if we can't resolve one.
+wp=$(grep -oE '/[^ ]+\.(png|jpg|jpeg|webp)' "$HOME/.fehbg" 2>/dev/null | tail -1)
+
+export XSECURELOCK_NO_PAM_RHOST=1
+if [ -n "$wp" ] && [ -f "$wp" ] && command -v mpv >/dev/null 2>&1; then
+    export XSECURELOCK_SAVER=saver_mpv
+    # saver_mpv runs this command to get its playlist — just the one wallpaper.
+    export XSECURELOCK_LIST_VIDEOS_COMMAND="printf '%s\n' '$wp'"
+    export XSECURELOCK_IMAGE_DURATION_SECONDS=86400
+    # --vo=x11: pure software output (no GPU). eq: gentle dim + slight desat so
+    # the white auth text stays legible over the art. Static frame ≈ 0% CPU.
+    export XSECURELOCK_VIDEOS_FLAGS="--vo=x11 --image-display-duration=inf --vf=lavfi=[eq=brightness=-0.4:saturation=0.85]"
+else
+    export XSECURELOCK_SAVER=saver_blank
+fi
+
+xsecurelock &
+locker=$!
+# Arm the auth prompt (and thus the fingerprint reader) without a keypress.
+sleep 0.3
+pkill -x -USR2 xsecurelock 2>/dev/null
+# Stay in the foreground until unlocked, so xss-lock tracks the lock correctly.
+wait "$locker"

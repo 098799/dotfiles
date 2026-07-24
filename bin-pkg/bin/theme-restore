@@ -1,0 +1,13 @@
+#!/bin/bash
+# Re-apply the last-used theme (written to ~/.config/theme/state by `theme`).
+# Safe to call from i3 autostart so everything matches on login.
+set -euo pipefail
+# i3's autostart exec runs with a minimal PATH; ensure every binary `theme`
+# needs (uv, jq, feh, i3-msg, emacsclient, …) is reachable.
+export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+state=$HOME/.config/theme/state
+read -r mode palette < "$state" 2>/dev/null || { mode=dark; palette=gruvbox; }
+# Skip the i3 reload: at login the palette symlink is already correct, and a
+# reload here could loop with i3's autostart exec.
+export THEME_NO_I3_RELOAD=1
+exec "$(dirname "$(readlink -f "$0")")/theme" "$mode" "$palette"
