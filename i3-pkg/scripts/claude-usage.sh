@@ -7,11 +7,21 @@ CONFIG_DIR="$HOME/.config"
 ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
 
-# Configured accounts, in display order. Add a new account by appending its
-# name here and giving it a single-char label below + a claude-cookies-<name>
-# file in $CONFIG_DIR (with a "# ORG_ID=..." line) for usage display.
+# Accounts in display order: the three legacy ones first, then any extra
+# discovered from a claude-cookies-<name> file in $CONFIG_DIR. Adding an
+# account is therefore just dropping in its cookie file (with a
+# "# ORG_ID=..." line) — same convention rcmon/cmon auto-discover (!5956).
+# Labels default to the uppercased first letter; override below for clashes.
 ACCOUNTS=(work private builder)
+for _f in "$CONFIG_DIR"/claude-cookies-*; do
+    [[ -e "$_f" ]] || continue
+    _name="${_f##*/claude-cookies-}"
+    [[ " ${ACCOUNTS[*]} " == *" $_name "* ]] || ACCOUNTS+=("$_name")
+done
 declare -A LABELS=([work]=W [private]=P [builder]=B)
+for _a in "${ACCOUNTS[@]}"; do
+    [[ -n "${LABELS[$_a]}" ]] || LABELS[$_a]=$(printf '%s' "${_a:0:1}" | tr '[:lower:]' '[:upper:]')
+done
 
 # Get current account (default to first configured)
 if [[ -f "$ACCOUNT_FILE" ]]; then
