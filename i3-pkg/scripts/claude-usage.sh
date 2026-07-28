@@ -8,14 +8,24 @@ ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
 
 # Accounts in display order: the three legacy ones first, then any extra
-# discovered from a claude-cookies-<name> file in $CONFIG_DIR. Adding an
-# account is therefore just dropping in its cookie file (with a
-# "# ORG_ID=..." line) — same convention rcmon/cmon auto-discover (!5956).
+# discovered from either a claude-cookies-<name> file in $CONFIG_DIR or a
+# ~/claude-<name> alt HOME holding a Claude Code login — the same two
+# conventions rcmon/cmon auto-discover (!5956). A cookie alone is enough, and
+# so is a login alone: usage falls back to the OAuth endpoint (see
+# fetch_usage_oauth) when there's no cookie, which is what a `/login`-only
+# account like sales has.
 # Labels default to the uppercased first letter; override below for clashes.
 ACCOUNTS=(work private builder)
 for _f in "$CONFIG_DIR"/claude-cookies-*; do
     [[ -e "$_f" ]] || continue
     _name="${_f##*/claude-cookies-}"
+    [[ " ${ACCOUNTS[*]} " == *" $_name "* ]] || ACCOUNTS+=("$_name")
+done
+for _d in "$HOME"/claude-*; do
+    [[ -f "$_d/.claude/.credentials.json" ]] || continue
+    _name="${_d##*/claude-}"
+    # claude-prim is the "work" account's home under a legacy name.
+    [[ "$_name" == "prim" ]] && continue
     [[ " ${ACCOUNTS[*]} " == *" $_name "* ]] || ACCOUNTS+=("$_name")
 done
 declare -A LABELS=([work]=W [private]=P [builder]=B)
@@ -70,38 +80,95 @@ case $BLOCK_BUTTON in
         ;;
 esac
 
+# Newest credentials file backing an account, or nothing. Mirrors rcmon's
+# home_agents.credential_source: the ~/.claude/.credentials-<acct>.json backup
+# this script maintains can be months stale (it only refreshes when the rofi
+# switcher swaps accounts), while the alt HOME's copy is refreshed by every
+# cmon/cherd spawn under that HOME. Newest wins.
+creds_for() {
+    local acct="$1" newest="" c
+    local -a cands=("$HOME/.claude/.credentials-$acct.json")
+    case "$acct" in
+        private) cands+=("$HOME/.claude/.credentials.json") ;;
+        work) cands+=("$HOME/claude-prim/.claude/.credentials.json") ;;
+        *) cands+=("$HOME/claude-$acct/.claude/.credentials.json") ;;
+    esac
+    for c in "${cands[@]}"; do
+        [[ -f "$c" ]] || continue
+        [[ -z "$newest" || "$c" -nt "$newest" ]] && newest="$c"
+    done
+    [[ -n "$newest" ]] && printf '%s' "$newest"
+}
+
+# Usage for an account straight from the OAuth endpoint — no browser cookie
+# needed. Used when an account has a Claude Code login but no
+# claude-cookies-<name> file (the normal state right after `/login`).
+#
+# Deliberately does NOT refresh an expired access token: that endpoint is rate
+# limited PER REFRESH TOKEN, and a 60s i3blocks tick hammering it would keep
+# the account permanently 429'd — exactly what wedged the mr-reviewer VM's
+# backups for a week. An expired token just reads "?" here until the next
+# Claude Code session under that account refreshes it in passing.
+fetch_usage_oauth() {
+    local acct="$1" creds token
+    creds=$(creds_for "$acct")
+    [[ -n "$creds" ]] || return 1
+    token=$(python3 - "$creds" <<'PY'
+import json, sys, time
+try:
+    o = json.load(open(sys.argv[1])).get("claudeAiOauth", {})
+except Exception:
+    sys.exit(1)
+tok, exp = o.get("accessToken"), o.get("expiresAt") or 0
+if not tok or exp / 1000 <= time.time():
+    sys.exit(1)
+print(tok)
+PY
+    ) || return 1
+    [[ -n "$token" ]] || return 1
+    curl -s --max-time 10 'https://api.anthropic.com/api/oauth/usage' \
+        -H "Authorization: Bearer $token" \
+        -H 'user-agent: claude-code/2.1.100' \
+        -H 'anthropic-client-platform: claude_code' \
+        2>/dev/null
+}
+
 # Fetch usage for a given account. Outputs: USAGE_INT COLOR RESET_STR (or "?" if unavailable)
+# Both sources return the same {"five_hour":{"utilization",…}} shape, so
+# everything below the fetch is source-agnostic.
 fetch_usage() {
     local acct="$1"
     local cookie_file="$CONFIG_DIR/claude-cookies-$acct"
     local cache_file="/tmp/.claude_usage_cache_$acct"
 
-    if [[ ! -f "$cookie_file" ]]; then
-        echo "? #657b83"
-        return
-    fi
-
-    local org_id
-    org_id=$(grep -oP '^# ORG_ID=\K.*' "$cookie_file")
-    if [[ -z "$org_id" ]]; then
-        echo "? #657b83"
-        return
+    local org_id=""
+    if [[ -f "$cookie_file" ]]; then
+        org_id=$(grep -oP '^# ORG_ID=\K.*' "$cookie_file")
     fi
 
     local response
     if [[ -f "$cache_file" ]] && [[ $(($(date +%s) - $(stat -c %Y "$cache_file"))) -lt 300 ]]; then
         response=$(cat "$cache_file")
     else
-        response=$(curl -s "https://claude.ai/api/organizations/$org_id/usage" \
-            -H 'accept: application/json' \
-            -H 'content-type: application/json' \
-            -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36' \
-            -b "$cookie_file" \
-            2>/dev/null)
+        if [[ -n "$org_id" ]]; then
+            response=$(curl -s "https://claude.ai/api/organizations/$org_id/usage" \
+                -H 'accept: application/json' \
+                -H 'content-type: application/json' \
+                -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36' \
+                -b "$cookie_file" \
+                2>/dev/null)
+        else
+            response=$(fetch_usage_oauth "$acct")
+        fi
 
         if [[ -n "$response" ]] && echo "$response" | grep -q "five_hour"; then
             echo "$response" > "$cache_file"
         fi
+    fi
+
+    if [[ -z "$response" ]]; then
+        echo "? #657b83"
+        return
     fi
 
     local usage resets
