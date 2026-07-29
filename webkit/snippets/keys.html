@@ -1,0 +1,551 @@
+{# ——— keyboard layer (webkit snippet) —————————————————————————————
+   A Vimium-style layer inside the app. Lifted from ~/museum
+   (museum/templates/_keys.html); see ~/dotfiles/webkit/README.md §5.
+
+   To adopt:
+     1. edit the CONFIG block below (storage key, leader targets, palette
+        endpoint, the "zoom" selector);
+     2. serve a JSON palette endpoint: {"items":[{k,t,s,u}, …]};
+     3. `{% include "_keys.html" %}` right before </body>;
+     4. expose your soft-nav function as `window.__go(url, push)`;
+     5. if a page has its own keys, have it consult `window.__keysBusy()`
+        and move its bindings off the layer's letters (digits + ↑↓/Enter).
+
+   Bindings are Tomek's own Vimium mappings — keep them; `m` is the leader
+   because his Vimium config unmaps it, which is what makes the two coexist. #}
+<style>
+#khud{position:fixed;left:0;bottom:0;z-index:82;display:none;
+  padding:5px 12px 5px 14px;border-radius:0 10px 0 0;background:var(--panel2);
+  border-top:1px solid var(--line);border-right:1px solid var(--line);
+  font-family:var(--sans);font-size:12.5px;color:var(--gold);letter-spacing:.08em}
+#khud.on{display:block}
+.khint{position:absolute;z-index:84;padding:1px 4px 2px;border-radius:4px;
+  background:linear-gradient(#f4d99a,#d9ae5c);color:#2b2113;border:1px solid #8a6c3c;
+  font:600 11px/1.35 var(--sans);letter-spacing:.06em;text-transform:uppercase;
+  box-shadow:0 2px 6px rgba(0,0,0,.55);pointer-events:none;white-space:nowrap}
+.khint.dim{opacity:.35}
+.khint b{color:#8a6c3c;font-weight:600}
+.kmatch{outline:2px solid var(--gold) !important;outline-offset:1px}
+#kpal,#khelp{position:fixed;inset:0;z-index:86;display:none;
+  background:rgba(6,4,2,.62);backdrop-filter:blur(2px)}
+#kpal.on,#khelp.on{display:block}
+#kpal .kp-card{max-width:620px;margin:8vh auto 0;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.6)}
+#kpal input{width:100%;box-sizing:border-box;padding:14px 16px;border:0;
+  border-bottom:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  font-size:16px;font-family:var(--serif);outline:none}
+#kpal .kp-list{max-height:58vh;overflow-y:auto}
+#kpal .kp-row{display:flex;gap:10px;align-items:baseline;padding:9px 16px;cursor:pointer}
+#kpal .kp-row.sel{background:color-mix(in srgb,var(--gold) 12%,var(--panel))}
+#kpal .kp-k{flex:none;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--gold-deep);width:62px}
+#kpal .kp-t{flex:1;min-width:0;font-family:var(--serif);font-size:15.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kpal .kp-s{flex:none;max-width:40%;font-size:12px;color:var(--faint);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kpal .kp-foot{padding:8px 16px;border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--faint);background:var(--panel2)}
+#khelp .kh-card{max-width:720px;margin:6vh auto 0;max-height:84vh;overflow-y:auto;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px 22px 18px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+#khelp h2{font-size:20px;margin-bottom:2px}
+#khelp .kh-grid{display:grid;grid-template-columns:1fr;gap:2px 26px;margin-top:6px}
+@media (min-width:700px){ #khelp .kh-grid{grid-template-columns:1fr 1fr} }
+#khelp .kh-row{display:flex;gap:10px;align-items:baseline;padding:3px 0;font-size:13.5px}
+#khelp kbd{flex:none;min-width:26px;text-align:center;padding:1px 6px;border-radius:5px;
+  border:1px solid var(--line);background:var(--panel2);color:var(--gold);
+  font:600 12px/1.5 var(--sans)}
+#khelp .kh-d{color:var(--dim);min-width:0}
+#khelp .kh-mode{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--dim)}
+#khelp .kh-mode b{color:var(--gold)}
+</style>
+<div id="khud" aria-hidden="true"></div>
+<div id="kpal" role="dialog" aria-label="Jump to">
+  <div class="kp-card">
+    <input type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+           placeholder="Jump to a gallery, painter, room or painting…" aria-label="Jump to">
+    <div class="kp-list"></div>
+    <div class="kp-foot">↑↓ choose · Enter open · Shift-Enter new tab · Esc close</div>
+  </div>
+</div>
+<div id="khelp" role="dialog" aria-label="Keyboard shortcuts"><div class="kh-card"></div></div>
+<script>
+(function(){
+  if (window.__keysLoaded) return;   // survives soft navigation; bind once
+  window.__keysLoaded = true;
+
+  // ——— CONFIG: the only part that is app-specific ————————————————
+  var CFG = {
+    store: 'app.keys',                 // localStorage key for the mode
+    palette: '/api/palette?q=',        // JSON: {"items":[{k,t,s,u}, …]}
+    zoom: '#content .zoomable',        // what `z` clicks, if anything
+    // `m` + key → path
+    leader: {g: '/', a: '/artists', q: '/quiz', h: '/quiz/history',
+             y: '/account', s: '/search', r: '/room/random'},
+    // rows the palette offers before any query
+    commands: [
+      {k: 'go', t: 'Home', s: '', u: '/'},
+      {k: 'go', t: 'Keyboard shortcuts', s: 'this list of keys', u: '#help'}
+    ],
+    // `]` / `[` walk the collection you clicked through; the selector is the
+    // kind of link that forms a trail (set to null to disable)
+    trail: 'a[href*="/painting/"]',
+    // optional overlays the layer must respect / scroll instead of the page
+    lightbox: '#lightbox',             // .open means a zoomed image is up
+    popinScroll: '#popin .pi-scroll',  // an article overlay's scroll box
+    strips: '#content .walk, #content .chips'   // what u/p steer sideways
+  };
+
+  // ——— mode: full (all keys) · leader (only m…, for when Vimium is driving)
+  //     · off. Kept per device; the account page and `m m` both set it ———
+  var MODES = ['full', 'leader', 'off'];
+  function mode(){
+    try { var m = localStorage.getItem(CFG.store); if (MODES.indexOf(m) >= 0) return m; }
+    catch(e){}
+    return 'full';
+  }
+  function setMode(m){
+    try { localStorage.setItem(CFG.store, m); } catch(e){}
+    hud(m === 'off' ? 'app keys off — set them again on /account'
+                    : 'app keys: ' + m, 1600);
+    if (window.__keysModeChanged) window.__keysModeChanged(m);
+  }
+  window.__keysMode = mode;
+  window.__keysSetMode = setMode;
+
+  var hud_ = document.getElementById('khud'), hudT = null;
+  function hud(text, ms){
+    clearTimeout(hudT);
+    if (!text){ hud_.classList.remove('on'); return; }
+    hud_.textContent = text; hud_.classList.add('on');
+    if (ms) hudT = setTimeout(function(){ hud_.classList.remove('on'); }, ms);
+  }
+
+  function go(url, newTab){
+    if (newTab){ window.open(url, '_blank'); return; }
+    if (window.__go) window.__go(url, true);
+    else location.href = url;
+  }
+  function typing(el){
+    return !!(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'
+                     || el.isContentEditable));
+  }
+  function lbOpen(){
+    var lb = CFG.lightbox && document.querySelector(CFG.lightbox);
+    return !!(lb && lb.classList.contains('open'));
+  }
+  function popOpen(){ return !!(window.__popinOpen && window.__popinOpen()); }
+  // A page can claim the digits for itself (the museum quiz answers on 1–4)
+  // by defining window.__keysDigitsTaken. The layer stays uniform; the page
+  // gives way — never the other way round.
+  function digitsTaken(){
+    return !!(window.__keysDigitsTaken && window.__keysDigitsTaken());
+  }
+  // pages with their own key handling (the quiz) must know when we hold the keys
+  window.__keysBusy = function(){
+    return palIsOpen() || helpIsOpen() || hints.length > 0;
+  };
+
+  // ——— scrolling ———————————————————————————————————————————————
+  var STEP = 64;
+  function scroller(){
+    if (popOpen()) return document.querySelector(CFG.popinScroll);
+    return null;  // null = the window
+  }
+  function scrollBy(dx, dy){
+    var s = scroller();
+    if (s){ s.scrollBy({left: dx, top: dy, behavior: 'auto'}); return; }
+    window.scrollBy({left: dx, top: dy, behavior: 'auto'});
+  }
+  function pageStep(){
+    var s = scroller();
+    return (s ? s.clientHeight : window.innerHeight) * 0.9;
+  }
+  function toEnd(bottom){
+    var s = scroller();
+    if (s){ s.scrollTo({top: bottom ? s.scrollHeight : 0}); return; }
+    window.scrollTo({top: bottom ? document.body.scrollHeight : 0});
+  }
+  // u/p steer the horizontal strip nearest the middle of the screen — the room
+  // walk and the chip rows are the only things that scroll sideways here
+  function strip(){
+    var best = null, bestD = 1e9, mid = innerHeight / 2;
+    document.querySelectorAll(CFG.strips).forEach(function(el){
+      if (el.scrollWidth <= el.clientWidth + 4) return;
+      var r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) return;
+      var d = Math.abs((r.top + r.bottom) / 2 - mid);
+      if (d < bestD){ bestD = d; best = el; }
+    });
+    return best;
+  }
+  function scrollSide(dir, n){
+    var el = strip();
+    if (el) el.scrollBy({left: dir * STEP * 2 * n, behavior: 'smooth'});
+    else scrollBy(dir * STEP * n, 0);
+  }
+
+  // ——— the painting trail: ] and [ walk the grid you came from ————————
+  var TKEY = CFG.store + '.trail';
+  function saveTrail(list, idx){
+    try { sessionStorage.setItem(TKEY, JSON.stringify({l: list, i: idx})); } catch(e){}
+  }
+  function trail(){
+    try { return JSON.parse(sessionStorage.getItem(TKEY)) || null; } catch(e){ return null; }
+  }
+  document.addEventListener('click', function(e){
+    if (!CFG.trail) return;
+    var a = e.target.closest(CFG.trail);
+    if (!a || a.host !== location.host) return;
+    // every sibling painting link in the same block becomes the trail
+    var box = a.closest('.grid, .walk, #content') || document;
+    var links = [].slice.call(box.querySelectorAll(CFG.trail))
+      .map(function(x){ return new URL(x.getAttribute('href'), location.href).pathname; });
+    links = links.filter(function(v, i){ return links.indexOf(v) === i; });
+    var here = new URL(a.getAttribute('href'), location.href).pathname;
+    if (links.length > 1) saveTrail(links, links.indexOf(here));
+  }, true);
+  function step(delta){
+    var t = trail();
+    var here = location.pathname;
+    if (!t || !t.l || t.l.length < 2){ hud('no collection to walk — open one from a grid', 1800); return; }
+    var i = t.l.indexOf(here);
+    if (i < 0) i = t.i || 0;
+    var j = i + delta;
+    if (j < 0 || j >= t.l.length){ hud(delta > 0 ? 'end of the wall' : 'start of the wall', 1400); return; }
+    saveTrail(t.l, j);
+    hud((j + 1) + ' / ' + t.l.length, 1200);
+    go(t.l[j]);
+  }
+
+  // ——— link hints ——————————————————————————————————————————————
+  var HCHARS = 'sadfjklewcmpgh';   // Vimium's own alphabet, in its own order
+  var hints = [], hintBuf = '', hintNewTab = false, hintLayer = null;
+  var HSEL = 'a[href], button, [role="button"], .zoomable, input:not([type="hidden"]), select, summary';
+  // Vimium's own scheme: as many one-key hints as the alphabet can spare,
+  // the rest two keys — 33 links become 5 single presses and 28 doubles.
+  function hintStrings(n){
+    var c = HCHARS.length, digits = 1;
+    while (Math.pow(c, digits) < n) digits++;
+    var shortCount = digits > 1
+      ? Math.floor((Math.pow(c, digits) - n) / (c - 1)) : 0;
+    function code(v, len){
+      var s = '';
+      // most-significant first, so the long codes all begin with a character
+      // no short code uses — no hint is ever a prefix of another
+      for (var k = 0; k < len; k++){ s = HCHARS[v % c] + s; v = Math.floor(v / c); }
+      return s;
+    }
+    var out = [];
+    for (var i = 0; i < shortCount; i++) out.push(code(i, digits - 1));
+    for (var j = shortCount * c; out.length < n; j++) out.push(code(j, digits));
+    return out;
+  }
+  function visibleTargets(){
+    var out = [];
+    document.querySelectorAll(HSEL).forEach(function(el){
+      if (el.closest('#kpal, #khelp, #khud')) return;
+      if (el.hasAttribute('hidden') || el.disabled) return;
+      var r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) return;
+      if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return;
+      var st = getComputedStyle(el);
+      if (st.visibility === 'hidden' || st.display === 'none' || +st.opacity === 0) return;
+      out.push({el: el, r: r});
+    });
+    // reading order: top to bottom, then left to right
+    out.sort(function(a, b){ return (a.r.top - b.r.top) || (a.r.left - b.r.left); });
+    return out;
+  }
+  function hintsOn(newTab){
+    hintsOff();
+    var targets = visibleTargets();
+    if (!targets.length){ hud('nothing to follow here', 1400); return; }
+    hintNewTab = newTab; hintBuf = '';
+    var codes = hintStrings(targets.length);
+    hintLayer = document.createElement('div');
+    hintLayer.id = 'khintlayer';
+    document.body.appendChild(hintLayer);
+    targets.forEach(function(t, i){
+      var m = document.createElement('span');
+      m.className = 'khint';
+      m.textContent = codes[i];
+      m.style.left = (t.r.left + scrollX + 1) + 'px';
+      m.style.top = (t.r.top + scrollY - 3) + 'px';
+      hintLayer.appendChild(m);
+      hints.push({code: codes[i], el: t.el, mark: m});
+    });
+    hud(newTab ? 'follow link in a new tab…' : 'follow link…');
+  }
+  function hintsOff(){
+    if (hintLayer) hintLayer.remove();
+    hintLayer = null; hints = []; hintBuf = '';
+    hud(null);
+  }
+  function hintKey(e){
+    if (e.key === 'Escape'){ hintsOff(); return true; }
+    if (e.key === 'Backspace'){ hintBuf = hintBuf.slice(0, -1); paintHints(); return true; }
+    var ch = e.key.toLowerCase();
+    if (HCHARS.indexOf(ch) < 0) return false;
+    hintBuf += ch;
+    var exact = hints.filter(function(h){ return h.code === hintBuf; });
+    if (exact.length === 1){ activate(exact[0].el); hintsOff(); return true; }
+    var live = hints.filter(function(h){ return h.code.indexOf(hintBuf) === 0; });
+    if (!live.length){ hintsOff(); return true; }
+    if (live.length === 1){ activate(live[0].el); hintsOff(); return true; }
+    paintHints();
+    return true;
+  }
+  function paintHints(){
+    hints.forEach(function(h){
+      var on = h.code.indexOf(hintBuf) === 0;
+      h.mark.classList.toggle('dim', !on);
+      h.mark.innerHTML = on && hintBuf
+        ? '<b>' + hintBuf + '</b>' + h.code.slice(hintBuf.length) : h.code;
+    });
+  }
+  function activate(el){
+    if (hintNewTab && el.tagName === 'A' && el.href){ window.open(el.href, '_blank'); return; }
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'){
+      el.focus(); return;
+    }
+    el.click();
+  }
+
+  // ——— the palette: everything in the museum, one query away ——————————
+  var pal = document.getElementById('kpal');
+  var palIn = pal.querySelector('input'), palList = pal.querySelector('.kp-list');
+  var palItems = [], palSel = 0, palSeq = 0, palT = null;
+  var STATIC = CFG.commands;
+  function palOpen(){
+    pal.classList.add('on');
+    palIn.value = ''; palSel = 0;
+    render(STATIC.slice());
+    palIn.focus();
+    query('');
+  }
+  function palClose(){ pal.classList.remove('on'); palIn.blur(); }
+  function palIsOpen(){ return pal.classList.contains('on'); }
+  function render(items){
+    palItems = items;
+    palList.innerHTML = '';
+    items.forEach(function(it, i){
+      var row = document.createElement('div');
+      row.className = 'kp-row' + (i === palSel ? ' sel' : '');
+      row.innerHTML = '<span class="kp-k"></span><span class="kp-t"></span><span class="kp-s"></span>';
+      row.children[0].textContent = it.k === 'go' ? 'go' : it.k;
+      row.children[1].textContent = it.t;
+      row.children[2].textContent = it.s || '';
+      row.addEventListener('mousedown', function(e){ e.preventDefault(); choose(i, e.shiftKey); });
+      palList.appendChild(row);
+    });
+  }
+  function select(i){
+    if (!palItems.length) return;
+    palSel = Math.max(0, Math.min(palItems.length - 1, i));
+    [].forEach.call(palList.children, function(r, j){ r.classList.toggle('sel', j === palSel); });
+    var sel = palList.children[palSel];
+    if (sel) sel.scrollIntoView({block: 'nearest'});
+  }
+  function choose(i, newTab){
+    var it = palItems[i];
+    if (!it) return;
+    palClose();
+    if (it.u === '#help'){ helpOpen(); return; }
+    go(it.u, newTab);
+  }
+  function query(q){
+    var mine = ++palSeq;
+    var local = STATIC.filter(function(s){
+      return !q || (s.t + ' ' + s.s).toLowerCase().indexOf(q.toLowerCase()) >= 0;
+    });
+    fetch(CFG.palette + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (mine !== palSeq) return;           // a newer keystroke already won
+        palSel = 0;
+        render(local.concat(d.items || []));
+      })
+      .catch(function(){ if (mine === palSeq){ palSel = 0; render(local); } });
+  }
+  palIn.addEventListener('input', function(){
+    clearTimeout(palT);
+    var q = palIn.value.trim();
+    palT = setTimeout(function(){ query(q); }, 110);
+  });
+  palIn.addEventListener('keydown', function(e){
+    if (e.key === 'Escape'){ e.preventDefault(); palClose(); return; }
+    if (e.key === 'ArrowDown' || (e.ctrlKey && e.key === 'n')){ e.preventDefault(); select(palSel + 1); return; }
+    if (e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p')){ e.preventDefault(); select(palSel - 1); return; }
+    if (e.key === 'Enter'){ e.preventDefault(); choose(palSel, e.shiftKey); return; }
+    e.stopPropagation();   // ordinary typing never reaches the key layer
+  });
+  pal.addEventListener('mousedown', function(e){ if (e.target === pal) palClose(); });
+
+  // ——— help sheet ————————————————————————————————————————————————
+  var help = document.getElementById('khelp'), helpCard = help.querySelector('.kh-card');
+  // app-specific: keep the first two sections, edit "Museum"/"This page"/"Quiz"
+  var SHEET = [
+    ['Scroll', [['i', 'down'], ['o', 'up'], ['k', 'page down'], ['l', 'page up'],
+                ['u', 'strip left'], ['p', 'strip right'], ['gg', 'top'], ['G', 'bottom']]],
+    ['Navigate', [['s', 'back'], ['S', 'forward'], ['f', 'follow a link'],
+                  ['e', 'link in a new tab'], [']', 'next painting'], ['[', 'previous painting']]],
+    ['Museum', [['d', 'jump to anything'], ['/', 'search'], ['m g', 'galleries'],
+                ['m a', 'artists'], ['m q', 'quiz'], ['m h', 'quiz history'],
+                ['m y', 'your account'], ['m r', 'a random room']]],
+    ['This page', [['z', 'zoom the painting'], ['y y', 'copy the address'],
+                   ['?', 'these keys'], ['Esc', 'close one layer'],
+                   ['m m', 'cycle the key modes']]],
+    ['Quiz', [['1 4', 'answer (1 to 4)'], ['↑ ↓', 'walk the options'],
+              ['Enter', 'commit, then next question']]]
+  ];
+  function helpOpen(){
+    var h = '<h2>Keyboard</h2><div class="faint" style="font-size:12.5px">' +
+      'Your Vimium bindings, inside the museum. A number repeats: <b>3i</b>.</div>' +
+      '<div class="kh-grid">';
+    SHEET.forEach(function(sec){
+      h += '<div><div class="eyebrow" style="margin:12px 0 4px">' + sec[0] + '</div>';
+      sec[1].forEach(function(r){
+        h += '<div class="kh-row"><kbd>' + r[0].replace(/ /g, '</kbd><kbd>') +
+             '</kbd><span class="kh-d">' + r[1] + '</span></div>';
+      });
+      h += '</div>';
+    });
+    h += '</div><div class="kh-mode">Mode: <b>' + mode() + '</b> — ' +
+      '<b>full</b> uses every key, <b>leader</b> only the <kbd>m</kbd> commands ' +
+      '(leave the rest to Vimium), <b>off</b> nothing. Press <kbd>m</kbd><kbd>m</kbd> ' +
+      'to cycle, or set it on your account page.</div>';
+    helpCard.innerHTML = h;
+    help.classList.add('on');
+  }
+  function helpClose(){ help.classList.remove('on'); }
+  function helpIsOpen(){ return help.classList.contains('on'); }
+  help.addEventListener('mousedown', function(e){ if (e.target === help) helpClose(); });
+  window.__keysHelp = helpOpen;
+
+  // ——— leader (m …) and the dispatcher ————————————————————————————
+  var LEADER = CFG.leader;
+  var pending = '', count = '', pendT = null;
+  function clearPending(){ pending = ''; count = ''; clearTimeout(pendT); hud(null); }
+  function arm(p){
+    pending = p;
+    hud(count + p + '…');
+    clearTimeout(pendT);
+    pendT = setTimeout(clearPending, 2500);   // a half-typed command forgets itself
+  }
+  function copyUrl(){
+    var url = location.href;
+    if (navigator.clipboard) navigator.clipboard.writeText(url).catch(function(){});
+    hud('copied ' + url.replace(/^https?:\/\//, '').slice(0, 46), 1600);
+  }
+  function zoom(){
+    var img = CFG.zoom && document.querySelector(CFG.zoom);
+    if (img) img.click(); else hud('no painting to zoom here', 1400);
+  }
+
+  window.addEventListener('keydown', function(e){
+    // our own overlays get the keys first, whatever the mode
+    if (palIsOpen()) return;                       // the palette input handles itself
+    if (hints.length){
+      if (hintKey(e)){ e.preventDefault(); e.stopPropagation(); }
+      return;
+    }
+    if (helpIsOpen()){
+      if (e.key === 'Escape' || e.key === '?' || e.key === 'q'){
+        e.preventDefault(); e.stopPropagation(); helpClose();
+      }
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (typing(document.activeElement)) return;
+    if (e.key === 'Escape'){ if (pending || count) clearPending(); return; }
+
+    var m = mode();
+    if (m === 'off' ) return;
+    var k = e.key;
+
+    // pending leader / two-key sequences
+    if (pending === 'm'){
+      e.preventDefault(); e.stopPropagation();
+      clearPending();
+      if (k === 'm'){
+        var next = MODES[(MODES.indexOf(m) + 1) % MODES.length];
+        setMode(next);
+      } else if (k === '?'){ helpOpen(); }
+      else if (LEADER[k]) go(LEADER[k]);
+      else hud('m' + k + ' is not a museum command', 1400);
+      return;
+    }
+    if (pending === 'g'){
+      e.preventDefault(); e.stopPropagation();
+      clearPending();
+      if (k === 'g') toEnd(false);
+      return;
+    }
+    if (pending === 'y'){
+      e.preventDefault(); e.stopPropagation();
+      clearPending();
+      if (k === 'y') copyUrl();
+      return;
+    }
+
+    if (k === 'm'){ e.preventDefault(); e.stopPropagation(); arm('m'); return; }
+    if (k === '?'){ e.preventDefault(); e.stopPropagation(); helpOpen(); return; }
+    if (m === 'leader') return;      // everything else belongs to Vimium
+
+    // digits build a repeat count (but 0 alone is not a count, and on a live
+    // quiz question 1–4 are answers, not counts)
+    if (/^[0-9]$/.test(k) && !(k === '0' && !count) && !digitsTaken()){
+      e.preventDefault(); e.stopPropagation();
+      count += k; hud(count + '…');
+      clearTimeout(pendT); pendT = setTimeout(clearPending, 2500);
+      return;
+    }
+    var n = Math.min(parseInt(count || '1', 10), 50);
+
+    // an open article reads like a page: scroll it, but leave links to the popin
+    if ((lbOpen() || popOpen()) && 'fe]['.indexOf(k) >= 0) return;
+
+    var handled = true;
+    switch (k){
+      case 'i': scrollBy(0, STEP * n); break;
+      case 'o': scrollBy(0, -STEP * n); break;
+      case 'k': scrollBy(0, pageStep() * n); break;
+      case 'l': scrollBy(0, -pageStep() * n); break;
+      case 'u': scrollSide(-1, n); break;
+      case 'p': scrollSide(1, n); break;
+      case 'G': toEnd(true); break;
+      case 'g': arm('g'); return;
+      case 'y': arm('y'); return;
+      case 's': history.back(); break;
+      case 'S': history.forward(); break;
+      case 'f': hintsOn(false); break;
+      case 'e': case 'F': hintsOn(true); break;
+      case 'd': palOpen(); break;
+      case ']': step(n); break;
+      case '[': step(-n); break;
+      case 'z': zoom(); break;
+      default: handled = false;
+    }
+    if (handled){ e.preventDefault(); e.stopPropagation(); clearPending(); }
+    else if (count) clearPending();
+  }, true);
+
+  // one quiet nudge, once per device, so the keys are discoverable at all
+  if (matchMedia('(hover:hover) and (pointer:fine)').matches && mode() !== 'off'){
+    try {
+      if (!localStorage.getItem(CFG.store + '.seen')){
+        localStorage.setItem(CFG.store + '.seen', '1');
+        setTimeout(function(){ hud('press ? for keyboard shortcuts', 6000); }, 1500);
+      }
+    } catch(e){}
+  }
+
+  // leaving the page (soft nav included) must not leave hints painted on it
+  window.addEventListener('popstate', hintsOff);
+  window.addEventListener('resize', hintsOff);
+  window.addEventListener('scroll', function(){ if (hints.length) hintsOff(); }, {passive: true});
+})();
+</script>
