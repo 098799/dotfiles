@@ -7,19 +7,21 @@ README.md drifted; trust this file.
 
 ## p340 — always-on home box (tailnet name `rcmon`, 100.77.63.74)
 
-All apps bind 127.0.0.1 and are fronted by `tailscale serve`
-(`https://rcmon.tail0c4bc8.ts.net:<PORT>`).
+All apps bind 127.0.0.1 and are fronted by `tailscale serve`. The tailnet
+**machine name is `rcmon`** (hostname p340 is not a tailnet name), so every
+URL is `https://rcmon.tail0c4bc8.ts.net:<PORT>` — full FQDN always, the
+short `rcmon` fails TLS SNI on https ports.
 
-| app | local port | tailnet port | notes |
+| app | local port | tailnet URL | notes |
 |---|---|---|---|
-| weekends (flight tracker) | 8321 | :8443 and :80 | + collector daemon, watchdog + daily backup timers |
+| weekends (flight tracker) | 8321 | https://rcmon.tail0c4bc8.ts.net:8443 (also plain http://rcmon) | + collector daemon, watchdog + daily backup timers |
 | museum | 8322 | — (public only) | canonical DB; hourly `museum-ingest` timer; mirrors to bae |
-| rcmon (phone dashboard) | 38000 | :8445 | runs from legartis utils repo |
-| health tracker | 19443 | :9443 | + coverage (hourly), reminder (20:30), backup (daily) timers |
-| dinozaury (kid app) | 17443 | :7443 | plain `serve.py`, repo `~/dinosaurs` |
-| pixelpaint (kid app) | 16443 | :6443 | `python -m http.server` over `~/drawing` |
-| haircut-studio | 8090 (LAN 0.0.0.0) | — | **crash-looping as of 2026-07-30** |
-| sudoku-jednorozca | 15443 | :5443 (unmapped) | **inactive** — moved to sudoku.grining.eu |
+| rcmon (phone dashboard) | 38000 | https://rcmon.tail0c4bc8.ts.net:8445 | runs from legartis utils repo |
+| health tracker | 19443 | https://rcmon.tail0c4bc8.ts.net:9443 | + coverage (hourly), reminder (20:30), backup (daily) timers |
+| dinozaury (kid app) | 17443 | https://rcmon.tail0c4bc8.ts.net:7443 | plain `serve.py`, repo `~/dinosaurs` |
+| pixelpaint (kid app) | 16443 | https://rcmon.tail0c4bc8.ts.net:6443 | `python -m http.server` over `~/drawing` |
+| haircut-studio | 8090 (LAN 0.0.0.0) | http://rcmon:8090 when up | **crash-looping as of 2026-07-30** |
+| sudoku-jednorozca | 15443 | — (unmapped) | **inactive** — moved to sudoku.grining.eu |
 
 Debris seen 2026-07-30: serve `:8444 → localhost:3001` points at nothing;
 `tailgate-sni.service` (a p14s service) synced here and retry-loops because it
@@ -71,14 +73,51 @@ server blocks; treat as parked/retired.
 9. **Verification**: `fe-shot` screenshots + `cdp_probe.py` interactions +
    rcmon image drop to show Tomek.
 
+# Feature baseline (audited 2026-07-30, grep of live repos)
+
+What every **full-tier** app should ship. Museum is the reference — it has
+the full house; copy from it.
+
+| feature | museum | memory | weekends | health | rcmon |
+|---|---|---|---|---|---|
+| PWA (manifest+SW) | ✓ | ✓ | partial | ✓ | partial |
+| SW refresh banner (`SKIP_WAITING`) | ✓ | ✓ | — | ✓ | — |
+| Install banner (`beforeinstallprompt`) | ✓ | ✓ | — | — | — |
+| Python backend | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Dark default | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Light-mode toggle in settings (dark/light/auto) | ✓ | — | — | — | — |
+| Google login (public + personal data only) | ✓ quiz | ✓ | n/a tailnet | n/a tailnet | n/a tailnet |
+
+Kid toys (dinozaury, pixelpaint) have basic SW+manifest — enough for that
+tier. kids-sudoku/public sudoku has none.
+
+Rules distilled:
+
+- **PWA + refresh banner travel together.** A SW without the
+  waiting-worker → toast → `SKIP_WAITING` flow is how phones get stuck on
+  last week's layout. weekends and rcmon need the flow retrofitted from
+  museum's base.html.
+- **Install banner** everywhere full-tier (museum/memory have the pattern).
+- **Backend is Python** — FastAPI by default; no node servers in this family
+  (node only as a build tool for memory's frontend).
+- **Dark is the default; the toggle lives in settings** (museum's
+  dark/light/auto on /account is the pattern to copy).
+- **Auth rule:** tailnet apps get no login (the tailnet is the auth). Public
+  apps with personal data get Google login (memory: full gate; museum: only
+  the quiz, since the collection itself is fine being public). Static/public
+  toys get none. pypen's auth story is unaudited — check before assuming.
+
 # Should-be commonalities — gaps this survey exposed
 
 1. **One registry, kept current.** README's port list said 9443=legartis on
    the home box; it's actually health. Serve `:8444` points at a dead port.
    This file is now the registry — touch it with every port change.
-2. **Backup timer wherever the canonical DB lives.** memory's only copy of
-   632 flashcards sits on bae with no backup; pypen likewise. Reuse the
-   weekends/health backup unit verbatim.
+2. **Backup timer wherever the canonical DB lives** — and VPS DBs get
+   **pulled to p340**. memory's only copy of 632 flashcards sits on bae with
+   no backup; pypen likewise. bae is not on the tailnet, but p340 can
+   `ssh bae_llm`, so the shape is a p340 user timer: remote `sqlite3
+   ".backup"` on bae → rsync down → rotate locally (off-site by
+   construction). Reuse the weekends/health rotation snippet.
 3. **One name per app, all layers.** Sudoku is `kids-sudoku` (repo),
    `sudoku-jednorozca` (unit), `sudoku-time` (VPS svc), `/var/www/sudoku`.
    Pick the short name once → repo = unit = /opt dir = subdomain.
