@@ -32,9 +32,10 @@ Reference implementations, in order of how much they have been polished:
 - systemd **user** units in `deploy/*.service`, `WorkingDirectory=%h/<app>`,
   uvicorn on `127.0.0.1:<port>`. Linger is on for both p14s and p340.
 - Tailnet: `tailscale serve --bg --https=<port> http://127.0.0.1:<port>`.
-  Ports in use: 443 rcmon, 8443/8444 weekends, 8445, 8446 (was museum's
-  private wing), 9443/6443/7443 legartis. **TLS with the bare short hostname
-  fails SNI** — always hand over the full `p340.tail0c4bc8.ts.net:PORT`.
+  Ports in use: see **`APPS.md`** — the canonical per-host app/port registry
+  (the list that used to sit here had drifted). Update it with every port
+  change. **TLS with the bare short hostname fails SNI** — always hand over
+  the full `rcmon.tail0c4bc8.ts.net:PORT`.
 - Public mirror (`*.grining.eu`) lives on the Hetzner VPS, ssh alias
   `bae_llm`, app in `/opt/<app>`, plain venv (no uv there), `www-data`,
   uvicorn behind nginx. Two scripts, keep this split:
