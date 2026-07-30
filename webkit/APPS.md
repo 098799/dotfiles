@@ -27,6 +27,45 @@ Debris seen 2026-07-30: serve `:8444 → localhost:3001` points at nothing;
 `tailgate-sni.service` (a p14s service) synced here and retry-loops because it
 binds p14s's IP; `vacation-digest` timer expired (last ran Jul 20).
 
+**`~/.config/systemd/user` is syncthing-synced between p14s and p340** (a
+`rcmon.sync-conflict-*` unit file proves it). That is why p14s-only units
+run — and crash-loop — on p340: haircut-studio's `~/haircut-studio` and
+vacation-digest's `~/uk` don't exist here at all. Any host-specific unit
+needs `ConditionHost=` or it will flap on the other machine.
+
+## Where the source lives (audited 2026-07-30)
+
+| app | repo | remote |
+|---|---|---|
+| museum | `~/museum` | local bare `~/git/museum.git` |
+| weekends | `~/weekends` | none |
+| health | `~/health` | none |
+| dinozaury | `~/dinosaurs` | none |
+| pixelpaint | `~/drawing` | none |
+| sudoku | `~/kids-sudoku` | none |
+| pypen | `~/pypen` | github 098799/pypen |
+| rcmon | **inside `~/legartis` monorepo** (`services/backend/util/util/rcmon`) | legartis GitLab |
+| memory | **no git at all** — `~/anki-clone-export/src` unversioned export | — |
+| haircut-studio | p14s only (`~/haircut-studio` absent on p340) | ? |
+
+## p340.grining.eu / p14s.grining.eu — half-built friendly-URL scheme
+
+bae's bind is authoritative for `grining.eu` and has delegated zones
+**`p340.grining.eu`** and **`p14s.grining.eu`**: A + wildcard
+(`*.p340.grining.eu`) → the host's **tailscale IP** (100.77.63.74 /
+100.98.125.20), plus a `certbot-grining` update-policy grant for
+`_acme-challenge` TXT — i.e. the "public DNS → tailnet IP + Let's Encrypt
+dns-01" trick, ready for real certs on tailnet-only services.
+
+**Only the DNS half exists.** Nothing on p340 consumes it: no LE certs
+issued, no reverse proxy mapping `health.p340.grining.eu` → :19443 etc.,
+zero references to the name in ~/bin or dotfiles. Apps are still reached via
+`rcmon.tail0c4bc8.ts.net:<port>`. Finishing it = one nginx/caddy on p340
+with a wildcard cert (dns-01 against bae's bind) + one vhost per registry
+row. **Gotcha: 0.0.0.0:443 on p340 is currently taken by the legartis
+slot-1 nginx container** — it must move to its 127.0.0.x loopback before
+anything can bind 443 for this.
+
 ## p14s — dev laptop (100.98.125.20)
 
 Dev copies of the above + legartis slots (`app{N}.local.legartis.ai:9443` via
