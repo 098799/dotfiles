@@ -1,39 +1,66 @@
 # ── Windows 95 ────────────────────────────────────────────────────────
 # An Alacritty palette that is not "Win95-ish" but literally the Windows
-# console palette: the sixteen VGA text-mode attributes as Windows 95 set
-# them, silver-on-black, with the shell's own five UI colours reused for
-# everything Alacritty draws that DOS never had (selection, hints, search).
+# colours: the sixteen VGA text-mode attributes, on the white canvas the rest
+# of the desktop uses.
 #
-#   #c0c0c0  silver   attribute 0x07 — the default text colour, and the
-#                     grey of every window frame in the OS
+#   #ffffff  white    the document canvas -- Notepad, Write, any edit control
+#   #c0c0c0  silver   window frames, the taskbar, every button
 #   #000080  navy     the active title bar, and Win95's selection highlight
 #   #008080  teal     the desktop
-#   #ffffff  white    attribute 0x0f — bright, the "highlight" colour
+#
+# Light, not the silver-on-black of an MS-DOS Prompt. The DOS box was black,
+# but it was one window on a desktop where everything you actually read --
+# documents, Explorer, help -- was black on white. The terminal now matches
+# the win95 Emacs theme rather than fighting it.
 #
 # Loaded by `w95 on` into ~/.config/alacritty/active-palette.toml, and put
 # back by `w95 off`. live_config_reload means already-open terminals repaint
 # without being restarted.
 
+# The font lives here rather than in active-font.toml so that `w95 off` takes
+# it away again along with the colours. active-font.toml belongs to the
+# {big,middle,small,huge}-font scripts and only ever carries a size, which
+# still wins because it is imported last.
+#
+# Terminus is the point: a bitmap face, so the glyphs are pixels rather than
+# smooth outlines. No amount of palette work reads as 1995 while the text is
+# rendered in a modern humanist mono.
+[font.normal]
+family = "Terminus (TTF)"
+style = "Regular"
+
+[font.bold]
+family = "Terminus (TTF)"
+style = "Bold"
+
+[font.italic]
+family = "Terminus (TTF)"
+style = "Italic"
+
+[font.bold_italic]
+family = "Terminus (TTF)"
+style = "Bold-Italic"
+
 [colors]
-# Bold text gets the bright half of the palette, exactly like a DOS console
-# with the intensity bit set. This is also what keeps `ls` directories
-# legible: bold blue lifts to #0000ff.
+# On a light background the intensity bit has to make text *darker*, not
+# lighter -- the usual bright set (#ffff00, #00ffff, #ffffff) is invisible on
+# white. The bright half below is deepened rather than lifted, which keeps
+# bold reading as emphasis and keeps `ls` colours legible.
 draw_bold_text_with_bright_colors = true
 
 [colors.primary]
-background = "#000000"
-foreground = "#c0c0c0"   # attribute 0x07, the DOS default
-bright_foreground = "#ffffff"
+background = "#ffffff"
+foreground = "#000000"
+bright_foreground = "#000000"
 
-# The block cursor from a Win95 MS-DOS Prompt: solid silver, text knocked
-# out to black underneath it.
+# A solid black block, knocking the character out to white underneath.
 [colors.cursor]
-cursor = "#c0c0c0"
-text = "#000000"
+cursor = "#000000"
+text = "#ffffff"
 
 [colors.vi_mode_cursor]
-cursor = "#00ffff"
-text = "#000000"
+cursor = "#000080"
+text = "#ffffff"
 
 # Win95's selection was white on navy everywhere in the shell — Explorer,
 # list boxes, the lot. It reads the same way here.
@@ -41,33 +68,31 @@ text = "#000000"
 background = "#000080"
 text = "#ffffff"
 
-# The sixteen console attributes. Windows set 'yellow' to olive (#808000)
-# and 'white' to silver, which is why DOS output has that particular drab
-# warmth; both are kept.
+# The sixteen console attributes. Windows set 'yellow' to olive (#808000),
+# which is why DOS output has that particular drab warmth; it is kept.
 [colors.normal]
 black = "#000000"
 red = "#800000"
 green = "#008000"
 yellow = "#808000"
-blue = "#0000aa"   # Windows used #000080; #0000aa is the VGA blue and the
-                   # smallest change that keeps `ls` directories readable
+blue = "#0000aa"
 magenta = "#800080"
 cyan = "#008080"   # the desktop teal
 white = "#c0c0c0"  # silver — the face colour of the whole OS
 
 [colors.bright]
 black = "#808080"   # the shadow grey of every bevel
-red = "#ff0000"
-green = "#00ff00"
-yellow = "#ffff00"
+red = "#c00000"
+green = "#006000"
+yellow = "#806000"
 blue = "#0000ff"
-magenta = "#ff00ff"
-cyan = "#00ffff"
-white = "#ffffff"
+magenta = "#a000a0"
+cyan = "#006060"
+white = "#404040"   # "bright white" has to go dark on a white canvas
 
 # Alacritty's hint labels and search, dressed as Win95 controls: a raised
 # silver button for the label, navy highlight for a match, and the amber of
-# a focused match kept bright so it stands out against the teal-and-navy.
+# a focused match kept bright so it stands out.
 [colors.hints.start]
 background = "#c0c0c0"
 foreground = "#000000"

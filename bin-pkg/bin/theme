@@ -13,6 +13,23 @@ palette=$2
 case $mode in light | dark) ;; *) usage ;; esac
 case $palette in gruvbox | selenized) ;; *) usage ;; esac
 
+# Picking a normal theme means leaving Windows 95, not wearing gruvbox inside
+# it. Without this the palette changed while the taskbar, the desktop icons,
+# the window chrome and the patched WM all stayed, which is neither look.
+# Runs first so the settings below land on top of whatever `w95 off` restored.
+# Keyed on active-chrome.conf, not active-palette.conf: this script rewrites
+# the palette link itself, so by the time anyone looked at it the marker was
+# already gone and you were left with gruvbox colours under Win95 chrome, a
+# Win95 taskbar and a Win95 terminal. Nothing but `w95` touches the chrome link.
+if [[ $(readlink -f "$HOME/.config/i3/active-chrome.conf" 2>/dev/null) == *win95.conf ]] &&
+    [[ -x $HOME/.local/bin/w95 ]]; then
+    "$HOME/.local/bin/w95" off >/dev/null 2>&1 || true
+    # The window manager is switched separately from the look, so drop back to
+    # stock i3 too -- otherwise the caption buttons stay Win95 under gruvbox.
+    [[ -x $HOME/.local/bin/w95-switch ]] &&
+        "$HOME/.local/bin/w95-switch" off >/dev/null 2>&1 || true
+fi
+
 case $palette:$mode in
     gruvbox:light) emacs_theme=doom-gruvbox-light ;;
     gruvbox:dark) emacs_theme=doom-gruvbox ;;

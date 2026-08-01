@@ -202,6 +202,10 @@ cmd_off() {
     fi
     restore_emacs_theme
     pkill -f "bin/w95bar" 2>/dev/null || true
+    # The icons go too. They are an override-redirect window the WM knows
+    # nothing about, so nothing else will ever clean them up -- leaving them
+    # running put a teal desktop with Win95 icons underneath a gruvbox session.
+    pkill -f "bin/w95-desktop" 2>/dev/null || true
     if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
         i3-msg -q reload
         i3-msg -q '[class=".*"] border pixel 10'
