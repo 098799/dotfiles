@@ -24,6 +24,7 @@ import os
 import subprocess
 import sys
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -82,7 +83,12 @@ class Desktop(Gtk.Window):
                     pb = GdkPixbuf.Pixbuf.new_from_file_at_size(path, ICON, ICON)
                 except Exception:
                     pb = None
-            self.items.append({"label": label, "pixbuf": pb, "cmd": cmd})
+            # Kept alongside the pixbuf purely as a mask for the selection
+            # tint; building it per frame would redo the conversion on every
+            # redraw.
+            surf = Gdk.cairo_surface_create_from_pixbuf(pb, 1, None) if pb else None
+            self.items.append({"label": label, "pixbuf": pb,
+                               "surface": surf, "cmd": cmd})
 
         # DESKTOP type alone is not enough: i3 happily takes such a window into
         # the tiling layout, which shrinks the desktop into a tile as soon as
@@ -147,15 +153,17 @@ class Desktop(Gtk.Window):
                 Gdk.cairo_set_source_pixbuf(cr, item["pixbuf"], px, cy)
                 cr.paint()
                 if sel:
-                    # Win95 tinted the icon navy rather than drawing a frame
-                    # around it; ATOP keeps the tint inside the icon's alpha.
-                    cr.save()
-                    cr.rectangle(px, cy, ICON, ICON)
-                    cr.clip()
-                    cr.set_operator(1)  # CAIRO_OPERATOR_ATOP
-                    cr.set_source_rgba(*NAVY, 0.45)
-                    cr.paint()
-                    cr.restore()
+                    # Win95 tinted the icon itself rather than framing it. The
+                    # tint has to be masked by the icon's own alpha: clipping
+                    # to its bounding box and painting (with ATOP or otherwise)
+                    # also tints the opaque teal behind it, leaving a navy
+                    # square around the icon.
+                    surf = item.get("surface")
+                    if surf is not None:
+                        cr.save()
+                        cr.set_source_rgba(*NAVY, 0.45)
+                        cr.mask_surface(surf, px, cy)
+                        cr.restore()
 
             layout.set_text(item["label"], -1)
             tw, th = layout.get_pixel_size()
