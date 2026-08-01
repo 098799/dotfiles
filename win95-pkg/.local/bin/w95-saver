@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""w95-saver — the Windows 95 screensavers, as an xsecurelock saver module.
+
+Run by xsecurelock, which hands us a window in $XSCREENSAVER_WINDOW and keeps
+the grabs, the PAM conversation and the fail-safe to itself. That division is
+deliberate: a screen locker is security code and this is a toy, so the toy
+draws and the audited program locks. Nothing here can leave the screen
+unlocked, because nothing here is what holds the lock.
+
+    w95-saver [mystify|starfield|flying|random]
+
+Drawing is X primitives -- lines and filled polygons into an off-screen pixmap,
+then one CopyArea per frame. The obvious alternative, rendering with cairo and
+pushing an image, moves ~8 MB per frame at 1080p and cannot hold 30 fps from
+Python. Primitives move a few hundred bytes. The 16-colour palette that falls
+out of this is not a compromise, it is the period-correct one.
+
+Every mode is drawn in dark-on-black VGA colours on purpose: xsecurelock paints
+its auth prompt over the top, and a bright saver makes the password field
+unreadable.
+"""
+
+import os
+import random
+import signal
+import sys
+import time
+
+from Xlib import X, display
+
+FPS = 30
+FRAME = 1.0 / FPS
+
+# The VGA 16, minus the ones that would fight the auth prompt for contrast.
+PALETTE = [
+    "#0000aa", "#00aa00", "#00aaaa", "#aa0000", "#aa00aa", "#aa5500",
+    "#5555ff", "#55ff55", "#55ffff", "#ff5555", "#ff55ff", "#ffff55",
+]
+
+
+class Canvas:
+    """A window, a matching off-screen pixmap, and a colour-allocating GC."""
+
+    def __init__(self):
+        wid = os.environ.get("XSCREENSAVER_WINDOW")
+        self.dpy = display.Display()
+        self.screen = self.dpy.screen()
+        if wid:
+            # xsecurelock passes it decimal; accept 0x-prefixed hex too.
+            self.win = self.dpy.create_resource_object(
+                "window", int(wid, 16) if wid.lower().startswith("0x") else int(wid))
+        else:
+            # Standalone (for `w95-saver mystify` at a terminal) -- our own
+            # window, so the modes can be developed without locking the screen.
+            self.win = self.screen.root.create_window(
+                0, 0, 800, 600, 0, self.screen.root_depth,
+                background_pixel=self.screen.black_pixel)
+            self.win.map()
+        self.cmap = self.screen.default_colormap
+        self._pens = {}
+        self.pix = None
+        self.resize()
+
+    def resize(self):
+        g = self.win.get_geometry()
+        self.w, self.h = max(1, g.width), max(1, g.height)
+        if self.pix is not None:
+            self.pix.free()
+        self.pix = self.win.create_pixmap(self.w, self.h, self.screen.root_depth)
+        self.gc = self.pix.create_gc()
+        self.clear()
+
+    def pen(self, spec):
+        if spec not in self._pens:
+            self._pens[spec] = self.cmap.alloc_named_color(spec).pixel
+        self.gc.change(foreground=self._pens[spec])
+        return self.gc
+
+    def clear(self, spec="#000000"):
+        self.pen(spec)
+        self.pix.fill_rectangle(self.gc, 0, 0, self.w, self.h)
+
+    def flip(self):
+        self.win.copy_area(self.gc, self.pix, 0, 0, self.w, self.h, 0, 0)
+        self.dpy.flush()
+
+
+class Mystify:
+    """Two polygons whose vertices bounce, trailing their own recent history.
+
+    The trail is the whole effect and it is why this keeps a deque of past
+    vertex sets rather than smearing the framebuffer: Win95's Mystify redraws
+    every ghost each frame at full brightness, so the tail stays crisp instead
+    of fading into mush the way an alpha-decay version does.
+    """
+
+    TRAIL = 12
+    # Frames between ghosts. At 1 the ghosts land a few pixels apart and the
+    # trail reads as a solid wedge rather than a stack of outlines; spacing
+    # them out is what gives Mystify its wireframe look.
+    SPACING = 3
+
+    def __init__(self, c, shapes=2, points=4):
+        self.c = c
+        self.tick = 0
+        self.shapes = []
+        for _ in range(shapes):
+            verts = [[random.uniform(0, c.w), random.uniform(0, c.h),
+                      random.uniform(-4, 4) or 2.0, random.uniform(-4, 4) or 2.0]
+                     for _ in range(points)]
+            self.shapes.append({
+                "verts": verts,
+                "trail": [],
+                "hue": random.randrange(len(PALETTE)),
+            })
+
+    def step(self):
+        c = self.c
+        c.clear()
+        for s in self.shapes:
+            for v in s["verts"]:
+                v[0] += v[2]
+                v[1] += v[3]
+                if v[0] < 0 or v[0] > c.w:
+                    v[2] = -v[2]
+                    v[0] = min(max(v[0], 0), c.w)
+                if v[1] < 0 or v[1] > c.h:
+                    v[3] = -v[3]
+                    v[1] = min(max(v[1], 0), c.h)
+            if self.tick % self.SPACING == 0:
+                s["trail"].append([(int(v[0]), int(v[1])) for v in s["verts"]])
+                if len(s["trail"]) > self.TRAIL:
+                    s["trail"].pop(0)
+            for i, poly in enumerate(s["trail"]):
+                spec = PALETTE[(s["hue"] + i) % len(PALETTE)]
+                c.pix.poly_line(c.pen(spec), X.CoordModeOrigin, poly + [poly[0]])
+            s["hue"] = (s["hue"] + 1) % len(PALETTE)
+        self.tick += 1
+
+
+class Starfield:
+    """Points on a z axis flying past the viewer. Nearer stars draw bigger."""
+
+    N = 320
+    SPEED = 0.9
+
+    def __init__(self, c):
+        self.c = c
+        self.stars = [self._spawn(random.uniform(1, 32)) for _ in range(self.N)]
+
+    def _spawn(self, z=32.0):
+        return [random.uniform(-1, 1), random.uniform(-1, 1), z]
+
+    def step(self):
+        c = self.c
+        c.clear()
+        cx, cy = c.w / 2, c.h / 2
+        for st in self.stars:
+            st[2] -= self.SPEED
+            if st[2] <= 0.5:
+                st[:] = self._spawn()
+                continue
+            k = 96.0 / st[2]
+            x, y = int(cx + st[0] * k * c.w / 100), int(cy + st[1] * k * c.h / 100)
+            if not (0 <= x < c.w and 0 <= y < c.h):
+                st[:] = self._spawn()
+                continue
+            # Brightness by depth: four steps is all the era would have given us.
+            near = 1.0 - min(st[2] / 32.0, 1.0)
+            spec = "#ffffff" if near > 0.75 else "#aaaaaa" if near > 0.5 else \
+                   "#777777" if near > 0.25 else "#444444"
+            size = 2 if near > 0.6 else 1
+            c.pix.fill_rectangle(c.pen(spec), x, y, size, size)
+
+
+class Flying:
+    """The four-pane flag, tumbling out of the screen.
+
+    Drawn as four quads that share a centre and scale with 1/z, which is the
+    cheap trick the original used too -- there is no perspective mesh here, and
+    at speed nobody can tell.
+    """
+
+    N = 20
+    SPEED = 0.5
+    FAR = 16.0  # spawn depth; further back and they spend their life as specks
+    QUADS = [  # (dx, dy, colour) -- Win95 flag order, clockwise from top-left
+        (-1, -1, "#ff5555"), (1, -1, "#55ff55"),
+        (-1, 1, "#5555ff"), (1, 1, "#ffff55"),
+    ]
+
+    def __init__(self, c):
+        self.c = c
+        self.flags = [self._spawn(random.uniform(1, self.FAR)) for _ in range(self.N)]
+
+    def _spawn(self, z=None):
+        z = self.FAR if z is None else z
+        return [random.uniform(-1, 1), random.uniform(-1, 1), z,
+                random.uniform(0, 6.28)]
+
+    def step(self):
+        c = self.c
+        c.clear()
+        cx, cy = c.w / 2, c.h / 2
+        for f in sorted(self.flags, key=lambda f: -f[2]):
+            f[2] -= self.SPEED
+            f[3] += 0.02
+            if f[2] <= 1.0:
+                f[:] = self._spawn()
+                continue
+            # Real perspective divide against a focal length in pixels. The
+            # previous version scaled by a fudge factor and produced flags a
+            # fraction of a pixel across -- correct maths, wrong units.
+            k = (c.w * 0.75) / f[2]
+            x = cx + f[0] * k
+            y = cy + f[1] * k
+            s = k * 0.28
+            if s < 1.5 or not (-s * 2 < x < c.w + s * 2 and -s * 2 < y < c.h + s * 2):
+                continue
+            # A slow tumble about the vertical axis: squash x, keep y.
+            import math
+            squash = abs(math.cos(f[3])) * 0.75 + 0.25
+            gap = max(1.0, s * 0.08)
+            hw, hh = s * squash, s
+            # One lean for the whole flag, not a shear per quadrant: the panes
+            # are parallelograms all tilting the same way, which is what makes
+            # it read as the logo instead of four staggered boxes.
+            lean = s * 0.22
+            for dx, dy, spec in self.QUADS:
+                xa = x + dx * gap - (hw if dx < 0 else 0)
+                ya = y + dy * gap - (hh if dy < 0 else 0)
+                xb, yb = xa + hw, ya + hh
+                pts = [
+                    (int(xa + lean), int(ya)),
+                    (int(xb + lean), int(ya)),
+                    (int(xb), int(yb)),
+                    (int(xa), int(yb)),
+                ]
+                c.pix.fill_poly(c.pen(spec), X.Convex, X.CoordModeOrigin, pts)
+
+
+MODES = {"mystify": Mystify, "starfield": Starfield, "flying": Flying}
+
+
+def main():
+    want = (sys.argv[1] if len(sys.argv) > 1 else
+            os.environ.get("W95_SAVER_MODE", "random")).lower()
+    if want not in MODES:
+        want = random.choice(list(MODES))
+
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
+    signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
+
+    c = Canvas()
+    saver = MODES[want](c)
+    c.win.change_attributes(event_mask=X.StructureNotifyMask | X.ExposureMask)
+
+    while True:
+        t0 = time.monotonic()
+        # A resize means our pixmap is the wrong size; rebuild and restart the
+        # mode rather than drawing a frame that is partly stale.
+        while c.dpy.pending_events():
+            ev = c.dpy.next_event()
+            if ev.type == X.ConfigureNotify and (
+                    ev.width != c.w or ev.height != c.h):
+                c.resize()
+                saver = MODES[want](c)
+        saver.step()
+        c.flip()
+        time.sleep(max(0, FRAME - (time.monotonic() - t0)))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    except Exception:
+        # A crashed saver must never be able to wedge the locker: die quietly
+        # and let xsecurelock carry on showing a blank screen.
+        sys.exit(0)

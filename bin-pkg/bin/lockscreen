@@ -13,7 +13,25 @@
 wp=$(grep -oE '/[^ ]+\.(png|jpg|jpeg|webp)' "$HOME/.fehbg" 2>/dev/null | tail -1)
 
 export XSECURELOCK_NO_PAM_RHOST=1
-if [ -n "$wp" ] && [ -f "$wp" ] && command -v mpv >/dev/null 2>&1; then
+
+# Under Windows 95 the wallpaper saver is wrong twice over: the desktop is a
+# flat teal with no image to dim, and the era had actual screensavers. Detected
+# from the palette symlink rather than ~/.config/w95/wm, because that file
+# tracks the *window manager* and stays "stock" when the look is switched on
+# without the patched i3.
+w95_active() {
+    case "$(readlink -f "$HOME/.config/i3/active-palette.conf" 2>/dev/null)" in
+        *win95.conf) return 0 ;;
+    esac
+    return 1
+}
+
+if w95_active && [ -x "$HOME/.local/bin/w95-saver" ]; then
+    # Mystify / Starfield / Flying Windows, picked at random each lock unless
+    # W95_SAVER_MODE names one. xsecurelock still owns the grabs and the PAM
+    # conversation; the saver only draws, so this cannot weaken the lock.
+    export XSECURELOCK_SAVER="$HOME/.local/bin/w95-saver"
+elif [ -n "$wp" ] && [ -f "$wp" ] && command -v mpv >/dev/null 2>&1; then
     export XSECURELOCK_SAVER=saver_mpv
     # saver_mpv runs this command to get its playlist — just the one wallpaper.
     export XSECURELOCK_LIST_VIDEOS_COMMAND="printf '%s\n' '$wp'"
