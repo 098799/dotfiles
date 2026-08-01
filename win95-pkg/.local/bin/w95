@@ -77,6 +77,56 @@ open(path, "w").write(text)
 PY
 }
 
+# ── Emacs ─────────────────────────────────────────────────────────────
+# Emacs is the one window that would otherwise sit on a Win95 desktop still
+# wearing gruvbox. Unlike GTK or alacritty there is no file Emacs re-reads, so
+# the choice is recorded in $EMACS_THEME_FILE and *also* pushed to a running
+# server. The file is what makes this stick: `theme` only ever pokes
+# emacsclient, so with no daemon up its choice evaporates, and an Emacs started
+# later would come back gruvbox on a Windows desktop. general.el reads this
+# file at startup and falls back to doom-gruvbox when it is absent.
+EMACS_THEME_FILE="$HOME/.config/w95/emacs-theme"
+
+emacs_server_up() {
+    command -v emacsclient >/dev/null && emacsclient -e t >/dev/null 2>&1
+}
+
+emacs_theme_set() {
+    mkdir -p "$(dirname "$EMACS_THEME_FILE")"
+    printf '%s\n' "$1" >"$EMACS_THEME_FILE"
+    emacs_server_up || return 0
+    emacsclient -n -e \
+        "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme '$1 t))" \
+        >/dev/null 2>&1 || true
+}
+
+# Remember what to come back to. Deliberately *not* guarded on "already saved"
+# the way backup_gtk is: the theme can change under us (`theme dark selenized`)
+# between one `w95 on` and the next, and a stale note would restore the wrong
+# one. The case guard is what keeps a Windows theme from being recorded as its
+# own predecessor.
+backup_emacs_theme() {
+    emacs_server_up || return 0
+    local cur
+    cur=$(emacsclient -e '(or (car custom-enabled-themes) "")' 2>/dev/null |
+              tr -d '"' | tr -d '\n')
+    case $cur in win95 | win311 | '') return 0 ;; esac
+    mkdir -p "$BACKUP"
+    printf '%s\n' "$cur" >"$BACKUP/emacs-theme"
+}
+
+restore_emacs_theme() {
+    local prev
+    prev=$(cat "$BACKUP/emacs-theme" 2>/dev/null || true)
+    [[ -n $prev ]] || prev=doom-gruvbox
+    mkdir -p "$(dirname "$EMACS_THEME_FILE")"
+    rm -f "$EMACS_THEME_FILE"
+    emacs_server_up || return 0
+    emacsclient -n -e \
+        "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme '$prev t))" \
+        >/dev/null 2>&1 || true
+}
+
 backup_gtk() {
     mkdir -p "$BACKUP"
     [[ -f $BACKUP/gtk-3.0-settings.ini ]] ||
@@ -93,6 +143,7 @@ backup_gtk() {
 cmd_on() {
     install_assets
     backup_gtk
+    backup_emacs_theme
 
     say "pointing i3 at the win95 palette and window chrome"
     ln -sfn "$I3DIR/colors.d/win95.conf" "$PALETTE"
@@ -117,6 +168,9 @@ cmd_on() {
     mkdir -p "$HOME/.icons/default"
     printf '[Icon Theme]\nInherits=Chicago95_Standard_Cursors\n' \
         >"$HOME/.icons/default/index.theme"
+
+    say "dressing Emacs in the win95 theme"
+    emacs_theme_set win95
 
     xsetroot -solid '#008080' 2>/dev/null || true
     if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
@@ -146,6 +200,7 @@ cmd_off() {
     else
         warn "no saved terminal palette; run \`theme <light|dark> <palette>\` to reset it"
     fi
+    restore_emacs_theme
     pkill -f "bin/w95bar" 2>/dev/null || true
     if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
         i3-msg -q reload
