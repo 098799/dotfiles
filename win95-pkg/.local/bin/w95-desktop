@@ -31,7 +31,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 gi.require_version("PangoCairo", "1.0")
-from gi.repository import Gdk, GdkPixbuf, Gtk, Pango, PangoCairo  # noqa: E402
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, Pango, PangoCairo  # noqa: E402
 
 TEAL = (0x00 / 255, 0x80 / 255, 0x80 / 255)
 NAVY = (0x00 / 255, 0x00 / 255, 0x80 / 255)
@@ -73,6 +73,7 @@ class Desktop(Gtk.Window):
     def __init__(self):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
         self.selected = None
+        self._xdpy = None
 
         self.items = []
         for label, rels, cmd in ITEMS:
@@ -111,16 +112,72 @@ class Desktop(Gtk.Window):
         self.move(geo.x, geo.y)
         self.set_default_size(geo.width, geo.height)
 
-        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK
+                        | Gdk.EventMask.VISIBILITY_NOTIFY_MASK)
+        self.connect("map-event", self.on_map)
+        self.connect("visibility-notify-event", self.on_visibility)
         self.connect("draw", self.on_draw)
         self.connect("button-press-event", self.on_click)
         self.connect("destroy", Gtk.main_quit)
+
+    def xlower(self):
+        """Lower via a raw X ConfigureWindow.
+
+        Gdk.Window.lower() is not enough: for a toplevel GDK asks the window
+        manager to restack, and i3 ignores such requests for a window it does
+        not manage -- which an override-redirect window never is. The result is
+        a full-screen desktop sitting on top of every other window with nothing
+        able to get above it. Going straight to the X server sidesteps the WM
+        entirely, which is the whole point of override-redirect.
+        """
+        gw = self.get_window()
+        if gw is None:
+            return
+        try:
+            from Xlib import X as _X
+            from Xlib import display as _display
+            if self._xdpy is None:
+                self._xdpy = _display.Display()
+            self._xdpy.create_resource_object(
+                "window", gw.get_xid()).configure(stack_mode=_X.Below)
+            self._xdpy.flush()
+        except Exception as e:
+            # Reported, not swallowed: a silent fallback here once hid the
+            # desktop sitting on top of every window for an entire session.
+            print("w95-desktop: xlower failed (%s: %s)" % (type(e).__name__, e),
+                  file=sys.stderr, flush=True)
+            gw.lower()  # better than nothing if python-xlib is unavailable
 
     def on_realize(self, _w):
         gw = self.get_window()
         if gw:
             gw.set_override_redirect(True)
-            gw.lower()
+
+    def _settle(self):
+        # One late re-lower. GTK issues its own restacking around map (keep-below
+        # and the EWMH hints both do), and anything landing after on_map would
+        # otherwise leave a full-screen window on top for the rest of the
+        # session -- the failure mode is bad enough to be worth the insurance.
+        self.xlower()
+        return False
+
+    def on_map(self, *_a):
+        # Lowering at realize is not enough: mapping the window restacks it to
+        # the top, so a lower() issued before or racing the map is undone and a
+        # full-screen override-redirect window ends up covering the desktop --
+        # every window on the screen, with no way to raise anything above it.
+        # Lower again once mapped, and keep lowering whenever anything puts us
+        # back on top.
+        self.xlower()
+        GLib.timeout_add(750, self._settle)
+        return False
+
+    def on_visibility(self, _w, ev):
+        # VisibilityUnobscured on a window that should always be behind means
+        # something restacked us to the front.
+        if ev.state == Gdk.VisibilityState.UNOBSCURED:
+            self.xlower()
+        return False
 
     # ── geometry ────────────────────────────────────────────────────────
     def cell_rect(self, i):
@@ -218,9 +275,7 @@ def main():
     win = Desktop()
     win.show_all()
     # lower() only takes effect once the window is realised.
-    gw = win.get_window()
-    if gw:
-        gw.lower()
+    win.xlower()
     Gtk.main()
 
 
