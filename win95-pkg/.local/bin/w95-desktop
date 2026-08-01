@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""w95-desktop — icons on the Windows 95 desktop.
+
+The teal is currently painted by `xsetroot -solid` and nothing else, which is
+the one thing that gives the illusion away the moment no window is maximised:
+a Win95 desktop is never empty. This puts My Computer, Network Neighborhood and
+the Recycle Bin in the top-left corner, selectable and double-clickable.
+
+Why a window and not the root pixmap
+------------------------------------
+Wallpaper tools draw straight into the root window, and that would be simpler
+-- but only one X client may select ButtonPress on the root, and under i3 that
+client is i3. Icons drawn there could never be clicked. So this is a real
+window, marked _NET_WM_WINDOW_TYPE_DESKTOP and kept below everything, which is
+the hint every EWMH window manager (i3 included) is supposed to honour by
+leaving it unmanaged at the bottom of the stack.
+
+Double-click launches; single click selects. Selection is drawn the Win95 way:
+the label gets a navy box with white text and the icon is tinted, rather than a
+modern rounded highlight.
+"""
+
+import os
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
+gi.require_version("PangoCairo", "1.0")
+from gi.repository import Gdk, GdkPixbuf, Gtk, Pango, PangoCairo  # noqa: E402
+
+TEAL = (0x00 / 255, 0x80 / 255, 0x80 / 255)
+NAVY = (0x00 / 255, 0x00 / 255, 0x80 / 255)
+WHITE = (1, 1, 1)
+
+ICON_DIRS = [
+    os.path.expanduser("~/.icons/Chicago95"),
+    "/usr/share/icons/Chicago95",
+]
+
+# (label, icon candidates in preference order, command)
+ITEMS = [
+    ("My Computer",
+     ["devices/32/computer.png", "places/32/gnome-fs-client.png"],
+     ["xdg-open", os.path.expanduser("~")]),
+    ("Network Neighborhood",
+     ["places/32/network_fs.png", "places/32/gnome-fs-network.png"],
+     ["xdg-open", "smb://"]),
+    ("Recycle Bin",
+     ["places/32/emptytrash.png", "places/32/gnome-stock-trash.png"],
+     ["xdg-open", "trash:///"]),
+]
+
+CELL_W, CELL_H = 96, 88
+MARGIN = 12
+ICON = 32
+
+
+def find_icon(rels):
+    for base in ICON_DIRS:
+        for rel in rels:
+            p = os.path.join(base, rel)
+            if os.path.exists(p):
+                return p
+    return None
+
+
+class Desktop(Gtk.Window):
+    def __init__(self):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.selected = None
+
+        self.items = []
+        for label, rels, cmd in ITEMS:
+            path = find_icon(rels)
+            pb = None
+            if path:
+                try:
+                    pb = GdkPixbuf.Pixbuf.new_from_file_at_size(path, ICON, ICON)
+                except Exception:
+                    pb = None
+            self.items.append({"label": label, "pixbuf": pb, "cmd": cmd})
+
+        # DESKTOP type alone is not enough: i3 happily takes such a window into
+        # the tiling layout, which shrinks the desktop into a tile as soon as
+        # anything else opens. Override-redirect is the only reliable answer --
+        # it makes the window invisible to the WM entirely, which is what
+        # wallpaper and conky-style tools rely on. Applied at realize, since
+        # there is no GdkWindow to set it on before that.
+        self.set_type_hint(Gdk.WindowTypeHint.DESKTOP)
+        self.connect("realize", self.on_realize)
+        self.set_keep_below(True)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        self.set_decorated(False)
+        self.set_accept_focus(False)
+        self.set_app_paintable(True)
+
+        disp = Gdk.Display.get_default()
+        mon = disp.get_primary_monitor() or disp.get_monitor(0)
+        geo = mon.get_geometry()
+        self.move(geo.x, geo.y)
+        self.set_default_size(geo.width, geo.height)
+
+        self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.connect("draw", self.on_draw)
+        self.connect("button-press-event", self.on_click)
+        self.connect("destroy", Gtk.main_quit)
+
+    def on_realize(self, _w):
+        gw = self.get_window()
+        if gw:
+            gw.set_override_redirect(True)
+            gw.lower()
+
+    # ── geometry ────────────────────────────────────────────────────────
+    def cell_rect(self, i):
+        return (MARGIN, MARGIN + i * CELL_H, CELL_W, CELL_H)
+
+    def hit(self, x, y):
+        for i in range(len(self.items)):
+            cx, cy, cw, ch = self.cell_rect(i)
+            if cx <= x < cx + cw and cy <= y < cy + ch:
+                return i
+        return None
+
+    # ── painting ────────────────────────────────────────────────────────
+    def on_draw(self, _w, cr):
+        cr.set_source_rgb(*TEAL)
+        cr.paint()
+
+        layout = PangoCairo.create_layout(cr)
+        layout.set_font_description(Pango.FontDescription("W95FA 9"))
+        layout.set_alignment(Pango.Alignment.CENTER)
+        layout.set_width(Pango.SCALE * (CELL_W - 8))
+        layout.set_wrap(Pango.WrapMode.WORD_CHAR)
+
+        for i, item in enumerate(self.items):
+            cx, cy, cw, _ = self.cell_rect(i)
+            sel = (i == self.selected)
+
+            if item["pixbuf"]:
+                px = cx + (cw - ICON) // 2
+                Gdk.cairo_set_source_pixbuf(cr, item["pixbuf"], px, cy)
+                cr.paint()
+                if sel:
+                    # Win95 tinted the icon navy rather than drawing a frame
+                    # around it; ATOP keeps the tint inside the icon's alpha.
+                    cr.save()
+                    cr.rectangle(px, cy, ICON, ICON)
+                    cr.clip()
+                    cr.set_operator(1)  # CAIRO_OPERATOR_ATOP
+                    cr.set_source_rgba(*NAVY, 0.45)
+                    cr.paint()
+                    cr.restore()
+
+            layout.set_text(item["label"], -1)
+            tw, th = layout.get_pixel_size()
+            tx = cx + (cw - tw) // 2
+            ty = cy + ICON + 4
+            if sel:
+                cr.set_source_rgb(*NAVY)
+                cr.rectangle(tx - 2, ty - 1, tw + 4, th + 2)
+                cr.fill()
+            cr.set_source_rgb(*WHITE)
+            cr.move_to(tx, ty)
+            PangoCairo.show_layout(cr, layout)
+
+            if sel:
+                # The dotted focus rectangle -- as much a Windows tell as the
+                # navy itself.
+                cr.set_source_rgb(*WHITE)
+                cr.set_line_width(1)
+                cr.set_dash([1, 1])
+                cr.rectangle(tx - 2.5, ty - 1.5, tw + 5, th + 3)
+                cr.stroke()
+                cr.set_dash([])
+        return True
+
+    # ── input ───────────────────────────────────────────────────────────
+    def on_click(self, _w, ev):
+        idx = self.hit(ev.x, ev.y)
+        if ev.type == Gdk.EventType._2BUTTON_PRESS and idx is not None:
+            try:
+                subprocess.Popen(self.items[idx]["cmd"],
+                                 stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
+            return True
+        self.selected = idx           # a click on bare desktop deselects
+        self.queue_draw()
+        return True
+
+
+def main():
+    win = Desktop()
+    win.show_all()
+    # lower() only takes effect once the window is realised.
+    gw = win.get_window()
+    if gw:
+        gw.lower()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(0)

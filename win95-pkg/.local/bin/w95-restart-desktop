@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Restart w95-desktop idempotently. Safe to call from i3's exec_always, which
+# fires on every reload. Matches on the full path so a desktop belonging to a
+# different checkout (or a nested test session) is left alone.
+set -u
+self="$(cd "$(dirname "$0")" && pwd)/w95-desktop"
+
+pkill -f "^([^ ]*python3? )?$self" 2>/dev/null
+sleep 0.2
+exec setsid -f "$self" >"${XDG_RUNTIME_DIR:-/tmp}/w95-desktop.log" 2>&1 </dev/null
