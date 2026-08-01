@@ -54,6 +54,57 @@ install_assets() {
         cp -r "$cache"/Chicago95/sounds/* "$HOME/.local/share/sounds/" 2>/dev/null || true
 }
 
+# ── Claude Code ───────────────────────────────────────────────────────
+# Same problem as Emacs: a dark TUI in a white-on-grey desktop. settings.json
+# is a big shared file, so only the "theme" string is rewritten, in place, by
+# regex -- a json round-trip would reformat every other key the CLI owns.
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+
+claude_theme_get() {
+    [[ -f $CLAUDE_SETTINGS ]] || return 0
+    python3 - "$CLAUDE_SETTINGS" <<'PY' 2>/dev/null
+import json, sys
+try:
+    print(json.load(open(sys.argv[1])).get("theme", ""))
+except Exception:
+    pass
+PY
+}
+
+claude_theme_set() {
+    [[ -f $CLAUDE_SETTINGS ]] || return 0
+    python3 - "$CLAUDE_SETTINGS" "$1" <<'PY' 2>/dev/null || true
+import json, re, sys
+path, want = sys.argv[1], sys.argv[2]
+text = open(path).read()
+try:
+    json.loads(text)
+except Exception:
+    sys.exit(0)                      # never touch a file we cannot parse
+new, n = re.subn(r'("theme"\s*:\s*)"[^"]*"', r'\1"%s"' % want, text, count=1)
+if n == 0:                           # no theme key yet -- add one
+    d = json.loads(text); d["theme"] = want
+    new = json.dumps(d, indent=2) + "\n"
+json.loads(new)                      # refuse to write invalid json
+open(path, "w").write(new)
+PY
+}
+
+backup_claude_theme() {
+    local cur
+    cur=$(claude_theme_get)
+    case $cur in light | '') return 0 ;; esac   # never record our own choice
+    mkdir -p "$BACKUP"
+    printf '%s\n' "$cur" >"$BACKUP/claude-theme"
+}
+
+restore_claude_theme() {
+    local prev
+    prev=$(cat "$BACKUP/claude-theme" 2>/dev/null || true)
+    [[ -n $prev ]] || prev=dark
+    claude_theme_set "$prev"
+}
+
 # ── GTK settings: swap the three theme keys, keep everything else ─────
 gtk_set() {
     local file="$HOME/.config/gtk-3.0/settings.ini"
@@ -144,6 +195,7 @@ cmd_on() {
     install_assets
     backup_gtk
     backup_emacs_theme
+    backup_claude_theme
 
     say "pointing i3 at the win95 palette and window chrome"
     ln -sfn "$I3DIR/colors.d/win95.conf" "$PALETTE"
@@ -171,6 +223,9 @@ cmd_on() {
 
     say "dressing Emacs in the win95 theme"
     emacs_theme_set win95
+
+    say "switching Claude Code to its light theme"
+    claude_theme_set light
 
     xsetroot -solid '#008080' 2>/dev/null || true
     if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
@@ -201,6 +256,7 @@ cmd_off() {
         warn "no saved terminal palette; run \`theme <light|dark> <palette>\` to reset it"
     fi
     restore_emacs_theme
+    restore_claude_theme
     pkill -f "bin/w95bar" 2>/dev/null || true
     # The icons go too. They are an override-redirect window the WM knows
     # nothing about, so nothing else will ever clean them up -- leaving them
