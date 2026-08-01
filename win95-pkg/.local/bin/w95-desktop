@@ -42,17 +42,43 @@ ICON_DIRS = [
     "/usr/share/icons/Chicago95",
 ]
 
+# Deliberately not xdg-open. Nothing on a typical desktop claims the trash://
+# scheme, so xdg-open falls through to the browser and the Recycle Bin opens
+# Firefox; inode/directory is just as likely to be pointed at a terminal.
+# Thunar leads the list because Chicago95 is an XFCE theme -- Thunar inherits it
+# and comes up looking like Explorer rather than a modern file manager.
+FILE_MANAGERS = ["thunar", "nemo", "nautilus", "pcmanfm", "caja"]
+
+
+def file_manager():
+    from shutil import which
+    for fm in FILE_MANAGERS:
+        if which(fm):
+            return fm
+    return None
+
+
+FM = file_manager()
+
+
+def open_with(target):
+    """Command to show `target` in a file manager, falling back to xdg-open."""
+    return [FM, target] if FM else ["xdg-open", target]
+
+
 # (label, icon candidates in preference order, command)
+# The gvfs URIs need gvfs installed; without it the file manager will say so
+# rather than silently opening the wrong thing, which is the improvement.
 ITEMS = [
     ("My Computer",
      ["devices/32/computer.png", "places/32/gnome-fs-client.png"],
-     ["xdg-open", os.path.expanduser("~")]),
+     open_with(os.path.expanduser("~"))),
     ("Network Neighborhood",
      ["places/32/network_fs.png", "places/32/gnome-fs-network.png"],
-     ["xdg-open", "smb://"]),
+     open_with("network:///")),
     ("Recycle Bin",
      ["places/32/emptytrash.png", "places/32/gnome-stock-trash.png"],
-     ["xdg-open", "trash:///"]),
+     open_with("trash:///")),
 ]
 
 CELL_W, CELL_H = 96, 88
