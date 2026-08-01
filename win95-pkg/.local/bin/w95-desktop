@@ -166,12 +166,22 @@ class Desktop(Gtk.Window):
                         cr.restore()
 
             layout.set_text(item["label"], -1)
-            tw, th = layout.get_pixel_size()
-            tx = cx + (cw - tw) // 2
+            _, th = layout.get_pixel_size()
+            # The layout is cell-wide and centres its own text, so it is drawn
+            # at a fixed origin: offsetting it again by (cell - text) / 2 -- as
+            # this used to -- centres twice and slides the label right of the
+            # icon it belongs to.
+            tx = cx + 4
             ty = cy + ICON + 4
+            # The highlight has to hug the text, so measure the widest line
+            # rather than using the layout's own (cell-wide) extent.
+            tw = 0
+            for li in range(layout.get_line_count()):
+                tw = max(tw, layout.get_line_readonly(li).get_pixel_extents()[1].width)
+            bx = cx + (cw - tw) // 2
             if sel:
                 cr.set_source_rgb(*NAVY)
-                cr.rectangle(tx - 2, ty - 1, tw + 4, th + 2)
+                cr.rectangle(bx - 2, ty - 1, tw + 4, th + 2)
                 cr.fill()
             cr.set_source_rgb(*WHITE)
             cr.move_to(tx, ty)
@@ -183,7 +193,7 @@ class Desktop(Gtk.Window):
                 cr.set_source_rgb(*WHITE)
                 cr.set_line_width(1)
                 cr.set_dash([1, 1])
-                cr.rectangle(tx - 2.5, ty - 1.5, tw + 5, th + 3)
+                cr.rectangle(bx - 2.5, ty - 1.5, tw + 5, th + 3)
                 cr.stroke()
                 cr.set_dash([])
         return True
