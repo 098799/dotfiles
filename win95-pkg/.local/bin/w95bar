@@ -138,7 +138,96 @@ class Bar(Gtk.Window):
         tray.pack_start(self.clock, False, False, 0)
         root.pack_end(tray, False, False, 0)
 
-        self.add(root)
+        # A Gtk.Box has no GdkWindow, so it cannot receive button events; the
+        # EventBox is what makes right-clicking the *empty* strip of taskbar
+        # work. Task buttons and Start handle their own clicks and never reach
+        # it, which is exactly the Win95 split: the bar's own menu arranges
+        # windows, a button's menu acts on one window.
+        frame = Gtk.EventBox()
+        frame.add(root)
+        frame.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        frame.connect("button-press-event", self._on_bar_click)
+        self.add(frame)
+
+    def _on_bar_click(self, _w, ev):
+        if ev.button == 3:
+            self._taskbar_menu(ev)
+            return True
+        return False
+
+    def _taskbar_menu(self, ev):
+        """Right-click the taskbar: Cascade / Tile / Minimize All."""
+        menu = Gtk.Menu()
+        style(menu, "w95-menu")
+        entries = [
+            ("Cascade Windows", lambda: self._arrange("cascade")),
+            ("Tile Windows Horizontally", lambda: self._arrange("horizontal")),
+            ("Tile Windows Vertically", lambda: self._arrange("vertical")),
+            (None, None),
+            ("Minimize All Windows", lambda: self._arrange("minimize")),
+        ]
+        for label, fn in entries:
+            if label is None:
+                menu.append(Gtk.SeparatorMenuItem())
+                continue
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", lambda _i, f=fn: f())
+            menu.append(item)
+        menu.show_all()
+        menu.popup_at_pointer(ev)
+
+    def _arrangeable(self):
+        """Windows on the focused workspace that are not minimised."""
+        try:
+            tree = self.i3.get_tree()
+            cur = next((w["name"] for w in self.i3.get_workspaces() if w.get("focused")), None)
+        except Exception:
+            return []
+        return [w for w in w95ipc.windows(tree)
+                if w.get("_ws") is not None and w.get("_ws") == cur]
+
+    def _arrange(self, mode):
+        wins = self._arrangeable()
+        if not wins:
+            return
+        if mode == "minimize":
+            for w in wins:
+                self.i3.command("[con_id=%d] move scratchpad" % w["id"])
+            GLib.timeout_add(60, lambda: (self.refresh(), False)[1])
+            return
+
+        # The usable desktop: the monitor minus the taskbar we are sitting on.
+        screen = Gdk.Screen.get_default()
+        geo = screen.get_monitor_geometry(screen.get_primary_monitor())
+        x0, y0 = geo.x, geo.y
+        w0, h0 = geo.width, geo.height - BAR_HEIGHT
+        n = len(wins)
+
+        rects = []
+        if mode == "horizontal":
+            # Win95's "Tile Horizontally" stacks full-width strips one *above*
+            # the other -- the name describes the split, not the direction.
+            step = h0 // n
+            rects = [(x0, y0 + i * step, w0, step) for i in range(n)]
+        elif mode == "vertical":
+            step = w0 // n
+            rects = [(x0 + i * step, y0, step, h0) for i in range(n)]
+        else:  # cascade
+            off = max(20, BAR_HEIGHT // 2)
+            cw, ch = int(w0 * 0.62), int(h0 * 0.62)
+            # Keep the last window fully on screen rather than marching off the
+            # bottom-right when there are many of them.
+            span = max(1, n - 1)
+            stepx = min(off, max(1, (w0 - cw) // span))
+            stepy = min(off, max(1, (h0 - ch) // span))
+            rects = [(x0 + i * stepx, y0 + i * stepy, cw, ch) for i in range(n)]
+
+        for win, (x, y, w, h) in zip(wins, rects):
+            # floating enable first: a tiled container ignores move/resize.
+            self.i3.command(
+                "[con_id=%d] floating enable, resize set %d %d, move position %d %d"
+                % (win["id"], w, h, x, y))
+        GLib.timeout_add(60, lambda: (self.refresh(), False)[1])
 
     def _place(self):
         screen = Gdk.Screen.get_default()
