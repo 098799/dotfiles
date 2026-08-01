@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-    echo "usage: theme <light|dark> <gruvbox|selenized>" >&2
+    echo "usage: theme <light|dark> <gruvbox|selenized|win95>" >&2
     exit 2
 }
 
@@ -11,7 +11,23 @@ mode=$1
 palette=$2
 
 case $mode in light | dark) ;; *) usage ;; esac
-case $palette in gruvbox | selenized) ;; *) usage ;; esac
+case $palette in gruvbox | selenized | win95) ;; *) usage ;; esac
+
+# Windows 95 is a light palette and only a light one; `theme dark win95` is a
+# typo, not a request. Routing it through here rather than leaving `w95 on` to
+# do everything is what finally gets dunst, rofi, tmux and fzf recoloured --
+# they are generated from the semantic table below, which `w95 on` never had.
+w95_mode=
+if [[ $palette == win95 ]]; then
+    w95_mode=1
+    mode=light
+    # Stash what we are leaving, so `w95-switch off` knows what to go back to.
+    # The state file is about to say "light win95", which is no help at all.
+    if [[ -f $HOME/.config/theme/state ]] &&
+        ! grep -q win95 "$HOME/.config/theme/state"; then
+        cp "$HOME/.config/theme/state" "$HOME/.config/theme/prew95"
+    fi
+fi
 
 # Picking a normal theme means leaving Windows 95, not wearing gruvbox inside
 # it. Without this the palette changed while the taskbar, the desktop icons,
@@ -21,13 +37,17 @@ case $palette in gruvbox | selenized) ;; *) usage ;; esac
 # the palette link itself, so by the time anyone looked at it the marker was
 # already gone and you were left with gruvbox colours under Win95 chrome, a
 # Win95 taskbar and a Win95 terminal. Nothing but `w95` touches the chrome link.
-if [[ $(readlink -f "$HOME/.config/i3/active-chrome.conf" 2>/dev/null) == *win95.conf ]] &&
+if [[ -z $w95_mode ]] &&
+    [[ $(readlink -f "$HOME/.config/i3/active-chrome.conf" 2>/dev/null) == *win95.conf ]] &&
     [[ -x $HOME/.local/bin/w95 ]]; then
     "$HOME/.local/bin/w95" off >/dev/null 2>&1 || true
     # The window manager is switched separately from the look, so drop back to
     # stock i3 too -- otherwise the caption buttons stay Win95 under gruvbox.
-    [[ -x $HOME/.local/bin/w95-switch ]] &&
+    # W95_NO_SWITCH is set by w95-switch itself, which calls us to repaint --
+    # without it the two would call each other until the stack ran out.
+    if [[ -z ${W95_NO_SWITCH:-} && -x $HOME/.local/bin/w95-switch ]]; then
         "$HOME/.local/bin/w95-switch" off >/dev/null 2>&1 || true
+    fi
 fi
 
 case $palette:$mode in
@@ -35,6 +55,7 @@ case $palette:$mode in
     gruvbox:dark) emacs_theme=doom-gruvbox ;;
     selenized:light) emacs_theme=doom-solarized-light ;;
     selenized:dark) emacs_theme=doom-solarized-dark ;;
+    win95:light) emacs_theme=win95 ;;
 esac
 
 # Load the semantic UI palette (bg_main, accent, urgent, …) from the i3 colors
@@ -54,9 +75,20 @@ case $palette:$mode in
     gruvbox:light) bat_theme="gruvbox-light";      btop_theme="gruvbox_light" ;;
     selenized:dark) bat_theme="Solarized (dark)";   btop_theme="solarized_dark" ;;
     selenized:light) bat_theme="Solarized (light)";  btop_theme="solarized_light" ;;
+    # bat "ansi" paints from the terminal's own 16 colours, which under
+    # win95 *are* the VGA attributes -- a truer match than any shipped theme.
+    win95:light) bat_theme="ansi";                   btop_theme="solarized_light" ;;
 esac
 
-uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette"
+# Under win95 the terminal palette, GTK theme, icons, cursors, chrome,
+# taskbar, desktop icons, Emacs and Claude all come from `w95 on`; running
+# the generic paths as well would immediately overwrite them with Adapta and
+# a generated Alacritty palette.
+if [[ -n $w95_mode ]]; then
+    "$HOME/.local/bin/w95" on >/dev/null 2>&1 || true
+else
+    uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette"
+fi
 
 if command -v gsettings >/dev/null; then
     gsettings set org.gnome.desktop.interface color-scheme "prefer-$mode"
@@ -75,8 +107,11 @@ case $mode in
         ;;
 esac
 
+# `w95 on` has already pointed GTK at Chicago95 and the Win95 cursors;
+# Adapta here would undo it a second later.
 gtk3_ini=$HOME/.config/gtk-3.0/settings.ini
 gtkrc2=$HOME/.gtkrc-2.0
+if [[ -n $w95_mode ]]; then gtk3_ini=/dev/null; gtkrc2=/dev/null; fi
 if [[ -f $gtk3_ini ]]; then
     sed -i -E \
         -e "s|^gtk-theme-name=.*|gtk-theme-name=$gtk_name|" \
@@ -88,6 +123,7 @@ if [[ -f $gtkrc2 ]]; then
 fi
 
 xs_conf=$HOME/.config/xsettingsd/xsettingsd.conf
+[[ -n $w95_mode ]] && xs_conf=/dev/null
 if [[ -f $xs_conf ]]; then
     sed -i -E \
         -e "s|^Net/ThemeName .*|Net/ThemeName \"$gtk_name\"|" \
@@ -133,6 +169,9 @@ fi
 if [[ -z $wallpaper && -f $HOME/Pictures/legartis-escher.png ]]; then
     wallpaper=$HOME/Pictures/legartis-escher.png
 fi
+# Win95 has no wallpaper -- it is a flat teal root with icons on top, and
+# feh would paint straight over both.
+[[ -n $w95_mode ]] && wallpaper=""
 if [[ -n $wallpaper ]] && command -v feh >/dev/null; then
     feh --no-fehbg --bg-scale "$wallpaper"
     printf '#!/bin/sh\nfeh --no-fehbg --bg-scale %q\n' "$wallpaper" >"$HOME/.fehbg"

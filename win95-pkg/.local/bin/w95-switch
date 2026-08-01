@@ -78,7 +78,15 @@ restart_i3() {
 cmd_on() {
     preflight
     say "applying Windows 95 assets, palette and GTK settings"
-    "$BIN/w95" on >/dev/null || die "w95 on failed"
+    # Through `theme`, not `w95` directly: `w95 on` dresses the desktop, but
+    # dunst, rofi, tmux, fzf and bat are generated from the semantic palette
+    # and only `theme` knows how to do that. Calling w95 alone left the Start
+    # menu and every notification in gruvbox.
+    if [[ -x $HOME/bin/theme ]]; then
+        W95_NO_SWITCH=1 "$HOME/bin/theme" light win95 >/dev/null || die "theme light win95 failed"
+    else
+        "$BIN/w95" on >/dev/null || die "w95 on failed"
+    fi
     mkdir -p "$(dirname "$STATE")"
     printf 'w95\n' >"$STATE"
     say "restarting i3 into i3-95 (layout is preserved)"
@@ -91,7 +99,14 @@ cmd_on() {
 cmd_off() {
     printf 'stock\n' >"$STATE"
     pkill -f "bin/w95bar" 2>/dev/null
-    "$BIN/w95" off >/dev/null 2>&1
+    # Repaint everything back to whatever we were on before Windows 95, which
+    # `theme` stashed in prew95 on the way in. This also runs `w95 off`.
+    prev=$(cat "$HOME/.config/theme/prew95" 2>/dev/null || echo "dark gruvbox")
+    if [[ -x $HOME/bin/theme ]]; then
+        W95_NO_SWITCH=1 "$HOME/bin/theme" $prev >/dev/null 2>&1 || true
+    else
+        "$BIN/w95" off >/dev/null 2>&1
+    fi
     say "restarting i3 into stock i3"
     restart_i3
     say "back to normal."
