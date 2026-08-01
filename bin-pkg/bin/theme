@@ -80,12 +80,32 @@ case $palette:$mode in
     win95:light) bat_theme="ansi";                   btop_theme="solarized_light" ;;
 esac
 
+# Notification font and icons. These were never themed at all: dunst kept
+# "Noto Sans 10" and GNOME's Adwaita icons under every palette, so a Windows 95
+# desktop popped up modern notifications with Adwaita glyphs in them.
+if [[ -n $w95_mode ]]; then
+    dunst_font="W95FA 11"
+    dunst_icons="$HOME/.icons/Chicago95/status/24/:$HOME/.icons/Chicago95/devices/24/"
+else
+    dunst_font="Noto Sans 10"
+    dunst_icons="/usr/share/icons/Adwaita/16x16/status/:/usr/share/icons/Adwaita/16x16/devices/"
+fi
+
 # Under win95 the terminal palette, GTK theme, icons, cursors, chrome,
 # taskbar, desktop icons, Emacs and Claude all come from `w95 on`; running
 # the generic paths as well would immediately overwrite them with Adapta and
 # a generated Alacritty palette.
 if [[ -n $w95_mode ]]; then
-    "$HOME/.local/bin/w95" on >/dev/null 2>&1 || true
+    # Symmetric with the exit path above, which already calls `w95-switch off`:
+    # without this, `theme light win95` dressed the desktop but left stock i3
+    # running, so there were no Win95 caption buttons on any window. W95_NO_SWITCH
+    # means w95-switch is the one calling us, and has the WM in hand already.
+    if [[ -z ${W95_NO_SWITCH:-} && -x $HOME/.local/bin/w95-switch ]] &&
+        "$HOME/.local/bin/w95-switch" status 2>/dev/null | grep -q '^switchable: yes'; then
+        "$HOME/.local/bin/w95-switch" on >/dev/null 2>&1 || true
+    else
+        "$HOME/.local/bin/w95" on >/dev/null 2>&1 || true
+    fi
 else
     uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette"
 fi
@@ -193,6 +213,7 @@ dunstrc=$HOME/.config/dunst/dunstrc
 if [[ -f $dunstrc ]] && [[ ${#COL[@]} -gt 0 ]]; then
     tmp=$(mktemp)
     awk -v frame="$(col accent)" \
+        -v sepcol="$(col sep)" -v dfont="$dunst_font" -v dicons="$dunst_icons" \
         -v lowbg="$(col bg_main)"  -v lowfg="$(col fg_dim)" \
         -v normbg="$(col bg_main)" -v normfg="$(col fg_main)" \
         -v critbg="$(col urgent)"  -v critfg="$(col urgent_fg)" '
@@ -200,6 +221,12 @@ if [[ -f $dunstrc ]] && [[ ${#COL[@]} -gt 0 ]]; then
         {
             if (sec=="[global]" && $0 ~ /^[[:space:]]*frame_color[[:space:]]*=/) {
                 print "    frame_color = \"" frame "\""; next }
+            if (sec=="[global]" && $0 ~ /^[[:space:]]*separator_color[[:space:]]*=/) {
+                print "    separator_color = " sepcol; next }
+            if (sec=="[global]" && $0 ~ /^[[:space:]]*font[[:space:]]*=/) {
+                print "    font = " dfont; next }
+            if (sec=="[global]" && $0 ~ /^[[:space:]]*icon_path[[:space:]]*=/) {
+                print "    icon_path = " dicons; next }
             if (sec=="[urgency_low]") {
                 if ($0 ~ /^[[:space:]]*background[[:space:]]*=/) { print "    background = \"" lowbg "\""; next }
                 if ($0 ~ /^[[:space:]]*foreground[[:space:]]*=/) { print "    foreground = \"" lowfg "\""; next } }
