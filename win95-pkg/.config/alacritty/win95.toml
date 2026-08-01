@@ -1,0 +1,89 @@
+# ── Windows 95 ────────────────────────────────────────────────────────
+# An Alacritty palette that is not "Win95-ish" but literally the Windows
+# console palette: the sixteen VGA text-mode attributes as Windows 95 set
+# them, silver-on-black, with the shell's own five UI colours reused for
+# everything Alacritty draws that DOS never had (selection, hints, search).
+#
+#   #c0c0c0  silver   attribute 0x07 — the default text colour, and the
+#                     grey of every window frame in the OS
+#   #000080  navy     the active title bar, and Win95's selection highlight
+#   #008080  teal     the desktop
+#   #ffffff  white    attribute 0x0f — bright, the "highlight" colour
+#
+# Loaded by `w95 on` into ~/.config/alacritty/active-palette.toml, and put
+# back by `w95 off`. live_config_reload means already-open terminals repaint
+# without being restarted.
+
+[colors]
+# Bold text gets the bright half of the palette, exactly like a DOS console
+# with the intensity bit set. This is also what keeps `ls` directories
+# legible: bold blue lifts to #0000ff.
+draw_bold_text_with_bright_colors = true
+
+[colors.primary]
+background = "#000000"
+foreground = "#c0c0c0"   # attribute 0x07, the DOS default
+bright_foreground = "#ffffff"
+
+# The block cursor from a Win95 MS-DOS Prompt: solid silver, text knocked
+# out to black underneath it.
+[colors.cursor]
+cursor = "#c0c0c0"
+text = "#000000"
+
+[colors.vi_mode_cursor]
+cursor = "#00ffff"
+text = "#000000"
+
+# Win95's selection was white on navy everywhere in the shell — Explorer,
+# list boxes, the lot. It reads the same way here.
+[colors.selection]
+background = "#000080"
+text = "#ffffff"
+
+# The sixteen console attributes. Windows set 'yellow' to olive (#808000)
+# and 'white' to silver, which is why DOS output has that particular drab
+# warmth; both are kept.
+[colors.normal]
+black = "#000000"
+red = "#800000"
+green = "#008000"
+yellow = "#808000"
+blue = "#0000aa"   # Windows used #000080; #0000aa is the VGA blue and the
+                   # smallest change that keeps `ls` directories readable
+magenta = "#800080"
+cyan = "#008080"   # the desktop teal
+white = "#c0c0c0"  # silver — the face colour of the whole OS
+
+[colors.bright]
+black = "#808080"   # the shadow grey of every bevel
+red = "#ff0000"
+green = "#00ff00"
+yellow = "#ffff00"
+blue = "#0000ff"
+magenta = "#ff00ff"
+cyan = "#00ffff"
+white = "#ffffff"
+
+# Alacritty's hint labels and search, dressed as Win95 controls: a raised
+# silver button for the label, navy highlight for a match, and the amber of
+# a focused match kept bright so it stands out against the teal-and-navy.
+[colors.hints.start]
+background = "#c0c0c0"
+foreground = "#000000"
+
+[colors.hints.end]
+background = "#808080"
+foreground = "#ffffff"
+
+[colors.search.matches]
+background = "#000080"
+foreground = "#ffffff"
+
+[colors.search.focused_match]
+background = "#ffff00"
+foreground = "#000000"
+
+[colors.footer_bar]
+background = "#c0c0c0"
+foreground = "#000000"

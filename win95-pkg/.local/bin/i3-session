@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# i3-session — start i3, choosing the binary at every (re)start.
+#
+# Log into the "i3 (Win95-switchable)" session and this becomes your window
+# manager. It reads ~/.config/w95/wm each time i3 starts and execs either the
+# stock i3 or the patched i3-95. Because i3's own `restart` re-execs
+# start_argv[0] — which is this script — `w95-switch` can swap the window
+# manager under a live session, layout and all, with no X restart.
+#
+# Two safety properties, both load-bearing:
+#
+#   * If i3-95 is missing or not executable we silently fall back to stock i3,
+#     so a half-finished build never costs you a session.
+#   * This script supervises the WM. If the selected WM dies with a non-zero
+#     status we flip the state back to stock and relaunch, rather than letting
+#     the X session collapse to the greeter. A crashing i3-95 therefore drops
+#     you into a working desktop instead of a login loop.
+set -u
+
+SELF=$(readlink -f "$0")
+STATE_DIR=$HOME/.config/w95
+STATE=$STATE_DIR/wm
+LOG=$HOME/.local/state/w95/session.log
+STOCK=/usr/bin/i3
+W95=$HOME/.local/bin/i3-95
+
+mkdir -p "$STATE_DIR" "$(dirname "$LOG")"
+
+note() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
+
+pick() {
+    if [[ $(cat "$STATE" 2>/dev/null) == w95 && -x $W95 ]]; then
+        printf '%s' "$W95"
+    else
+        printf '%s' "$STOCK"
+    fi
+}
+
+# ── inner invocation ──────────────────────────────────────────────────
+# Reached both from the supervisor below and from i3's own restart, which
+# execs start_argv[0] (= $SELF). argv[0] is forced back to $SELF so the *next*
+# restart lands here again instead of nailing itself to one binary.
+if [[ -n ${W95_SUPERVISED:-} ]]; then
+    bin=$(pick)
+    note "starting $bin ($*)"
+    exec -a "$SELF" "$bin" "$@"
+    note "exec of $bin failed; falling back to $STOCK"
+    exec -a "$SELF" "$STOCK" "$@"
+fi
+
+# ── supervisor ────────────────────────────────────────────────────────
+export W95_SUPERVISED=1
+fell_back=0
+while :; do
+    "$SELF" "$@"
+    rc=$?
+    note "window manager exited rc=$rc"
+    # rc 0 is a deliberate `i3-msg exit` — log out for real.
+    if (( rc == 0 )) || (( fell_back )) || [[ $(cat "$STATE" 2>/dev/null) != w95 ]]; then
+        exit "$rc"
+    fi
+    note "i3-95 died (rc=$rc) — reverting to stock i3 for this session"
+    printf 'stock\n' >"$STATE"
+    fell_back=1
+    # Tear the rest of the shell down too. Without this you land in stock i3
+    # still wearing the Win95 palette, with an orphaned taskbar that the next
+    # startup would stack a second copy on top of.
+    pkill -f "bin/w95bar" 2>/dev/null
+    "$HOME/.local/bin/w95" off >/dev/null 2>&1
+    # Drop i3's accumulated restart arguments: the saved layout belongs to the
+    # process that just crashed and replaying it could reproduce the crash.
+    set --
+done

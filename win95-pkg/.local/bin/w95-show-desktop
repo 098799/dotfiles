@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Win+D. i3 has no "minimise all", so we sweep every window on the current
+# workspace into the scratchpad — and sweep them back out on the next press.
+# The set of swept windows is remembered in a state file, because once they
+# are in the scratchpad i3 can no longer tell us where they came from.
+set -u
+state="${XDG_RUNTIME_DIR:-/tmp}/w95-show-desktop"
+
+if [[ -s $state ]]; then
+    while read -r id; do
+        [[ -n $id ]] || continue
+        i3-msg -q "[con_id=$id] scratchpad show, move to workspace current, floating disable"
+    done <"$state"
+    : >"$state"
+    exit 0
+fi
+
+ids=$(i3-msg -t get_tree | python3 -c '
+import json, sys
+
+tree = json.load(sys.stdin)
+
+
+def walk(node):
+    yield node
+    for kid in node.get("nodes", []) + node.get("floating_nodes", []):
+        yield from walk(kid)
+
+
+def current(node):
+    """The focused workspace, found by following the focus chain."""
+    for n in walk(node):
+        if n.get("type") == "workspace" and n.get("focused"):
+            return n
+    for n in walk(node):
+        if n.get("type") == "workspace" and n.get("name") != "__i3_scratch":
+            for m in walk(n):
+                if m.get("focused"):
+                    return n
+    return None
+
+
+ws = current(tree)
+if ws:
+    for n in walk(ws):
+        if n.get("window"):
+            print(n["id"])
+')
+
+[[ -n $ids ]] || exit 0
+printf '%s\n' "$ids" >"$state"
+while read -r id; do
+    i3-msg -q "[con_id=$id] move scratchpad"
+done <<<"$ids"

@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# w95 — turn the Windows 95 desktop on and off.
+#
+#   w95 on        install assets, switch i3 + GTK + cursors, restart the shell
+#   w95 off       put everything back the way it was
+#   w95 status    what is currently active
+#   w95 assets    (re)install fonts, GTK theme, icons, cursors, sounds
+#   w95 sandbox   run the whole thing in a nested X server, touching nothing
+#   w95 wm        build and install the patched i3-95 window manager
+#
+# Every change is user-local: ~/.themes, ~/.icons, ~/.local, ~/.config.
+# Nothing is written outside $HOME and nothing needs root.
+set -euo pipefail
+
+PKG="$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)"
+I3DIR="$HOME/.config/i3"
+PALETTE="$I3DIR/active-palette.conf"
+CHROME="$I3DIR/active-chrome.conf"
+ALACRITTY="$HOME/.config/alacritty/active-palette.toml"
+BACKUP="$HOME/.local/state/w95"
+UPSTREAM="https://github.com/grassmunk/Chicago95.git"
+W95FA="https://raw.githubusercontent.com/verkcuos/w95fa/main/W95FA.otf"
+
+say() { printf '\033[1m%s\033[0m\n' "$*"; }
+warn() { printf 'w95: %s\n' "$*" >&2; }
+
+# ── assets ────────────────────────────────────────────────────────────
+# All third-party: the W95FA typeface and grassmunk's Chicago95 theme.
+# Fetched rather than vendored so the repo stays small and the upstreams
+# stay attributable.
+install_assets() {
+    local cache="$HOME/.cache/w95"
+    mkdir -p "$cache" "$HOME/.themes" "$HOME/.icons" \
+             "$HOME/.local/share/fonts/w95" "$HOME/.local/share/sounds"
+
+    if [[ ! -s $HOME/.local/share/fonts/w95/W95FA.otf ]]; then
+        say "fetching the W95FA typeface"
+        curl -fsSL -o "$HOME/.local/share/fonts/w95/W95FA.otf" "$W95FA" ||
+            warn "could not fetch W95FA — titles will fall back to Sans"
+        fc-cache -f "$HOME/.local/share/fonts" >/dev/null
+    fi
+
+    if [[ ! -d $cache/Chicago95 ]]; then
+        say "fetching Chicago95 (GTK theme, icons, cursors, sounds)"
+        git clone --depth 1 "$UPSTREAM" "$cache/Chicago95" >/dev/null 2>&1 ||
+            { warn "could not clone Chicago95 — skipping GTK theming"; return 0; }
+    fi
+
+    say "installing themes into ~/.themes, ~/.icons, ~/.local/share/sounds"
+    cp -r "$cache/Chicago95/Theme/Chicago95" "$HOME/.themes/"
+    cp -r "$cache/Chicago95/Icons/Chicago95" "$HOME/.icons/"
+    cp -r "$cache/Chicago95/Cursors/Chicago95_Standard_Cursors" "$HOME/.icons/"
+    cp -r "$cache/Chicago95/sounds/Chicago95" "$HOME/.local/share/sounds/" 2>/dev/null ||
+        cp -r "$cache"/Chicago95/sounds/* "$HOME/.local/share/sounds/" 2>/dev/null || true
+}
+
+# ── GTK settings: swap the three theme keys, keep everything else ─────
+gtk_set() {
+    local file="$HOME/.config/gtk-3.0/settings.ini"
+    mkdir -p "$(dirname "$file")"
+    [[ -f $file ]] || printf '[Settings]\n' >"$file"
+    python3 - "$file" "$@" <<'PY'
+import re
+import sys
+
+path, *pairs = sys.argv[1:]
+text = open(path).read()
+for pair in pairs:
+    key, _, value = pair.partition("=")
+    line = "%s=%s" % (key, value)
+    pattern = re.compile(r"(?m)^\s*#?\s*%s\s*=.*$" % re.escape(key))
+    if pattern.search(text):
+        text = pattern.sub(line, text, count=1)
+    else:
+        text = text.replace("[Settings]", "[Settings]\n" + line, 1)
+open(path, "w").write(text)
+PY
+}
+
+backup_gtk() {
+    mkdir -p "$BACKUP"
+    [[ -f $BACKUP/gtk-3.0-settings.ini ]] ||
+        cp "$HOME/.config/gtk-3.0/settings.ini" "$BACKUP/gtk-3.0-settings.ini" 2>/dev/null || true
+    [[ -f $BACKUP/palette ]] ||
+        readlink -f "$PALETTE" >"$BACKUP/palette" 2>/dev/null || true
+    # `theme` *generates* active-palette.toml rather than linking it, so the
+    # terminal palette has to be copied aside, not remembered by name.
+    [[ -f $BACKUP/alacritty-palette.toml ]] ||
+        cp "$ALACRITTY" "$BACKUP/alacritty-palette.toml" 2>/dev/null || true
+}
+
+# ── commands ──────────────────────────────────────────────────────────
+cmd_on() {
+    install_assets
+    backup_gtk
+
+    say "pointing i3 at the win95 palette and window chrome"
+    ln -sfn "$I3DIR/colors.d/win95.conf" "$PALETTE"
+    ln -sfn "$I3DIR/chrome.d/win95.conf" "$CHROME"
+
+    if [[ -d $(dirname "$ALACRITTY") ]]; then
+        say "dressing alacritty in the Windows 95 console palette"
+        # live_config_reload repaints open terminals; no restart needed.
+        cp "$PKG/.config/alacritty/win95.toml" "$ALACRITTY"
+    fi
+
+    say "switching GTK, icons and cursors"
+    gtk_set \
+        "gtk-theme-name=Chicago95" \
+        "gtk-icon-theme-name=Chicago95" \
+        "gtk-cursor-theme-name=Chicago95_Standard_Cursors" \
+        "gtk-font-name=W95FA 11" \
+        "gtk-application-prefer-dark-theme=false" \
+        "gtk-xft-antialias=1" \
+        "gtk-xft-hintstyle=hintfull"
+
+    mkdir -p "$HOME/.icons/default"
+    printf '[Icon Theme]\nInherits=Chicago95_Standard_Cursors\n' \
+        >"$HOME/.icons/default/index.theme"
+
+    xsetroot -solid '#008080' 2>/dev/null || true
+    if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
+        say "reloading i3"
+        i3-msg -q reload
+        # for_window only fires for new windows; put captions on the ones
+        # already open too.
+        i3-msg -q '[class=".*"] border normal 3'
+    fi
+    "$PKG/.local/bin/w95-chime" desktop-login &
+    say "done — Windows 95 is now running. \`w95 off\` to go back."
+}
+
+cmd_off() {
+    say "restoring the previous palette and GTK settings"
+    if [[ -s $BACKUP/palette ]]; then
+        ln -sfn "$(cat "$BACKUP/palette")" "$PALETTE"
+    else
+        warn "no saved palette; leaving $PALETTE alone"
+    fi
+    if [[ -f $BACKUP/gtk-3.0-settings.ini ]]; then
+        cp "$BACKUP/gtk-3.0-settings.ini" "$HOME/.config/gtk-3.0/settings.ini"
+    fi
+    ln -sfn "$I3DIR/chrome.d/stock.conf" "$CHROME"
+    if [[ -f $BACKUP/alacritty-palette.toml ]]; then
+        cp "$BACKUP/alacritty-palette.toml" "$ALACRITTY"
+    else
+        warn "no saved terminal palette; run \`theme <light|dark> <palette>\` to reset it"
+    fi
+    pkill -f "bin/w95bar" 2>/dev/null || true
+    if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
+        i3-msg -q reload
+        i3-msg -q '[class=".*"] border pixel 10'
+    fi
+    say "back to normal."
+}
+
+cmd_status() {
+    printf 'palette : %s\n' "$(readlink -f "$PALETTE" 2>/dev/null || echo '(none)')"
+    printf 'chrome  : %s\n' "$(basename "$(readlink -f "$CHROME" 2>/dev/null)" 2>/dev/null || echo '(none)')"
+    printf 'gtk     : %s\n' \
+        "$(sed -n 's/^gtk-theme-name=//p' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null)"
+    printf 'terminal: %s\n' \
+        "$(grep -q 'Windows 95' "$ALACRITTY" 2>/dev/null && echo win95 || echo stock)"
+    printf 'taskbar : %s\n' \
+        "$(pgrep -f 'bin/w95bar' >/dev/null && echo running || echo stopped)"
+    printf 'wm      : %s\n' "$(i3 --version 2>/dev/null)"
+    printf 'i3-95   : %s\n' \
+        "$([[ -x $HOME/.local/bin/i3-95 ]] && echo installed || echo 'not built (w95 wm)')"
+}
+
+cmd_wm() { exec "$PKG/.local/bin/w95-build-wm" "$@"; }
+
+cmd_sandbox() { exec "$PKG/.local/bin/w95-sandbox" "$@"; }
+
+case "${1:-status}" in
+on) cmd_on ;;
+off) cmd_off ;;
+status) cmd_status ;;
+assets) install_assets ;;
+wm) shift; cmd_wm "$@" ;;
+sandbox) shift; cmd_sandbox "$@" ;;
+*)
+    sed -n '2,14p' "$(readlink -f "$0")" | sed 's/^# \?//'
+    exit 1
+    ;;
+esac

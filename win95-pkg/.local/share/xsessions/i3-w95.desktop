@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=XSession
+Name=i3 (Win95-switchable)
+Comment=i3, started through i3-session so w95-switch can swap in i3-95 live
+Exec=/home/tgrining/.local/bin/i3-session --shmlog-size 0
+DesktopNames=i3

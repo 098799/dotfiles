@@ -1,0 +1,211 @@
+/* ─────────────────────────────────────────────────────────────
+   w95.css — the Windows 95 "chrome" design system for GTK3.
+   Everything here is built from five colours and two bevels.
+
+     face      #c0c0c0   the grey of everything
+     hilite    #ffffff   outer top/left
+     light     #dfdfdf   inner top/left
+     shadow    #808080   inner bottom/right
+     dkshadow  #000000   outer bottom/right
+
+   RAISED = hilite/light outside-in on top-left, dkshadow/shadow
+   on bottom-right.  SUNKEN is the same thing mirrored.  Win95's
+   entire visual language is those two rules applied recursively.
+   ───────────────────────────────────────────────────────────── */
+
+* {
+    font-family: "W95FA", "MS Sans Serif", "Sans";
+    font-size: 12px;
+    color: #000000;
+    text-shadow: none;
+    outline-color: #000000;
+    outline-style: dotted;
+    outline-width: 1px;
+    outline-offset: -3px;
+}
+
+window, .w95-bar {
+    background-color: #c0c0c0;
+}
+
+/* ── The taskbar itself: a raised plate with a hairline hilite ── */
+.w95-bar {
+    border-top: 1px solid #ffffff;
+    box-shadow: inset 0 1px 0 #dfdfdf;
+}
+
+/* ── RAISED: buttons, start button, task buttons at rest ── */
+.w95-raised,
+button.w95-btn {
+    background-color: #c0c0c0;
+    background-image: none;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    border-radius: 0;
+    padding: 1px 6px;
+    min-height: 0;
+    min-width: 0;
+    color: #000000;
+    font-weight: normal;
+}
+
+/* ── SUNKEN: the pressed/active state. Note the 1px content nudge:
+      Win95 shifts the label down-right when a button goes in. ── */
+.w95-sunken,
+button.w95-btn:active,
+button.w95-btn:checked {
+    background-color: #c0c0c0;
+    background-image: none;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    padding: 2px 5px 0 7px;
+}
+
+/* The focused task button gets the classic 50% dither fill. */
+button.w95-task:checked {
+    background-color: #c0c0c0;
+    background-image: url("dither.png");
+    background-repeat: repeat;
+}
+
+button.w95-btn:hover  { background-color: #c8c8c8; }
+button.w95-btn:disabled label { color: #808080; text-shadow: 1px 1px 0 #ffffff; }
+
+/* ── The Start button: same bevel, bolder, slightly wider ── */
+button.w95-start        { font-weight: bold; padding: 1px 6px 1px 3px; }
+button.w95-start:checked,
+button.w95-start:active { padding: 2px 5px 0 4px; }
+
+/* ── Vertical divider: two 1px rules, the cheapest bevel there is ── */
+.w95-divider {
+    border-left: 1px solid #808080;
+    border-right: 1px solid #ffffff;
+    margin: 2px 3px;
+    min-width: 0;
+}
+
+/* ── SUNKEN WELL: clock tray, status fields, text entries ── */
+.w95-well {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    padding: 2px 6px;
+}
+
+entry.w95-entry {
+    background-color: #ffffff;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    border-radius: 0;
+    padding: 2px 3px;
+    min-height: 0;
+    color: #000000;
+}
+entry.w95-entry selection { background-color: #000080; color: #ffffff; }
+
+/* ─────────────────────────────────────────────────────────────
+   START MENU
+   ───────────────────────────────────────────────────────────── */
+
+.w95-menu {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+}
+
+/* The blue gutter with "Windows95" running up it. Drawn in code
+   (rotated text on a cairo surface) — here we only own the fill. */
+.w95-banner {
+    background-image: linear-gradient(to bottom, #000080 0%, #000080 100%);
+    min-width: 21px;
+}
+
+button.w95-item {
+    background-color: transparent;
+    background-image: none;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 3px 18px 3px 4px;
+    min-height: 0;
+    color: #000000;
+}
+button.w95-item:hover,
+button.w95-item:focus {
+    background-color: #000080;
+    color: #ffffff;
+}
+button.w95-item:hover label,
+button.w95-item:focus label { color: #ffffff; }
+button.w95-item:disabled label { color: #808080; text-shadow: 1px 1px 0 #ffffff; }
+
+/* Menu separator: the same two-rule bevel, horizontal. */
+.w95-sep {
+    border-top: 1px solid #808080;
+    border-bottom: 1px solid #ffffff;
+    margin: 3px 2px;
+    min-height: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DIALOGS (Run..., Shut Down...)
+   ───────────────────────────────────────────────────────────── */
+
+.w95-dialog {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+}
+
+/* The gradient title bar — Win95's one flash of colour. */
+.w95-title {
+    background-image: linear-gradient(to right, #000080, #1084d0);
+    padding: 2px 2px 2px 3px;
+}
+.w95-title label { color: #ffffff; font-weight: bold; }
+
+.w95-titlebtn {
+    background-color: #c0c0c0;
+    background-image: none;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    border-radius: 0;
+    min-width: 14px;
+    min-height: 12px;
+    padding: 0;
+}
+
+/* Default button in a dialog wears an extra black ring. */
+button.w95-default {
+    border: 1px solid #000000;
+    box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #000000,
+                inset 2px 2px 0 #dfdfdf, inset -2px -2px 0 #808080;
+    padding: 2px 10px;
+}
+
+tooltip, tooltip.background {
+    background-color: #ffffe1;
+    border: 1px solid #000000;
+    border-radius: 0;
+    box-shadow: none;
+}
+tooltip label { color: #000000; }
+
+scrollbar { background-color: #c0c0c0; }
+scrollbar slider {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    border-radius: 0;
+    min-width: 12px;
+    min-height: 12px;
+}
+scrollbar trough { background-image: url("dither.png"); background-repeat: repeat; }

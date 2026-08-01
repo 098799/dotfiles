@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Build i3-95: stock i3 plus the Windows 95 chrome patch.
+#
+#   w95 wm build      clone + patch + build into ~/.cache/w95/i3-95
+#   w95 wm install    also link the result to ~/.local/bin/i3-95
+#   w95 wm try        build, then run it in a nested X server
+#   w95 wm clean      throw the build tree away
+#
+# The result is a *separate binary*. It never replaces the system i3, so a
+# broken build cannot lock you out — you just keep logging into stock i3
+# until you point your session at ~/.local/bin/i3-95 yourself.
+set -euo pipefail
+
+SHARE="$(cd "$(dirname "$(readlink -f "$0")")/../share/w95" && pwd)"
+SRC="$HOME/.cache/w95/i3-95"
+PATCHES="$SHARE/i3-95"
+
+say() { printf '\033[1m%s\033[0m\n' "$*"; }
+die() { printf 'w95 wm: %s\n' "$*" >&2; exit 1; }
+
+need() {
+    command -v "$1" >/dev/null || die "missing $1 — install it first ($2)"
+}
+
+do_build() {
+    need git "pacman -S git"
+    need meson "pacman -S meson ninja"
+    need ninja "pacman -S meson ninja"
+
+    # Match the patch to the i3 you actually run, so the decoration code we
+    # are patching is the code your config expects.
+    local version
+    version="$(i3 --version 2>/dev/null | sed -n 's/^i3 version \([0-9.]*\).*/\1/p')"
+    version="${version:-4.25.1}"
+    say "building i3-95 from i3 $version"
+
+    if [[ ! -d $SRC/.git ]]; then
+        mkdir -p "$(dirname "$SRC")"
+        git clone --depth 1 --branch "$version" https://github.com/i3/i3.git "$SRC" ||
+            die "could not clone i3 $version"
+    fi
+
+    git -C "$SRC" checkout -- . 2>/dev/null || true
+    git -C "$SRC" clean -fd src include >/dev/null 2>&1 || true
+
+    say "applying the Win95 chrome patch"
+    for p in "$PATCHES"/*.patch; do
+        git -C "$SRC" apply --verbose "$p" || die "patch $p did not apply to i3 $version"
+    done
+
+    [[ -d $SRC/build ]] ||
+        meson setup "$SRC/build" "$SRC" -Ddocs=false -Dmans=false >/dev/null
+    ninja -C "$SRC/build" i3
+    say "built $SRC/build/i3"
+}
+
+case "${1:-build}" in
+build) do_build ;;
+install)
+    do_build
+    mkdir -p "$HOME/.local/bin"
+    ln -sfn "$SRC/build/i3" "$HOME/.local/bin/i3-95"
+    say "linked ~/.local/bin/i3-95"
+    cat <<'EOF'
+
+To use it for real, point your session at it. Safest route, in order:
+
+  1. Try it nested first:      w95 sandbox --wm ~/.local/bin/i3-95
+  2. Swap in-place, live:      i3-msg "restart"  after putting
+                               exec ~/.local/bin/i3-95  in your session file
+  3. Or add a display-manager entry: copy /usr/share/xsessions/i3.desktop
+     to ~/.local/share/xsessions/i3-95.desktop and change Exec=.
+
+Set I3_W95=0 in the environment to get stock rendering out of the same binary.
+EOF
+    ;;
+try)
+    do_build
+    exec "$(dirname "$(readlink -f "$0")")/w95-sandbox" --wm "$SRC/build/i3"
+    ;;
+clean) rm -rf "$SRC"; say "removed $SRC" ;;
+*) sed -n '2,12p' "$(readlink -f "$0")" | sed 's/^# \?//'; exit 1 ;;
+esac

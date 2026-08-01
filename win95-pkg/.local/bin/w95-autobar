@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# w95-autobar — make the shell match ~/.config/w95/wm on every i3 (re)start.
+#
+# Called from an `exec_always` at the very end of the i3 config, so it runs on
+# login, on reload and on restart. Without it, rebooting while the Win95
+# desktop is active gives you i3-95's chrome and no taskbar, which looks like
+# the bar crashed. w95bar refuses to start twice on one display, so running
+# this repeatedly is free.
+#
+# It is placed after the wallpaper `exec_always` on purpose: in Win95 mode the
+# desktop should be the flat teal, and the last writer wins.
+set -u
+export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
+state=$(cat "$HOME/.config/w95/wm" 2>/dev/null || echo stock)
+
+if [[ $state == w95 ]]; then
+    mkdir -p "$HOME/.local/state/w95"
+    setsid -f "$HOME/.local/bin/w95bar" \
+        >>"$HOME/.local/state/w95/bar.log" 2>&1 </dev/null
+    xsetroot -solid '#008080' 2>/dev/null
+else
+    pkill -f "bin/w95bar" 2>/dev/null
+    # Hand the desktop back to whatever feh was showing.
+    [[ -x $HOME/.fehbg ]] && "$HOME/.fehbg" 2>/dev/null
+fi
+exit 0

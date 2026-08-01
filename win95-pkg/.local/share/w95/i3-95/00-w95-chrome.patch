@@ -1,0 +1,572 @@
+diff --git a/include/w95.h b/include/w95.h
+new file mode 100644
+index 0000000..d65f1a1
+--- /dev/null
++++ b/include/w95.h
+@@ -0,0 +1,64 @@
++/*
++ * vim:ts=4:sw=4:expandtab
++ *
++ * i3-95 — Windows 95 window chrome for i3.
++ *
++ * Plain i3 draws flat decorations: a solid title bar and solid borders. Win95's
++ * whole visual language is 3D bevels and a gradient caption with control
++ * buttons, none of which i3 can express through config colours alone. This
++ * module adds them as an extra pass over the same surfaces i3 already draws to.
++ *
++ * Enable/disable at runtime with the I3_W95 environment variable (default on
++ * in this fork; set I3_W95=0 for stock rendering).
++ */
++#pragma once
++
++/* Include after all.h — this header leans on i3's Con/surface_t/color_t. */
++
++/* Which control button, if any, sits under a point in the title bar. */
++typedef enum {
++    W95_BTN_NONE = 0,
++    W95_BTN_MINIMIZE,
++    W95_BTN_MAXIMIZE,
++    W95_BTN_CLOSE,
++} w95_button_t;
++
++/**
++ * True when Win95 chrome is active. Read once from the environment.
++ */
++bool w95_enabled(void);
++
++/**
++ * Horizontal space (px) the control buttons need at the right end of a title
++ * bar of the given height. x.c subtracts this from the room available to the
++ * title text so long titles don't run underneath the buttons.
++ */
++int w95_button_strip_width(int deco_height);
++
++/**
++ * Horizontal space (px) reserved at the LEFT end of a title bar for the
++ * system-menu box, which is where Win95 put the window's icon. x.c shifts the
++ * title text and i3's own window-icon by this much.
++ */
++int w95_title_inset(int deco_height);
++
++/**
++ * Paint the raised 3D frame around a container's client area, into the
++ * container's own frame buffer. Called after i3 has filled the border in
++ * child_border colour, so we only add the light/dark edges on top.
++ */
++void w95_draw_frame(Con *con, surface_t *surface);
++
++/**
++ * Paint the caption: a horizontal gradient plus the [_][□][X] control buttons.
++ * Replaces i3's flat title-bar fill.
++ */
++void w95_draw_titlebar(Con *con, color_t base, bool focused, surface_t *surface);
++
++/**
++ * Which control button contains the point (fx, fy), given in the coordinate
++ * space of the frame that owns con->deco_rect. W95_BTN_NONE if the point is
++ * outside the button strip (so the click falls through to i3's usual
++ * focus/drag handling).
++ */
++w95_button_t w95_button_at(Con *con, int fx, int fy);
+diff --git a/src/w95.c b/src/w95.c
+new file mode 100644
+index 0000000..3c44d46
+--- /dev/null
++++ b/src/w95.c
+@@ -0,0 +1,324 @@
++/*
++ * vim:ts=4:sw=4:expandtab
++ *
++ * i3-95 — Windows 95 window chrome.
++ *
++ * Two ideas carry the entire look:
++ *
++ *  1. A BEVEL is a pair of 1px L-shapes. Light on the top and left, dark on
++ *     the bottom and right, and the thing reads as raised; swap them and it
++ *     reads as sunken. Nest two bevels and you get the chunky Win95 edge.
++ *     bevel() below is the only geometry primitive we need.
++ *
++ *  2. The caption is a left-to-right gradient, drawn as N vertical strips.
++ *     Win95 itself did this on 8-bit displays with a handful of bands; we use
++ *     one strip per pixel column because we can.
++ *
++ * Everything is drawn with draw_util_rectangle() — no cairo paths, no fonts
++ * beyond what i3 already loads. The control-button glyphs are deliberately
++ * built from square blocks rather than strokes, because that is how the
++ * originals were: 1-bit bitmaps, with a staircase X.
++ */
++#include "all.h"
++#include "w95.h"
++
++#include <stdlib.h>
++#include <string.h>
++
++/* ── The palette. Five greys and two blues, same as everywhere else. ── */
++#define W95_FACE "#c0c0c0"
++#define W95_HILITE "#ffffff"
++#define W95_LIGHT "#dfdfdf"
++#define W95_SHADOW "#808080"
++#define W95_DKSHADOW "#000000"
++#define W95_CAPTION "#000080"
++#define W95_CAPTION2 "#1084d0"
++#define W95_INACTIVE "#808080"
++#define W95_INACTIVE2 "#b5b5b5"
++#define W95_URGENT "#800000"
++#define W95_URGENT2 "#c04040"
++
++/* Button strip metrics, in the same proportions as the original. */
++#define BTN_MARGIN 2  /* gap from the right edge of the caption */
++#define BTN_GAP 2     /* extra gap between maximize and close */
++
++typedef struct {
++    color_t face, hilite, light, shadow, dkshadow;
++} w95_colors_t;
++
++static bool colors_ready = false;
++static w95_colors_t C;
++
++static void ensure_colors(void) {
++    if (colors_ready) {
++        return;
++    }
++    C.face = draw_util_hex_to_color(W95_FACE);
++    C.hilite = draw_util_hex_to_color(W95_HILITE);
++    C.light = draw_util_hex_to_color(W95_LIGHT);
++    C.shadow = draw_util_hex_to_color(W95_SHADOW);
++    C.dkshadow = draw_util_hex_to_color(W95_DKSHADOW);
++    colors_ready = true;
++}
++
++bool w95_enabled(void) {
++    static int cached = -1;
++    if (cached == -1) {
++        const char *env = getenv("I3_W95");
++        /* On by default — this fork exists to draw this chrome. */
++        cached = (env == NULL || (strcmp(env, "0") != 0 && strcmp(env, "no") != 0));
++    }
++    return cached == 1;
++}
++
++/*
++ * One 1px bevel ring: `tl` along the top and left edges, `br` along the bottom
++ * and right. The corners belong to whichever edge is drawn last, which matches
++ * how Windows drew them (bottom-right wins).
++ */
++static void bevel(surface_t *s, int x, int y, int w, int h, color_t tl, color_t br) {
++    if (w <= 0 || h <= 0) {
++        return;
++    }
++    draw_util_rectangle(s, tl, x, y, w, 1);            /* top */
++    draw_util_rectangle(s, tl, x, y, 1, h);            /* left */
++    draw_util_rectangle(s, br, x, y + h - 1, w, 1);    /* bottom */
++    draw_util_rectangle(s, br, x + w - 1, y, 1, h);    /* right */
++}
++
++/* The classic two-ring raised edge, outermost ring first. */
++static void raised(surface_t *s, int x, int y, int w, int h) {
++    bevel(s, x, y, w, h, C.light, C.dkshadow);
++    bevel(s, x + 1, y + 1, w - 2, h - 2, C.hilite, C.shadow);
++}
++
++/* Its mirror: what a pressed button or a well looks like. */
++static void sunken(surface_t *s, int x, int y, int w, int h) {
++    bevel(s, x, y, w, h, C.shadow, C.hilite);
++    bevel(s, x + 1, y + 1, w - 2, h - 2, C.dkshadow, C.light);
++}
++
++/*
++ * A horizontal gradient, one vertical strip per pixel column. Win95 banded
++ * this into 8 or 16 steps to save palette entries; at 24bpp we can just do it
++ * smoothly and it still reads as period-correct because the endpoints are.
++ */
++static void gradient(surface_t *s, int x, int y, int w, int h, color_t a, color_t b) {
++    if (w <= 0 || h <= 0) {
++        return;
++    }
++    for (int i = 0; i < w; i++) {
++        const double t = (w == 1) ? 0.0 : (double)i / (double)(w - 1);
++        color_t c = a;
++        c.red = a.red + (b.red - a.red) * t;
++        c.green = a.green + (b.green - a.green) * t;
++        c.blue = a.blue + (b.blue - a.blue) * t;
++        c.alpha = a.alpha + (b.alpha - a.alpha) * t;
++        c.colorpixel = a.colorpixel;
++        draw_util_rectangle(s, c, x + i, y, 1, h);
++    }
++}
++
++/* ── control buttons ────────────────────────────────────────────────── */
++
++/*
++ * Button side length. Win95 buttons are square and sit two pixels inside the
++ * caption, so the caption height drives everything.
++ */
++static int button_size(int deco_height) {
++    int size = deco_height - 2 * BTN_MARGIN;
++    if (size < 8) {
++        size = 8;
++    }
++    /* Odd sizes make the X glyph symmetric about a centre pixel. */
++    return size;
++}
++
++int w95_button_strip_width(int deco_height) {
++    if (!w95_enabled()) {
++        return 0;
++    }
++    const int s = button_size(deco_height);
++    return BTN_MARGIN + 3 * s + BTN_GAP + BTN_MARGIN;
++}
++
++/*
++ * Left edge of button `index` (0 = minimize, 1 = maximize, 2 = close), relative
++ * to the left edge of the caption. Close is pushed right by BTN_GAP — that
++ * little separation is one of the most recognisable details of the shell.
++ */
++static int button_x(int deco_width, int deco_height, int index) {
++    const int s = button_size(deco_height);
++    const int right = deco_width - BTN_MARGIN;
++    switch (index) {
++        case 2:
++            return right - s;
++        case 1:
++            return right - s - BTN_GAP - s;
++        default:
++            return right - s - BTN_GAP - 2 * s;
++    }
++}
++
++int w95_title_inset(int deco_height) {
++    if (!w95_enabled()) {
++        return 0;
++    }
++    /* Square, same size as a control button, plus a hair of breathing room. */
++    return button_size(deco_height) + BTN_MARGIN + 1;
++}
++
++/* ── glyphs: blocks only, no strokes ─────────────────────────────────── */
++
++static void glyph_minimize(surface_t *s, int x, int y, int size) {
++    const int w = size / 2;
++    draw_util_rectangle(s, C.dkshadow,
++                        x + (size - w) / 2, y + size - size / 3, w, 2);
++}
++
++static void glyph_maximize(surface_t *s, int x, int y, int size) {
++    const int m = size / 4;
++    const int w = size - 2 * m;
++    /* Outline plus a doubled top edge: the title bar of a tiny window. */
++    bevel(s, x + m, y + m, w, w, C.dkshadow, C.dkshadow);
++    draw_util_rectangle(s, C.dkshadow, x + m, y + m, w, 2);
++}
++
++static void glyph_close(surface_t *s, int x, int y, int size) {
++    /* A staircase of single pixels, exactly as the original 1-bit bitmap.
++     * Drawing this as an antialiased line would look wrong at 8px. */
++    const int m = size / 4;
++    const int n = size - 2 * m;
++    for (int i = 0; i < n; i++) {
++        draw_util_rectangle(s, C.dkshadow, x + m + i, y + m + i, 2, 1);
++        draw_util_rectangle(s, C.dkshadow, x + m + n - 1 - i, y + m + i, 2, 1);
++    }
++}
++
++/*
++ * The system-menu box: a miniature window, drawn flat (not beveled) because
++ * in Win95 it is an icon sitting on the caption, not a button. Only used when
++ * the client supplied no icon of its own — otherwise i3 draws the real one
++ * into the same slot.
++ */
++static void glyph_sysmenu(surface_t *s, int x, int y, int size) {
++    const int m = size / 5;
++    const int w = size - 2 * m;
++    draw_util_rectangle(s, C.face, x + m, y + m, w, w);
++    bevel(s, x + m, y + m, w, w, C.dkshadow, C.dkshadow);
++    draw_util_rectangle(s, C.shadow, x + m + 1, y + m + 1, w - 2, 2);
++}
++
++static void draw_button(surface_t *s, int x, int y, int size, int index) {
++    draw_util_rectangle(s, C.face, x, y, size, size);
++    raised(s, x, y, size, size);
++    switch (index) {
++        case 0:
++            glyph_minimize(s, x, y, size);
++            break;
++        case 1:
++            glyph_maximize(s, x, y, size);
++            break;
++        default:
++            glyph_close(s, x, y, size);
++            break;
++    }
++}
++
++/* ── public drawing entry points ─────────────────────────────────────── */
++
++void w95_draw_frame(Con *con, surface_t *surface) {
++    if (!w95_enabled() || con == NULL || surface == NULL) {
++        return;
++    }
++    ensure_colors();
++
++    const Rect *r = &(con->rect);
++    const Rect *w = &(con->window_rect);
++    if (r->width < 6 || r->height < 6) {
++        return;
++    }
++
++    /* The whole frame stands proud of the desktop... */
++    raised(surface, 0, 0, r->width, r->height);
++
++    /* ...and the client area is recessed into it. Only worth drawing when
++     * the border is thick enough for the two rings to be visible. */
++    if (w->x >= 2 && w->y >= 2 && w->width > 0 && w->height > 0) {
++        sunken(surface, w->x - 2, w->y - 2, w->width + 4, w->height + 4);
++    }
++}
++
++void w95_draw_titlebar(Con *con, color_t base, bool focused, surface_t *surface) {
++    if (!w95_enabled() || con == NULL || surface == NULL) {
++        return;
++    }
++    ensure_colors();
++
++    const int x = con->deco_rect.x;
++    const int y = con->deco_rect.y;
++    const int width = con->deco_rect.width;
++    const int height = con->deco_rect.height;
++    if (width <= 0 || height <= 0) {
++        return;
++    }
++
++    /* Pick the gradient endpoints. `base` is whatever the user configured for
++     * this state, so a custom palette still comes through; we only supply the
++     * lighter end that i3 has no way to express. */
++    color_t left = base;
++    color_t right;
++    if (con->urgent) {
++        left = draw_util_hex_to_color(W95_URGENT);
++        right = draw_util_hex_to_color(W95_URGENT2);
++    } else if (focused) {
++        right = draw_util_hex_to_color(W95_CAPTION2);
++    } else {
++        right = draw_util_hex_to_color(W95_INACTIVE2);
++    }
++    right.colorpixel = base.colorpixel;
++
++    /* Caption inset by 2px so the frame bevel stays visible around it. */
++    const int cx = x + 2;
++    const int cw = width - 4;
++    draw_util_rectangle(surface, C.face, x, y, width, height);
++    gradient(surface, cx, y + 1, cw, height - 2, left, right);
++
++    const int size = button_size(height);
++    const int by = y + (height - size) / 2;
++    for (int i = 0; i < 3; i++) {
++        draw_button(surface, x + button_x(width, height, i), by, size, i);
++    }
++
++    /* Left end: the system-menu box, unless the client has a real icon that
++     * i3 is about to draw in the very same place. */
++    if (con->window == NULL || con->window->icon == NULL) {
++        glyph_sysmenu(surface, x + BTN_MARGIN + 1, by, size);
++    }
++}
++
++w95_button_t w95_button_at(Con *con, int fx, int fy) {
++    if (!w95_enabled() || con == NULL) {
++        return W95_BTN_NONE;
++    }
++    const int x = fx - con->deco_rect.x;
++    const int y = fy - con->deco_rect.y;
++    const int width = con->deco_rect.width;
++    const int height = con->deco_rect.height;
++    if (x < 0 || y < 0 || x >= width || y >= height) {
++        return W95_BTN_NONE;
++    }
++
++    const int size = button_size(height);
++    const int by = (height - size) / 2;
++    if (y < by || y >= by + size) {
++        return W95_BTN_NONE;
++    }
++    for (int i = 0; i < 3; i++) {
++        const int bx = button_x(width, height, i);
++        if (x >= bx && x < bx + size) {
++            return (w95_button_t)(W95_BTN_MINIMIZE + i);
++        }
++    }
++    return W95_BTN_NONE;
++}
+diff --git a/meson.build b/meson.build
+index 88c1e1d..64d68ba 100644
+--- a/meson.build
++++ b/meson.build
+@@ -420,6 +420,7 @@ i3srcs = [
+   'src/version.c',
+   'src/window.c',
+   'src/workspace.c',
++  'src/w95.c',
+   'src/x.c',
+   'src/xcb.c',
+   'src/xcursor.c',
+diff --git a/src/click.c b/src/click.c
+index f3388db..32f6c14 100644
+--- a/src/click.c
++++ b/src/click.c
+@@ -8,6 +8,7 @@
+  *
+  */
+ #include "all.h"
++#include "w95.h"
+ 
+ #include <time.h>
+ 
+@@ -180,6 +181,40 @@ static void route_click(Con *con, xcb_button_press_event_t *event, const click_d
+         return;
+     }
+ 
++    /* i3-95: a left click on one of the caption's control buttons acts on the
++     * window instead of falling through to focus/drag. Checked before user
++     * bindings so [X] stays [X] no matter what else is bound to button 1.
++     * Only the press is acted on; the matching release is swallowed below so
++     * it can't reach a window that no longer exists. */
++    if (dest == CLICK_DECORATION && event->detail == XCB_BUTTON_CLICK_LEFT) {
++        const w95_button_t hit = w95_button_at(con, event->event_x, event->event_y);
++        if (hit != W95_BTN_NONE) {
++            if (event->response_type == XCB_BUTTON_PRESS) {
++                switch (hit) {
++                    case W95_BTN_MINIMIZE:
++                        /* i3 has no iconify; the scratchpad is the closest
++                         * thing, and w95bar lists scratchpad windows greyed
++                         * out so they can be restored from the taskbar. */
++                        con_focus(con);
++                        scratchpad_move(con);
++                        break;
++                    case W95_BTN_MAXIMIZE:
++                        con_toggle_fullscreen(con, CF_OUTPUT);
++                        break;
++                    case W95_BTN_CLOSE:
++                        tree_close_internal(con, KILL_WINDOW, false);
++                        break;
++                    default:
++                        break;
++                }
++                tree_render();
++            }
++            xcb_allow_events(conn, XCB_ALLOW_ASYNC_POINTER, event->time);
++            xcb_flush(conn);
++            return;
++        }
++    }
++
+     /* if the user has bound an action to this click, it should override the
+      * default behavior. */
+     Binding *bind = get_binding_from_xcb_event((xcb_generic_event_t *)event);
+diff --git a/src/x.c b/src/x.c
+index 87ee05c..97d9b54 100644
+--- a/src/x.c
++++ b/src/x.c
+@@ -9,6 +9,7 @@
+  *
+  */
+ #include "all.h"
++#include "w95.h"
+ 
+ #include <unistd.h>
+ 
+@@ -579,6 +580,11 @@ void x_draw_decoration(Con *con) {
+                                 rectangles[i].height);
+         }
+ 
++        /* i3-95: turn the flat border into a raised 3D frame with the
++         * client area recessed into it. Drawn after the fill so the bevel
++         * sits on top of the child_border colour. */
++        w95_draw_frame(con, &(con->frame_buffer));
++
+         /* Highlight the side of the border at which the next window will be
+          * opened if we are rendering a single window within a split container
+          * (which is undistinguishable from a single window outside a split
+@@ -628,11 +634,19 @@ void x_draw_decoration(Con *con) {
+     /* 4: paint the bar */
+     DLOG("con->deco_rect = (x=%d, y=%d, w=%d, h=%d) for con->name=%s\n",
+          con->deco_rect.x, con->deco_rect.y, con->deco_rect.width, con->deco_rect.height, con->name);
+-    draw_util_rectangle(dest_surface, p->color->background,
+-                        con->deco_rect.x, con->deco_rect.y, con->deco_rect.width, con->deco_rect.height);
++    if (w95_enabled()) {
++        /* i3-95: gradient caption plus [_][max][X] control buttons. This
++         * replaces both the flat fill and i3's 1px title border, which would
++         * otherwise cut through the frame bevel. */
++        w95_draw_titlebar(con, p->color->background,
++                          p->color == &config.client.focused, dest_surface);
++    } else {
++        draw_util_rectangle(dest_surface, p->color->background,
++                            con->deco_rect.x, con->deco_rect.y, con->deco_rect.width, con->deco_rect.height);
+ 
+-    /* 5: draw title border */
+-    x_draw_title_border(con, p, dest_surface);
++        /* 5: draw title border */
++        x_draw_title_border(con, p, dest_surface);
++    }
+ 
+     /* 6: draw the icon and title */
+     int text_offset_y = (con->deco_rect.height - config.font.height) / 2;
+@@ -642,7 +656,9 @@ void x_draw_decoration(Con *con) {
+     const int deco_width = (int)con->deco_rect.width;
+     const int title_padding = logical_px(2);
+ 
+-    int mark_width = 0;
++    /* i3-95: the control buttons occupy the right end of the caption; treat
++     * that strip exactly like a mark so every title_align case avoids it. */
++    int mark_width = w95_button_strip_width((int)con->deco_rect.height);
+     if (config.show_marks && !TAILQ_EMPTY(&(con->marks_head))) {
+         char *formatted_mark = sstrdup("");
+         bool had_visible_mark = false;
+@@ -662,19 +678,21 @@ void x_draw_decoration(Con *con) {
+ 
+         if (had_visible_mark) {
+             i3String *mark = i3string_from_utf8(formatted_mark);
+-            mark_width = predict_text_width(mark);
++            /* i3-95: mark_width already holds the control-button reserve, so
++             * marks are laid out just inside it rather than on top of it. */
++            const int text_width = predict_text_width(mark);
+ 
+             int mark_offset_x = (config.title_align == ALIGN_RIGHT)
+                                     ? title_padding
+-                                    : deco_width - mark_width - title_padding;
++                                    : deco_width - mark_width - text_width - title_padding;
+ 
+             draw_util_text(mark, dest_surface,
+                            p->color->text, p->color->background,
+                            con->deco_rect.x + mark_offset_x,
+-                           con->deco_rect.y + text_offset_y, mark_width);
++                           con->deco_rect.y + text_offset_y, text_width);
+             I3STRING_FREE(mark);
+ 
+-            mark_width += title_padding;
++            mark_width += text_width + title_padding;
+         }
+ 
+         FREE(formatted_mark);
+@@ -713,13 +731,17 @@ void x_draw_decoration(Con *con) {
+     int icon_offset_x;
+     int title_offset_x;
+     switch (config.title_align) {
+-        case ALIGN_LEFT:
++        case ALIGN_LEFT: {
+             /* (pad)[(pad)(icon)(pad)][text    ](pad)[mark + its pad)
+              *             ^           ^--- title_offset_x
+-             *             ^--- icon_offset_x */
+-            icon_offset_x = icon_padding;
+-            title_offset_x = title_padding + total_icon_space;
++             *             ^--- icon_offset_x
++             * i3-95 adds a left inset for the system-menu box; the client's
++             * own icon, when it has one, goes there instead. */
++            const int inset = w95_title_inset((int)con->deco_rect.height);
++            icon_offset_x = has_icon ? icon_padding : inset;
++            title_offset_x = title_padding + max(total_icon_space, inset);
+             break;
++        }
+         case ALIGN_CENTER:
+             /* (pad)[  ][(pad)(icon)(pad)][text  ](pad)[mark + its pad)
+              *                 ^           ^--- title_offset_x

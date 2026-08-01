@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# The startup sound. Silent (exit 0) if the theme or a player is missing —
+# this runs from i3's exec and must never hold up a login.
+set -u
+theme=${1:-desktop-login}
+for dir in "$HOME/.local/share/sounds/Chicago95/stereo" \
+           "/usr/share/sounds/Chicago95/stereo"; do
+    f="$dir/$theme.wav"
+    [[ -r $f ]] || continue
+    if command -v paplay >/dev/null; then exec paplay "$f"; fi
+    if command -v aplay  >/dev/null; then exec aplay -q "$f"; fi
+done
+exit 0

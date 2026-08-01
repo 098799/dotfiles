@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# w95-rofi — pick the desktop from rofi. Bound to a key, or just type
+# "w95-rofi" into the usual $mod+d run menu.
+set -uo pipefail
+export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+state=$(cat "$HOME/.config/w95/wm" 2>/dev/null || echo stock)
+if [[ $state == w95 ]]; then
+    entries="Leave Windows 95\nRestart the taskbar\nRebuild i3-95"
+else
+    entries="Enter Windows 95\nRebuild i3-95"
+fi
+choice=$(printf '%b' "$entries" |
+    rofi -dmenu -i -p "desktop" -lines 4 -font "Ubuntu 25" -bw 0) || exit 0
+case $choice in
+    "Enter Windows 95") exec w95-switch on ;;
+    "Leave Windows 95") exec w95-switch off ;;
+    "Restart the taskbar") exec w95-restart-bar ;;
+    "Rebuild i3-95") exec w95 wm install ;;
+esac

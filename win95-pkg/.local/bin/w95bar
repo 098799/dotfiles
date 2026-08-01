@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+"""w95bar — a Windows 95 taskbar for i3.
+
+Start button, per-window task buttons, a workspace strip (i3's one concession
+to not being Windows), and a sunken clock tray. Talks to i3 over its IPC
+socket; redraws on window/workspace events.
+
+Run with no arguments. Kill and re-run to reload — it's stateless.
+"""
+
+import os
+import signal
+import subprocess
+import sys
+import time
+
+def _share_dir():
+    """Where w95.css and the helper modules live.
+
+    Works both stowed (~/.local/share/w95) and straight out of the repo
+    checkout, so the sandbox can run the working tree without installing.
+    """
+    here = os.path.dirname(os.path.realpath(__file__))
+    for candidate in (
+        os.path.expanduser("~/.local/share/w95"),
+        os.path.join(here, "..", "share", "w95"),          # stow layout
+        os.path.join(here, "..", "..", "share", "w95"),    # repo layout
+    ):
+        candidate = os.path.normpath(candidate)
+        if os.path.exists(os.path.join(candidate, "w95.css")):
+            return candidate
+    sys.exit("w95bar: cannot locate w95.css")
+
+
+SHARE = _share_dir()
+sys.path.insert(0, SHARE)
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
+
+import w95conf  # noqa: E402
+import w95draw  # noqa: E402
+import w95ipc  # noqa: E402
+import w95menu  # noqa: E402
+
+BAR_HEIGHT = w95conf.BAR_HEIGHT
+MAX_TASK_WIDTH = 170
+MIN_TASK_WIDTH = 42
+
+
+def style(widget, *classes):
+    ctx = widget.get_style_context()
+    for c in classes:
+        ctx.add_class(c)
+    return widget
+
+
+def elide(text, limit=22):
+    text = " ".join((text or "").split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+class Bar(Gtk.Window):
+    def __init__(self):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.i3 = w95ipc.I3()
+        self.start_menu = None
+        self._dirty = False
+
+        self.set_decorated(False)
+        self.set_resizable(False)
+        self.set_skip_taskbar_hint(True)
+        self.set_skip_pager_hint(True)
+        self.set_keep_above(True)
+        self.set_type_hint(Gdk.WindowTypeHint.DOCK)
+        self.set_wmclass("w95bar", "W95bar")
+        self.set_accept_focus(False)
+
+        self.css = Gtk.CssProvider()
+        self.css.load_from_path(os.path.join(SHARE, "w95.css"))
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), self.css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        # Sizes that follow bar_height ride in a second provider layered on
+        # top, so w95.css stays a plain readable stylesheet with no templating.
+        self.scale_css = Gtk.CssProvider()
+        self.scale_css.load_from_data(w95conf.scale_css())
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), self.scale_css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        )
+
+        self._build()
+        self._place()
+
+        self.i3.subscribe(
+            ["workspace", "window", "binding"],
+            lambda name, payload: GLib.idle_add(self._schedule),
+        )
+        GLib.timeout_add_seconds(1, self._tick)
+        self.refresh()
+
+    # ── layout ──────────────────────────────────────────────────────────
+    def _build(self):
+        root = style(Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0), "w95-bar")
+        root.set_border_width(2)
+
+        self.start_btn = style(Gtk.ToggleButton(), "w95-btn", "w95-start")
+        sb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        sb.pack_start(w95draw.Flag(w95conf.ICON_SIZE), False, False, 0)
+        sb.pack_start(Gtk.Label(label="Start"), False, False, 0)
+        self.start_btn.add(sb)
+        self.start_btn.connect("toggled", self._on_start)
+        root.pack_start(self.start_btn, False, False, 0)
+
+        root.pack_start(style(Gtk.Box(), "w95-divider"), False, False, 0)
+
+        # Workspace strip — Win95 never had these, so they get the smallest
+        # possible treatment: numbered mini-buttons, pressed = current.
+        self.ws_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+        root.pack_start(self.ws_box, False, False, 0)
+
+        root.pack_start(style(Gtk.Box(), "w95-divider"), False, False, 0)
+
+        self.task_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        self.task_box.set_homogeneous(True)
+        root.pack_start(self.task_box, True, True, 0)
+
+        # ── tray: sunken well holding indicators + clock ──
+        tray = style(Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6), "w95-well")
+        self.indicators = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        tray.pack_start(self.indicators, False, False, 0)
+        self.clock = Gtk.Label()
+        self.clock.set_tooltip_text("")
+        tray.pack_start(self.clock, False, False, 0)
+        root.pack_end(tray, False, False, 0)
+
+        self.add(root)
+
+    def _place(self):
+        screen = Gdk.Screen.get_default()
+        mon = screen.get_primary_monitor()
+        geo = screen.get_monitor_geometry(mon)
+        self.width, self.x, self.bottom = geo.width, geo.x, geo.y + geo.height
+        self.set_size_request(self.width, BAR_HEIGHT)
+        self.move(self.x, self.bottom - BAR_HEIGHT)
+        self.connect("realize", self._set_strut)
+
+    def _set_strut(self, *_):
+        """Reserve the bottom strip so i3 tiles above us.
+
+        i3 also reads _NET_WM_STRUT to decide top-vs-bottom docking, so this
+        is load-bearing for placement, not just for space.
+        """
+        # PyGObject dropped Gdk.property_change, so we shell out to xprop —
+        # the one place where the "obvious" GTK API simply isn't bound.
+        xid = self.get_window().get_xid()
+        vals = [0, 0, 0, BAR_HEIGHT,          # left, right, top, bottom
+                0, 0, 0, 0,                   # left/right start-end
+                0, 0,                         # top start-end
+                self.x, self.x + self.width]  # bottom start-end
+        for name, n in (("_NET_WM_STRUT_PARTIAL", 12), ("_NET_WM_STRUT", 4)):
+            try:
+                subprocess.run(
+                    ["xprop", "-id", str(xid), "-f", name, "32" + "c" * n,
+                     "-set", name, ",".join(str(v) for v in vals[:n])],
+                    check=True, stderr=subprocess.DEVNULL,
+                )
+            except (OSError, subprocess.CalledProcessError) as exc:
+                # Non-fatal: i3 still docks us from the DOCK type hint.
+                print("w95bar: could not set %s (%s)" % (name, exc), file=sys.stderr)
+
+    # ── i3 state → widgets ──────────────────────────────────────────────
+    def _schedule(self):
+        """Coalesce bursts of i3 events into one redraw per frame."""
+        if self._dirty:
+            return False
+        self._dirty = True
+        GLib.timeout_add(20, self._flush)
+        return False
+
+    def _flush(self):
+        self._dirty = False
+        self.refresh()
+        return False
+
+    def refresh(self):
+        try:
+            tree = self.i3.get_tree()
+            workspaces = self.i3.get_workspaces()
+        except Exception:
+            return True
+        self._render_workspaces(workspaces)
+        self._render_tasks(w95ipc.windows(tree))
+        self.show_all()
+        return True
+
+    def _render_workspaces(self, workspaces):
+        for child in self.ws_box.get_children():
+            child.destroy()
+        for ws in sorted(workspaces, key=lambda w: w.get("num", 0)):
+            name = ws.get("name", "?")
+            btn = style(Gtk.ToggleButton(), "w95-btn")
+            btn.set_active(ws.get("focused", False))
+            label = Gtk.Label()
+            markup = GLib.markup_escape_text(name.split(":")[-1] or name)
+            if ws.get("urgent"):
+                markup = '<span foreground="#800000"><b>%s</b></span>' % markup
+            label.set_markup(markup)
+            btn.add(label)
+            btn.set_size_request(max(24, BAR_HEIGHT - 12), -1)
+            btn.connect("button-press-event", self._on_workspace, name)
+            btn.set_tooltip_text("Workspace %s" % name)
+            self.ws_box.pack_start(btn, False, False, 0)
+
+    def _render_tasks(self, wins):
+        for child in self.task_box.get_children():
+            child.destroy()
+        if not wins:
+            return
+        # Stable order: by workspace then by window id, so buttons don't
+        # jump around as focus moves.
+        wins.sort(key=lambda w: (str(w.get("_ws") or "￿"), w.get("window") or 0))
+
+        avail = max(self.width - 340, MIN_TASK_WIDTH)
+        per = min(MAX_TASK_WIDTH, max(MIN_TASK_WIDTH, avail // max(1, len(wins))))
+
+        for win in wins:
+            minimized = win.get("_ws") is None
+            btn = style(Gtk.ToggleButton(), "w95-btn", "w95-task")
+            btn.set_active(bool(win.get("focused")))
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+            box.pack_start(self._icon_for(win), False, False, 0)
+            title = elide(win.get("name") or "(untitled)", max(6, per // 8))
+            markup = GLib.markup_escape_text(title)
+            if minimized:
+                markup = '<span foreground="#606060">%s</span>' % markup
+            if win.get("urgent"):
+                markup = "<b>%s</b>" % markup
+            lab = Gtk.Label(xalign=0)
+            lab.set_markup(markup)
+            lab.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+            box.pack_start(lab, True, True, 0)
+            btn.add(box)
+            btn.set_size_request(per, -1)
+            btn.set_tooltip_text("%s\n%s" % (
+                win.get("name") or "", win.get("window_class")
+                or (win.get("window_properties") or {}).get("class") or ""))
+            btn.connect("button-press-event", self._on_task, win)
+            self.task_box.pack_start(btn, True, True, 0)
+
+    def _icon_for(self, win):
+        props = win.get("window_properties") or {}
+        names = [n for n in (win.get("window_class"), props.get("class"),
+                             props.get("instance")) if n]
+        theme = Gtk.IconTheme.get_default()
+        for name in names:
+            for candidate in (name, name.lower(), name.lower().split(".")[-1]):
+                if theme.has_icon(candidate):
+                    try:
+                        pb = theme.load_icon(candidate, w95conf.ICON_SIZE,
+                                             Gtk.IconLookupFlags.FORCE_SIZE)
+                        return Gtk.Image.new_from_pixbuf(pb)
+                    except GLib.Error:
+                        pass
+        return w95draw.Glyph("window", w95conf.ICON_SIZE)
+
+    # ── interaction ─────────────────────────────────────────────────────
+    def _on_start(self, btn):
+        if btn.get_active():
+            if self.start_menu is None:
+                self.start_menu = w95menu.StartMenu(
+                    self.css, self.x + 2, self.bottom - BAR_HEIGHT,
+                    on_close=self._menu_closed,
+                )
+        elif self.start_menu is not None:
+            menu, self.start_menu = self.start_menu, None
+            menu.dismiss()
+
+    def _menu_closed(self):
+        self.start_menu = None
+        if self.start_btn.get_active():
+            self.start_btn.set_active(False)
+
+    def _on_workspace(self, _btn, ev, name):
+        if ev.button == 1:
+            self.i3.command('workspace "%s"' % name)
+        elif ev.button == 3:
+            self.i3.command('move container to workspace "%s"; workspace "%s"' % (name, name))
+        return True
+
+    def _on_task(self, _btn, ev, win):
+        cid = win.get("id")
+        minimized = win.get("_ws") is None
+        if ev.button == 1:
+            if minimized:
+                # Restore: pull it out of the scratchpad onto the current ws.
+                self.i3.command('[con_id=%d] scratchpad show, move to workspace current, '
+                                'floating disable, focus' % cid)
+            elif win.get("focused"):
+                self.i3.command("[con_id=%d] move scratchpad" % cid)  # minimise
+            else:
+                self.i3.command("[con_id=%d] focus" % cid)
+        elif ev.button == 2:
+            self.i3.command("[con_id=%d] kill" % cid)
+        elif ev.button == 3:
+            self._window_menu(ev, win)
+        GLib.timeout_add(40, lambda: (self.refresh(), False)[1])
+        return True
+
+    def _window_menu(self, ev, win):
+        """The control-box menu you got from right-clicking a task button."""
+        cid = win.get("id")
+        menu = Gtk.Menu()
+        style(menu, "w95-menu")
+        entries = [
+            ("Restore", "[con_id=%d] scratchpad show, move to workspace current, "
+                        "floating disable, focus" % cid),
+            ("Move to here", "[con_id=%d] move to workspace current, focus" % cid),
+            ("Minimize", "[con_id=%d] move scratchpad" % cid),
+            ("Maximize", "[con_id=%d] fullscreen toggle" % cid),
+            ("Float", "[con_id=%d] floating toggle" % cid),
+            (None, None),
+            ("Close\tAlt+F4", "[con_id=%d] kill" % cid),
+        ]
+        for label, cmd in entries:
+            if label is None:
+                menu.append(Gtk.SeparatorMenuItem())
+                continue
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", lambda _i, c=cmd: self.i3.command(c))
+            menu.append(item)
+        menu.show_all()
+        menu.popup_at_pointer(ev)
+
+    def reload_css(self):
+        """Re-read w95.css in place, so tweaking the theme doesn't need a
+        restart (and doesn't lose the i3 subscription)."""
+        try:
+            self.css.load_from_path(os.path.join(SHARE, "w95.css"))
+        except GLib.Error as exc:
+            print("w95bar: %s" % exc, file=sys.stderr)
+        self.queue_draw()
+
+    def _tick(self):
+        now = time.localtime()
+        self.clock.set_markup(time.strftime("%H:%M", now))
+        self.clock.set_tooltip_text(time.strftime("%A, %d %B %Y", now))
+        return True
+
+
+def main():
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    bar = Bar()
+    bar.show_all()
+
+    # Ctrl+Esc is *the* Start-menu key, but i3 owns the keyboard, so the
+    # binding lives in i3's config and pokes us with SIGUSR1 from there.
+    # GLib.unix_signal_add delivers it on the main loop, not in a handler,
+    # so it is safe to touch widgets from here.
+    GLib.unix_signal_add(
+        GLib.PRIORITY_DEFAULT, signal.SIGUSR1,
+        lambda *_: (bar.start_btn.set_active(not bar.start_btn.get_active()), True)[1],
+    )
+    # SIGUSR2 forces a redraw — handy after a theme edit.
+    GLib.unix_signal_add(
+        GLib.PRIORITY_DEFAULT, signal.SIGUSR2,
+        lambda *_: (bar.reload_css(), True)[1],
+    )
+    Gtk.main()
+
+
+def claim_single_instance():
+    """Refuse to start if a taskbar is already up on this display.
+
+    Two bars stack on top of each other and both fight for the same struts,
+    which looks like a rendering bug and is impossible to diagnose from the
+    screenshot. A pkill by path cannot prevent it — the bar gets launched
+    variously as ~/.local/bin/w95bar and ~/dotfiles/.../w95bar — so the lock
+    is held on an abstract socket keyed by display instead of on a path.
+    """
+    import socket
+
+    display = os.environ.get("DISPLAY", ":0")
+    lock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        lock.bind("\0w95bar" + display)
+    except OSError:
+        print("w95bar: already running on %s" % display, file=sys.stderr)
+        raise SystemExit(0)
+    return lock  # kept alive for the process lifetime; closed on exit
+
+
+if __name__ == "__main__":
+    _lock = claim_single_instance()
+    main()

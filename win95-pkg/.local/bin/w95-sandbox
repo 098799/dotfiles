@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Run the whole Windows 95 desktop inside a nested X server.
+#
+#   w95 sandbox                     stock i3 + w95bar
+#   w95 sandbox --wm ~/.local/bin/i3-95    the patched WM too
+#   w95 sandbox --shot out.png      screenshot the nested display and exit
+#   w95 sandbox --down              kill it
+#
+# Nothing here touches the real session: separate X display, separate i3
+# with its own config and its own IPC socket, separate everything. This is
+# the right way to look at the theme before committing to it.
+set -u
+
+DISP=${W95_DISPLAY:-:95}
+GEO=${W95_GEOMETRY:-1280x800}
+BIN="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+PKG="$(cd "$BIN/../.." && pwd)"
+RUN="${XDG_RUNTIME_DIR:-/tmp}/w95-sandbox"
+WM=i3
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --wm) WM=$2; shift 2 ;;
+    --shot)
+        DISPLAY=$DISP import -window root "${2:-$RUN/shot.png}" && echo "${2:-$RUN/shot.png}"
+        exit $?
+        ;;
+    --down)
+        pkill -f "i3 -c $RUN/i3.conf" 2>/dev/null
+        pkill -f "Xephyr $DISP" 2>/dev/null
+        echo "sandbox down"
+        exit 0
+        ;;
+    *) echo "unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+
+command -v Xephyr >/dev/null || {
+    echo "w95 sandbox: needs Xephyr (pacman -S xorg-server-xephyr)" >&2
+    exit 1
+}
+
+mkdir -p "$RUN"
+"$0" --down >/dev/null 2>&1
+
+# A throwaway i3 config: our palette, its own IPC socket so the real i3 on
+# :0 is not disturbed, and enough bindings to actually drive the thing.
+cat >"$RUN/i3.conf" <<EOF
+set \$mod Mod4
+font pango:W95FA 12
+ipc-socket $RUN/i3.sock
+include $PKG/.config/i3/colors.d/win95.conf
+include $PKG/.config/i3/win95-keys.conf
+bindsym \$mod+Return exec i3-sensible-terminal
+bindsym \$mod+Shift+q kill
+bindsym \$mod+f fullscreen toggle
+bindsym \$mod+v split vertical
+bindsym \$mod+h split horizontal
+floating_modifier \$mod
+EOF
+# exec_always from the palette would fight us for control of the bar.
+sed -i '/w95-restart-bar/d' "$RUN/i3.conf" 2>/dev/null || true
+
+setsid -f Xephyr "$DISP" -screen "$GEO" -ac -br -noreset \
+    >"$RUN/xephyr.log" 2>&1 </dev/null
+for _ in $(seq 40); do
+    xdpyinfo -display "$DISP" >/dev/null 2>&1 && break
+    sleep 0.15
+done
+xdpyinfo -display "$DISP" >/dev/null 2>&1 || {
+    echo "w95 sandbox: Xephyr did not start" >&2
+    tail -5 "$RUN/xephyr.log" >&2
+    exit 1
+}
+
+DISPLAY=$DISP xsetroot -solid '#008080'
+DISPLAY=$DISP setsid -f "$WM" -c "$RUN/i3.conf" >"$RUN/i3.log" 2>&1 </dev/null
+sleep 1.5
+DISPLAY=$DISP GTK_THEME=Chicago95 XCURSOR_THEME=Chicago95_Standard_Cursors \
+    setsid -f "$BIN/w95bar" >"$RUN/bar.log" 2>&1 </dev/null
+
+cat <<EOF
+sandbox up on $DISP  (wm: $WM)
+  logs      $RUN/{i3,bar,xephyr}.log
+  a shell   DISPLAY=$DISP i3-sensible-terminal &
+  a shot    w95 sandbox --shot /tmp/w95.png
+  stop it   w95 sandbox --down
+EOF
