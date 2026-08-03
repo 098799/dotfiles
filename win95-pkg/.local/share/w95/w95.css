@@ -135,13 +135,14 @@ button.w95-item {
     min-height: 0;
     color: #000000;
 }
-button.w95-item:hover,
-button.w95-item:focus {
+/* Hover only — never :focus. A Start-menu row is a GtkButton, so the first
+   one took focus as the menu opened and stayed navy, which reads as "this
+   item is selected" when nothing is. Win95 lit the row under the pointer. */
+button.w95-item:hover {
     background-color: #000080;
     color: #ffffff;
 }
-button.w95-item:hover label,
-button.w95-item:focus label { color: #ffffff; }
+button.w95-item:hover label { color: #ffffff; }
 button.w95-item:disabled label { color: #808080; text-shadow: 1px 1px 0 #ffffff; }
 
 /* Menu separator: the same two-rule bevel, horizontal. */

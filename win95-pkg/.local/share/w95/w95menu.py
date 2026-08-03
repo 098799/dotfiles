@@ -4,6 +4,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 
 import gi
 
@@ -45,6 +46,12 @@ class MenuItem(Gtk.Button):
         super().__init__()
         self.rows_factory = None  # set by StartMenu for rows that fly out
         self.set_relief(Gtk.ReliefStyle.NONE)
+        # The Start menu highlights what the pointer is on, nothing else. As a
+        # focusable button the first row took focus the instant the menu
+        # opened and sat there navy — "Programs" permanently lit, looking
+        # selected when it was not. Nothing here is keyboard-driven (the menu
+        # handles only Escape), so the focusable state has no use to lose.
+        self.set_can_focus(False)
         _style(self, "w95-item")
         box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         icon_size = w95conf.BIG_ICON_SIZE if big else w95conf.ICON_SIZE
@@ -192,11 +199,34 @@ class StartMenu(Popup):
 
     def _grab(self):
         """Pointer grab so a click anywhere outside dismisses the menu —
-        exactly how the real Start menu behaves."""
-        win = self.get_window()
-        seat = Gdk.Display.get_default().get_default_seat()
-        seat.grab(win, Gdk.SeatCapabilities.ALL, True, None, None, None, None)
+        exactly how the real Start menu behaves.
+
+        Deferred, and checked. `show_all()` only *queues* the map, so at the
+        point this is called the server has usually not mapped the window yet
+        and the grab comes back GDK_GRAB_NOT_VIEWABLE. Nothing looked at that
+        return value, so the failure was silent and total: with no grab, a
+        click outside the menu went to whatever was underneath it and the menu
+        just stayed on screen — which is exactly the bug this replaces.
+        """
         self.connect("button-press-event", self._maybe_dismiss)
+        self._grab_tries = 0
+        GLib.timeout_add(20, self._try_grab)
+
+    def _try_grab(self):
+        window = self.get_window()
+        status = None
+        if window is not None and window.is_viewable():
+            seat = Gdk.Display.get_default().get_default_seat()
+            status = seat.grab(window, Gdk.SeatCapabilities.ALL, True,
+                               None, None, None, None)
+            if status == Gdk.GrabStatus.SUCCESS:
+                return False
+        self._grab_tries += 1
+        if self._grab_tries < 25:      # keep trying for ~half a second
+            return True
+        print("w95menu: could not grab the pointer (%s); clicking outside the "
+              "menu will not close it" % status, file=sys.stderr)
+        return False
 
     def _maybe_dismiss(self, _w, ev):
         alloc = self.get_allocation()

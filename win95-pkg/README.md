@@ -118,6 +118,20 @@ Rows that fly out: Programs (every `.desktop` on the box, scrolling),
 Documents (home dirs + `RecentManager`), Settings (only the control panels
 that are actually installed, via `shutil.which`), Find (rofi modes).
 
+Two things about that grab are load-bearing and were both got wrong once:
+
+* **It has to be taken after the window is mapped.** `show_all()` only queues
+  the map, so grabbing immediately after it returns `GDK_GRAB_NOT_VIEWABLE`.
+  Nothing checked the return value, so the failure was silent and total — with
+  no grab, a click outside the menu went to whatever was underneath and the
+  menu simply stayed on screen. `_try_grab` now retries until the window is
+  viewable and complains on stderr if it never manages it.
+* **Rows must not be focusable.** A row is a `GtkButton`, so the first one took
+  focus the moment the menu opened and sat there in navy — "Programs"
+  permanently lit, looking selected when it was not. `set_can_focus(False)`,
+  and the stylesheet highlights `:hover` only, never `:focus`. Win95 lit the
+  row under the pointer and nothing else.
+
 ## System Monitor
 
 `w95bar` replaces i3bar, and with it goes the `bar {}` block — so Win95 mode
