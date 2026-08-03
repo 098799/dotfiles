@@ -1,0 +1,411 @@
+/* w95slack.css — Slack, in the Windows 95 "Windows Standard" scheme.
+ *
+ * Slack ships a design-token layer: ~480 `--dt_color-*` custom properties that
+ * every component reads through. Retheming means redefining a couple of dozen
+ * roots, not chasing class names -- which is the only reason this has a chance
+ * of surviving a Slack release. Anything targeted by class below is structural
+ * (a radius, a shadow, a bevel) and degrades to "not quite period" rather than
+ * to "unreadable" if the class is renamed.
+ *
+ * The palette is the same VGA-16 set as the i3 and Emacs halves:
+ *   #c0c0c0 face (chrome)   #ffffff hilite   #dfdfdf light
+ *   #808080 shadow          #000000 dkshadow
+ *   #000080 navy (selection) #008080 teal    #800000 maroon
+ *
+ * Win95's rule for what is silver and what is white: chrome is silver, the
+ * document is white. So the sidebar, toolbars and dialogs go #c0c0c0 and the
+ * message pane stays #ffffff -- like a Word window, not like a dark IDE.
+ */
+
+/* Every custom property below is `!important`, and `body` is in the selector
+ * list twice over. Both are load-bearing, for the same non-obvious reason.
+ *
+ * Slack's dark appearance redefines these tokens on `body.sk-client-theme--dark`.
+ * Custom properties do not cascade across elements the way ordinary ones do:
+ * each element resolves its own value, and a descendant inherits from the
+ * *nearest ancestor that declares it*. So a declaration on `body` wins for the
+ * whole client subtree no matter what `:root` says -- `!important` on `html`
+ * cannot reach it, because the two are different elements and never compete.
+ * The override therefore has to land on `body` as well, and be `!important`
+ * there to outrank the higher-specificity `body.sk-client-theme--dark`.
+ *
+ * Getting this wrong is what produced the first attempt: a correct silver
+ * sidebar and toolbar (those took explicit rules) around a message pane still
+ * painted Slack dark-mode charcoal, with light grey text on it. */
+:root,
+html,
+body,
+body.sk-client-theme--dark,
+body.sk-client-theme--light,
+.p-client,
+.p-ia4_client,
+.p-view_contents {
+    /* ── surfaces ─────────────────────────────────────────────────────── */
+    /* pry is the document: the message pane, threads, canvases. Stays white. */
+    --dt_color-base-pry: #ffffff !important;
+    --dt_color-base-pry-hover: #0000800f !important;
+    --dt_color-base-pry-pressed: #00008021 !important;
+    /* sec/ter are chrome: sidebars, headers, toolbars, composer trim. */
+    --dt_color-base-sec: #c0c0c0 !important;
+    --dt_color-base-sec-hover: #0000800f !important;
+    --dt_color-base-sec-pressed: #00008021 !important;
+    --dt_color-base-ter: #c0c0c0 !important;
+    --dt_color-base-ter-hover: #0000800f !important;
+    --dt_color-base-ter-pressed: #00008021 !important;
+
+    /* ── text ─────────────────────────────────────────────────────────── */
+    /* Black, not near-black: everything sits on white or silver, and Win95
+     * had no grey body text -- only greyed-out (disabled) text, which is ter. */
+    --dt_color-content-pry: #000000 !important;
+    --dt_color-content-sec: #000000 !important;
+    --dt_color-content-ter: #808080 !important;
+    --dt_color-content-inv-pry: #ffffff !important;
+    --dt_color-content-inv-sec: #dfdfdf !important;
+
+    /* ── the inverse (selected) family = navy-on-white ────────────────── */
+    /* In Win95 navy is precisely "the selected thing": title bars, list rows,
+     * highlighted menu items. Slack's inv-pry is used for exactly that. */
+    --dt_color-base-inv-pry: #000080 !important;
+    --dt_color-base-inv-pry-hover: #1084d0 !important;
+    --dt_color-base-inv-pry-pressed: #000060 !important;
+
+    /* ── accents, mapped onto the VGA-16 set ──────────────────────────── */
+    --dt_color-content-hgl-1: #000080 !important;   /* links */
+    --dt_color-content-hgl-2: #008000 !important;   /* success */
+    --dt_color-content-hgl-3: #808000 !important;   /* warning: olive, Win95's "yellow" */
+    --dt_color-content-imp: #800000 !important;     /* danger: maroon */
+    --dt_color-base-inv-hgl-1: #000080 !important;
+    --dt_color-base-inv-hgl-2: #008000 !important;
+    --dt_color-base-inv-hgl-3: #808000 !important;
+    --dt_color-base-inv-imp: #800000 !important;
+    --dt_color-base-hgl-1: #dfdfdf !important;
+    --dt_color-base-hgl-2: #dfdfdf !important;
+    --dt_color-base-hgl-3: #dfdfdf !important;
+    --dt_color-base-imp: #dfdfdf !important;
+
+    /* ── edges ────────────────────────────────────────────────────────── */
+    --border-color: #808080 !important;
+    --sk_form_border_color: #808080 !important;
+    --dt_color-border-pry: #808080 !important;
+    --dt_color-border-sec: #808080 !important;
+    --dt_color-border-ter: #dfdfdf !important;
+
+    /* ── the sidebar, whose tokens are separate from the rest ─────────── */
+    --column_bg: #c0c0c0 !important;
+    --menu_bg_hover: #dfdfdf !important;
+    --active_item: #000080 !important;
+    --active_item_text: #ffffff !important;
+    --hover_item: #dfdfdf !important;
+    --text_color: #000000 !important;
+    --active_presence: #008000 !important;
+    --mention_badge: #800000 !important;
+    --top_nav_bg: #000080 !important;
+    --top_nav_text: #ffffff !important;
+
+    /* Win95 drew no rounded corners anywhere. Zero the radius scale at the
+     * root so every component that derives from it follows, instead of
+     * needing a `border-radius: 0` rule per class. */
+    --dt_static_radius-xs: 0 !important;
+    --dt_static_radius-sm: 0 !important;
+    --dt_static_radius-md: 0 !important;
+    --dt_static_radius-lg: 0 !important;
+    --dt_static_radius-xl: 0 !important;
+    --dt_static_radius-circle: 0 !important;
+    --dt_static_radius-rounded: 0 !important;
+}
+
+/* ── the typeface ──────────────────────────────────────────────────────
+ * W95FA is installed by `w95 assets` into ~/.local/share/fonts/w95, so
+ * fontconfig resolves it for Slack like any other local app. Monospace stays
+ * monospace: code blocks and snippets are the one place a proportional
+ * face would actually lose information. */
+body,
+.p-client,
+button,
+input,
+textarea,
+select {
+    font-family: "W95FA", "MS Sans Serif", Tahoma, sans-serif !important;
+}
+
+code,
+pre,
+.c-mrkdwn__pre,
+.c-mrkdwn__code,
+.ql-code-block {
+    font-family: "Terminus", "Courier New", monospace !important;
+}
+
+/* ── flatten, then bevel ───────────────────────────────────────────────
+ * Two passes on purpose. The blanket rule kills every radius and drop shadow
+ * Slack draws, including on classes this file has never heard of; the rules
+ * after it put the 3D edges back only where Win95 had them. Doing it the other
+ * way round leaves a stray rounded corner on every component added since. */
+* {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+/* Raised: buttons, and anything acting as one. Win95's bevel is two 1px rings
+ * -- white/silver on the top-left, grey/black on the bottom-right -- which is
+ * exactly what a four-sided border with two colours gives you. */
+button.c-button,
+button.c-button--outline,
+.c-button-unstyled.c-icon_button,
+.p-composer__button,
+.c-menu_item__button {
+    background: #c0c0c0 !important;
+    color: #000000 !important;
+    border-top: 2px solid #ffffff !important;
+    border-left: 2px solid #ffffff !important;
+    border-bottom: 2px solid #808080 !important;
+    border-right: 2px solid #808080 !important;
+    padding: 2px 8px !important;
+}
+
+button.c-button:active,
+.c-button-unstyled.c-icon_button:active,
+.p-composer__button:active {
+    /* Pressed = the same bevel, inverted. Nothing moves; only the light does. */
+    border-top-color: #808080 !important;
+    border-left-color: #808080 !important;
+    border-bottom-color: #ffffff !important;
+    border-right-color: #ffffff !important;
+}
+
+/* Sunken: text fields, the composer, lists, scroll areas. The inverse bevel
+ * on a white ground -- Win95's "this is where you type" affordance. */
+.p-composer__input,
+.ql-editor,
+input[type="text"],
+input[type="search"],
+textarea,
+.c-texty_input,
+.p-message_input {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border-top: 2px solid #808080 !important;
+    border-left: 2px solid #808080 !important;
+    border-bottom: 2px solid #ffffff !important;
+    border-right: 2px solid #ffffff !important;
+}
+
+/* ── chrome that has to be silver whatever the tokens say ─────────────── */
+.p-channel_sidebar,
+.p-workspace__sidebar,
+.p-tab_rail,
+.p-ia4_client_sidebar,
+.p-view_header,
+.p-workspace__title_bar,
+.p-classic_nav__team_header,
+.p-ia4_top_nav {
+    background: #c0c0c0 !important;
+    color: #000000 !important;
+}
+
+/* ── the document: the one big white surface ────────────────────────────
+ * `.p-view_contents` is what actually paints the canvas behind the message
+ * list -- the message pane and every wrapper between them are transparent, so
+ * this is the single element that decides whether you are looking at paper or
+ * at charcoal. Set explicitly rather than left to the tokens because Slack's
+ * dark stylesheet reaches it by a route the token override does not cover. */
+/* Found by sampling `elementsFromPoint` and then looking for every element over
+ * 400x300 with a dark computed background -- guessing at this from class names
+ * does not work, because the two that actually paint it are named after a
+ * scrollbar and a message *kit*, neither of which sounds like a canvas.
+ *   .c-scrollbar__hider     the message list's scroll container
+ *   .c-message_kit__background  one per message row, on top of it
+ * Miss either and you get black text on charcoal, which is worse than either
+ * theme on its own. */
+.p-message_pane .c-scrollbar__hider,
+.c-message_kit__background,
+.p-message_pane,
+.c-message_list,
+.p-view_contents--primary,
+.p-workspace__primary_view_body,
+.p-workspace__primary_view,
+.p-file_drag_drop__container {
+    background: #ffffff !important;
+}
+
+/* `.p-view_contents` is used for both columns, so it cannot be set in one go:
+ * --sidebar is chrome and silver, --primary is the document and white.
+ *
+ * Same trap for `.c-scrollbar__hider`, which is the scroll container for the
+ * message list *and* for the channel list. Painting it white unscoped turned the
+ * sidebar into a white column with the silver only showing at its edges -- so the
+ * canvas rule above is scoped under .p-message_pane, and the sidebar's copy is
+ * named here. Any generic class in this file needs that check. */
+.p-view_contents--sidebar,
+.p-channel_sidebar .c-scrollbar__hider,
+.p-channel_sidebar .c-virtual_list__scroll_container,
+.p-tab_rail .c-scrollbar__hider {
+    background: #c0c0c0 !important;
+}
+
+/* Slack paints a full-bleed radial gradient behind the client as decoration.
+ * Windows 95 had a flat teal root and nothing else; a soft glow reads as 2015
+ * however correct the rest of the palette is. */
+.p-theme_background {
+    background-image: none !important;
+    background: transparent !important;
+}
+
+/* Message text. Slack's dark rules set this straight on the rich-text spans,
+ * which is why the first pass left light grey body copy on white. */
+.p-rich_text_section,
+.c-message_kit__blocks,
+.c-message__body,
+.c-message_kit__text,
+.p-rich_text_block {
+    color: #000000 !important;
+}
+
+/* Author names and timestamps: black and grey, the Win95 way round. */
+.c-message__sender_button,
+.c-message_kit__sender {
+    color: #000000 !important;
+    font-weight: bold !important;
+}
+.c-timestamp,
+.c-message_kit__labels,
+.c-message__body .c-timestamp {
+    color: #808080 !important;
+}
+
+/* Day dividers and the channel's own header rule become single grey lines. */
+.c-message_list__day_divider__line,
+.c-message_list__day_divider__label {
+    border-color: #808080 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+}
+
+/* ── the sidebar theme, which is a third colour system again ─────────────
+ * Slack injects a <style class="p-team_sidebar__theme"> holding the workspace's
+ * chosen sidebar theme, and it sets channel names to that theme's text colour --
+ * here `rgba(178, 227, 228, .8)`, a pale cyan meant for a dark sidebar. On
+ * silver it is all but invisible, and neither the design tokens nor the dark
+ * appearance has anything to do with it: this is a third, independent layer.
+ *
+ * So the text colour is forced across the whole of the chrome rather than per
+ * component. Blunt on purpose -- the alternative is enumerating class names for
+ * every row type in the sidebar, which is exactly the kind of list that rots. */
+.p-channel_sidebar,
+.p-channel_sidebar *,
+.p-tab_rail,
+.p-tab_rail *,
+.p-ia4_top_nav,
+.p-ia4_top_nav *,
+.p-ia4_home_header_menu,
+.p-ia4_home_header_menu *,
+.p-classic_nav__team_header,
+.p-classic_nav__team_header * {
+    color: #000000 !important;
+}
+
+/* Unread channels were bold in every list Win95 ever drew; keep that signal
+ * once everything is the same black. */
+.p-channel_sidebar__channel--unread .p-channel_sidebar__name {
+    font-weight: bold !important;
+}
+
+/* Muted / low-priority rows are the greyed-out case, which Win95 did have. */
+.p-channel_sidebar__channel--muted .p-channel_sidebar__name,
+.p-channel_sidebar__section_heading_label {
+    color: #808080 !important;
+}
+
+/* The day divider's pill kept Slack's dark chip colour, so "Friday, July 31st"
+ * came out white-on-black in the middle of a white page. Win95 would have drawn
+ * a sunken groove and a silver label, so: silver chip, grey rule. */
+.c-message_list__day_divider__label__pill {
+    background: #c0c0c0 !important;
+    color: #000000 !important;
+    border-top: 1px solid #808080 !important;
+    border-left: 1px solid #808080 !important;
+    border-bottom: 1px solid #ffffff !important;
+    border-right: 1px solid #ffffff !important;
+}
+.c-message_list__day_divider__line {
+    border-top: 1px solid #808080 !important;
+}
+
+/* ── the last of the dark-mode greys ────────────────────────────────────
+ * These were found by walking the DOM for text lighter than rgb(150,150,150) --
+ * they are the labels Slack dims against a charcoal background, and every one of
+ * them was still doing that on white. #808080 is the Win95 disabled/secondary
+ * grey, which is what they all mean.
+ *
+ * BEM child classes, so they are not necessarily *inside* an element carrying the
+ * block class -- which is why the blanket chrome rules above missed the team name.
+ * Matched on their own names for that reason. */
+.c-timestamp__label,
+.c-message__reply_bar_last_reply,
+.p-avatar_stack__count,
+.c-file_name,
+.c-message_kit__labels,
+.p-ia4_home_header_menu__team_name,
+.c-search_input__input::placeholder,
+input::placeholder,
+textarea::placeholder {
+    color: #808080 !important;
+}
+
+/* The team name is the window's title, effectively -- black and bold, not dim. */
+.p-ia4_home_header_menu__team_name {
+    color: #000000 !important;
+    font-weight: bold !important;
+}
+
+/* Thread affordances are links, and Win95 links were navy. */
+.c-message__reply_bar_view_thread,
+.p-message_pane a.c-link,
+.c-message_kit__blocks a {
+    color: #000080 !important;
+}
+
+/* The active channel row: navy fill, white text, square. Win95 list selection.
+ * Higher specificity than the blanket chrome rule above, so it still wins. */
+.p-channel_sidebar__channel--selected,
+.p-channel_sidebar__channel--selected:hover,
+.c-virtual_list__item--selected {
+    background: #000080 !important;
+    color: #ffffff !important;
+}
+.p-channel_sidebar__channel--selected *,
+.c-virtual_list__item--selected * {
+    color: #ffffff !important;
+}
+
+/* ── scrollbars: the chunky silver ones with a dithered trough ────────── */
+::-webkit-scrollbar {
+    width: 16px;
+    height: 16px;
+    background: #dfdfdf;
+}
+::-webkit-scrollbar-thumb {
+    background: #c0c0c0;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-bottom: 2px solid #808080;
+    border-right: 2px solid #808080;
+}
+::-webkit-scrollbar-track {
+    /* The 50% checkerboard, drawn with a gradient rather than the dither PNG
+     * so this file stays a single self-contained asset. */
+    background-image:
+        linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%),
+        linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%);
+    background-color: #dfdfdf;
+    background-size: 4px 4px;
+    background-position: 0 0, 2px 2px;
+}
+
+/* Avatars were square in 1995 and there were no gradients. */
+.c-base_icon,
+.c-avatar__image,
+.c-avatar {
+    border-radius: 0 !important;
+}

@@ -1,0 +1,18 @@
+[Desktop Entry]
+# Shadows /usr/share/applications/slack.desktop — XDG_DATA_HOME wins, so the
+# launcher, the Win95 Start menu and xdg-open all pick this up with no root and
+# nothing for a pacman update to overwrite.
+#
+# The only change is --remote-debugging-port, which is what lets `w95-slack`
+# reach Slack's CSS at all (see that script for why this is the least-bad route).
+# It binds to loopback and does nothing unless something connects to it.
+Name=Slack
+StartupWMClass=Slack
+Comment=Slack Desktop
+GenericName=Slack Client for Linux
+Exec=/usr/bin/slack --gtk-version=3 -s --remote-debugging-port=9333 %U
+Icon=slack
+Type=Application
+StartupNotify=true
+Categories=GNOME;GTK;Network;InstantMessaging;
+MimeType=x-scheme-handler/slack;

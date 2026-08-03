@@ -1,0 +1,334 @@
+#!/usr/bin/env -S uv run --quiet --with websockets --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["websockets"]
+# ///
+"""w95-slack — put the Windows 95 scheme on Slack, without touching Slack.
+
+    w95-slack on       inject the stylesheet into every open Slack window
+    w95-slack off      remove it again
+    w95-slack attach   like `on`, but a no-op if Slack is not already up
+    w95-slack status   whether Slack is reachable, and whether it is themed
+
+Slack's own theming stops at the sidebar: ten hex values in Preferences, and the
+message pane stays white and modern whatever you pick. Getting the rest means
+CSS, and Slack has no supported way to load any.
+
+The two usual answers are both bad. Patching `/usr/lib/slack/resources/app.asar`
+needs root, and pacman replaces it on every update -- the theme would silently
+vanish a few times a year. The Chrome extension route does not exist for a
+packaged Electron app.
+
+So this drives the debugging protocol instead. Slack is Electron, Electron is
+Chromium, and Chromium takes `--remote-debugging-port`; from there CSS is one
+`Runtime.evaluate` away. Nothing outside $HOME is modified, an update cannot
+undo it, and `off` is genuinely complete because all that was ever added is one
+<style> element.
+
+The injection is registered twice on purpose: once against the live document, and
+once through `Page.addScriptToEvaluateOnNewDocument` so it replays on reload --
+Slack reloads itself on reconnect, on update, and whenever it feels like it, and
+a theme that only survived until the next reconnect would be worse than none.
+
+Requires Slack to have been started with the debugging port. The desktop file in
+this package (`.local/share/applications/slack.desktop`) does that; it shadows
+the packaged one, so the launcher and the Start menu both get it. `on` starts
+Slack that way if it is not running, but it will not restart a Slack that is
+already up without the port -- losing an unsent message to a theme would be a
+bad trade. It says so and exits instead.
+"""
+
+import asyncio
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+import websockets
+
+PORT = int(os.environ.get("W95_SLACK_CDP_PORT", "9333"))
+CSS = os.path.expanduser("~/.local/share/w95/w95slack.css")
+STYLE_ID = "w95-slack-theme"
+SLACK = "/usr/bin/slack"
+
+
+def say(msg):
+    print("\033[1m%s\033[0m" % msg)
+
+
+def warn(msg):
+    print("w95-slack: %s" % msg, file=sys.stderr)
+
+
+def targets():
+    """Every Slack page target, or [] if the debugging port is not open."""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:%d/json" % PORT, timeout=2) as r:
+            return [t for t in json.load(r) if t.get("type") == "page"]
+    except (urllib.error.URLError, OSError, ValueError):
+        return []
+
+
+def slack_running():
+    return subprocess.run(["pgrep", "-x", "slack"],
+                          stdout=subprocess.DEVNULL).returncode == 0
+
+
+def start_slack():
+    """Launch Slack with the port, detached, and wait for CDP to answer."""
+    say("starting Slack with the debugging port on %d" % PORT)
+    subprocess.Popen(
+        ["setsid", "-f", SLACK, "--gtk-version=3", "-s",
+         "--remote-debugging-port=%d" % PORT],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL, start_new_session=True)
+    for _ in range(40):          # Slack needs ~10s to paint a window
+        time.sleep(0.5)
+        if targets():
+            return True
+    return False
+
+
+# The document-side half. Kept as one expression so it works both through
+# Runtime.evaluate now and through addScriptToEvaluateOnNewDocument later.
+APPLY_JS = """
+(() => {
+  const id = %(id)s, css = %(css)s;
+  const put = () => {
+    if (!document.head) return false;
+    let el = document.getElementById(id);
+    if (!el) {
+      el = document.createElement("style");
+      el.id = id;
+      document.head.appendChild(el);
+    }
+    if (el.textContent !== css) el.textContent = css;
+    // Slack rebuilds <head> on some navigations and would drop the tag with it.
+    if (!window.__w95SlackGuard) {
+      window.__w95SlackGuard = new MutationObserver(() => {
+        if (!document.getElementById(id)) put();
+      });
+      window.__w95SlackGuard.observe(document.documentElement,
+                                     {childList: true, subtree: true});
+    }
+    return true;
+  };
+  if (!put()) document.addEventListener("DOMContentLoaded", put);
+  return "ok";
+})()
+"""
+
+REMOVE_JS = """
+(() => {
+  if (window.__w95SlackGuard) {
+    window.__w95SlackGuard.disconnect();
+    delete window.__w95SlackGuard;
+  }
+  const el = document.getElementById(%(id)s);
+  if (el) el.remove();
+  return "ok";
+})()
+"""
+
+
+async def drive(target, expr, persist=None):
+    """Run `expr` in one target; optionally also register it for future loads."""
+    async with websockets.connect(target["webSocketDebuggerUrl"],
+                                  max_size=None) as ws:
+        msg_id = 0
+
+        async def call(method, params=None):
+            nonlocal msg_id
+            msg_id += 1
+            mine = msg_id
+            await ws.send(json.dumps({"id": mine, "method": method,
+                                      "params": params or {}}))
+            while True:
+                m = json.loads(await ws.recv())
+                if m.get("id") == mine:
+                    if "error" in m:
+                        raise RuntimeError(m["error"].get("message", "CDP error"))
+                    return m.get("result", {})
+
+        await call("Page.enable")
+        # Clear any earlier registration first, so `on` twice does not stack up
+        # a new on-load script per run.
+        if persist is not None:
+            ident = STATE.get(target["id"])
+            if ident:
+                try:
+                    await call("Page.removeScriptToEvaluateOnNewDocument",
+                               {"identifier": ident})
+                except RuntimeError:
+                    pass
+            res = await call("Page.addScriptToEvaluateOnNewDocument",
+                             {"source": persist})
+            STATE[target["id"]] = res.get("identifier")
+        await call("Runtime.evaluate", {"expression": expr, "returnByValue": True})
+
+
+# Which on-new-document scripts we registered, so `off` and a second `on` can
+# take them back out. Per-target and per-Slack-run, so a plain file is enough.
+STATE_PATH = os.path.expanduser("~/.local/state/w95/slack-scripts.json")
+
+
+def load_state():
+    try:
+        with open(STATE_PATH) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_state():
+    os.makedirs(os.path.dirname(STATE_PATH), exist_ok=True)
+    with open(STATE_PATH, "w") as f:
+        json.dump(STATE, f)
+
+
+STATE = load_state()
+
+
+async def each(tgts, expr, persist=None):
+    ok = 0
+    for t in tgts:
+        try:
+            await drive(t, expr, persist)
+            ok += 1
+        except Exception as exc:                      # one bad tab is not fatal
+            warn("%s: %s" % (t.get("title", "?")[:40], exc))
+    return ok
+
+
+def read_css():
+    try:
+        with open(CSS) as f:
+            return f.read()
+    except OSError:
+        warn("%s is missing — re-stow win95-pkg" % CSS)
+        sys.exit(1)
+
+
+def cmd_on():
+    css = read_css()
+    tgts = targets()
+    if not tgts:
+        if slack_running():
+            warn("Slack is running without --remote-debugging-port, so its CSS "
+                 "cannot be reached.")
+            warn("Quit Slack and start it again (the launcher now passes the "
+                 "flag), then re-run this.")
+            sys.exit(1)
+        if not start_slack():
+            warn("Slack did not come up with a debugging port on %d" % PORT)
+            sys.exit(1)
+        tgts = targets()
+
+    expr = APPLY_JS % {"id": json.dumps(STYLE_ID), "css": json.dumps(css)}
+    n = asyncio.run(each(tgts, expr, persist=expr))
+    save_state()
+    say("Windows 95 applied to %d Slack window%s." % (n, "" if n == 1 else "s"))
+
+
+def cmd_off():
+    tgts = targets()
+    if not tgts:
+        warn("no Slack with a debugging port — nothing to undo")
+        return
+    expr = REMOVE_JS % {"id": json.dumps(STYLE_ID)}
+
+    async def run():
+        for t in tgts:
+            ident = STATE.pop(t["id"], None)
+            try:
+                async with websockets.connect(t["webSocketDebuggerUrl"],
+                                              max_size=None) as ws:
+                    async def call(method, params=None, _ws=ws, _n=[0]):
+                        _n[0] += 1
+                        mine = _n[0]
+                        await _ws.send(json.dumps({"id": mine, "method": method,
+                                                   "params": params or {}}))
+                        while True:
+                            m = json.loads(await _ws.recv())
+                            if m.get("id") == mine:
+                                return m
+
+                    await call("Page.enable")
+                    if ident:
+                        await call("Page.removeScriptToEvaluateOnNewDocument",
+                                   {"identifier": ident})
+                    await call("Runtime.evaluate",
+                               {"expression": expr, "returnByValue": True})
+            except Exception as exc:
+                warn("%s: %s" % (t.get("title", "?")[:40], exc))
+
+    asyncio.run(run())
+    save_state()
+    say("Slack is back to its own theme.")
+
+
+def cmd_status():
+    tgts = targets()
+    print("slack     : %s" % ("running" if slack_running() else "not running"))
+    print("cdp port  : %s" % ("open on %d" % PORT if tgts
+                              else "closed (launch Slack via this package's "
+                                   ".desktop file)"))
+    print("stylesheet: %s" % (CSS if os.path.exists(CSS) else "MISSING"))
+    if not tgts:
+        return
+
+    probe = "!!document.getElementById(%s)" % json.dumps(STYLE_ID)
+
+    async def run():
+        for t in tgts:
+            try:
+                async with websockets.connect(t["webSocketDebuggerUrl"],
+                                              max_size=None) as ws:
+                    await ws.send(json.dumps(
+                        {"id": 1, "method": "Runtime.evaluate",
+                         "params": {"expression": probe, "returnByValue": True}}))
+                    while True:
+                        m = json.loads(await ws.recv())
+                        if m.get("id") == 1:
+                            themed = m["result"]["result"].get("value")
+                            print("  %-46s %s" % (t.get("title", "?")[:46],
+                                                  "themed" if themed else "stock"))
+                            break
+            except Exception as exc:
+                warn("%s: %s" % (t.get("title", "?")[:40], exc))
+
+    asyncio.run(run())
+
+
+def cmd_attach():
+    """Theme Slack if it is already reachable; otherwise do nothing, quietly.
+
+    This is the entry point `w95 on` uses. `on` would start Slack when it is not
+    running, which is the wrong thing for a desktop-wide theme switch to do --
+    turning on a Windows 95 look should not launch a chat client.
+    """
+    if not targets():
+        return
+    cmd_on()
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd == "attach":
+        cmd_attach()
+    elif cmd == "on":
+        cmd_on()
+    elif cmd == "off":
+        cmd_off()
+    elif cmd == "status":
+        cmd_status()
+    else:
+        print(__doc__.split("\n\n")[1].replace("    ", "  "))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
