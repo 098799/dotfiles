@@ -83,7 +83,14 @@ cmd_on() {
     # and only `theme` knows how to do that. Calling w95 alone left the Start
     # menu and every notification in gruvbox.
     if [[ -x $HOME/bin/theme ]]; then
-        W95_NO_SWITCH=1 "$HOME/bin/theme" light win95 >/dev/null || die "theme light win95 failed"
+        # `theme` calls `w95 on` about half way through, so a failure after that
+        # point leaves Win95 colours, GTK theme and window chrome on top of stock
+        # i3 -- no taskbar, no caption buttons, and `status` still saying "stock".
+        # Undo the assets before reporting, so a failure is a no-op like preflight.
+        if ! W95_NO_SWITCH=1 "$HOME/bin/theme" light win95 >/dev/null; then
+            "$BIN/w95" off >/dev/null 2>&1 || true
+            die "theme light win95 failed — Win95 assets rolled back"
+        fi
     else
         "$BIN/w95" on >/dev/null || die "w95 on failed"
     fi
