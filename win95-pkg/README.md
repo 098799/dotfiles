@@ -108,9 +108,28 @@ has no i3blocks strip and no tray. `w95-sysmon` is where all of that went:
 
 It is a quake console. Full width, slides down from the top edge, sticky across
 workspaces, no decoration. The process stays **resident and hidden** between
-presses — that is what makes every press after the first instant — and pauses
-its polling while hidden, so nothing runs `checkupdates` at a window nobody is
-looking at. `Esc` and the X button hide it too; only File ▸ Exit really quits.
+presses — that is what makes every press after the first instant. `Esc` and the
+X button hide it too; only File ▸ Exit really quits.
+
+Hidden, it splits what it keeps doing:
+
+* **The charts keep running.** A strip chart whose history starts when you open
+  it cannot answer the question it exists for — what happened while you were
+  not watching. Sampling on a fixed interval regardless of visibility is also
+  the only way the x-axis means anything: stop and restart it and the series
+  splices two sessions together with no gap drawn, while the first reading back
+  averages the entire absence into one point (both meters are differential). A
+  thirty-second CPU burn arrived as a single spike, at the wrong height, in the
+  wrong place. Measured cost of leaving it on: **60 ms of CPU per minute**,
+  about 0.1% of one core, for three small reads under `/proc`.
+* **The probes stop.** `bluetoothctl`, `checkupdates` and a curl to the Claude
+  API have no business firing at a window nobody is looking at, and unlike the
+  charts they are point-in-time state with no history to miss.
+
+Start it at login with `w95-sysmon --hidden` and the panel already knows the
+last few minutes the first time you open it. That has to be `exec`, never
+`exec_always`: a second invocation is a keypress being forwarded to the
+resident one, so a reload would pop the panel open every time.
 
 Everything is on one page: three scrolling charts (processor, memory, network)
 over nine group boxes covering every block the bar had, plus `temp`, `keyboard`

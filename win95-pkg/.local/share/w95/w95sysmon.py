@@ -901,7 +901,13 @@ class Monitor(Gtk.Window):
         GLib.unix_fd_add_full(GLib.PRIORITY_DEFAULT, sock.fileno(),
                               GLib.IOCondition.IN, self._on_message, sock)
 
-        self.sample()          # one sample so nothing opens empty
+        # Prime, then start the clock straight away: charting begins at launch,
+        # not at the first time the window is looked at. `--hidden` from i3's
+        # exec is what makes that worth having — the panel then already knows
+        # the last few minutes the first time it is opened.
+        self._prime_meters()
+        self.sample(full=True)
+        self._restart_tick()
         if not hidden:
             self.show_panel()
 
@@ -1143,27 +1149,46 @@ class Monitor(Gtk.Window):
                 "recording": w95stat.recording()}
 
     # ── sampling ────────────────────────────────────────────────────────
-    def sample(self):
-        """One pass of everything cheap enough to read on the main loop."""
+    def sample(self, full=None):
+        """One pass. `full` adds everything only a visible window needs.
+
+        The charted half runs whether or not anyone is looking, because a strip
+        chart whose history begins when you open it is not a strip chart — the
+        question it exists to answer is "what happened while I wasn't
+        watching". It is also the cheap half: three small reads under
+        /proc, microseconds, which is why it can afford to be unconditional.
+
+        Sampling on a fixed interval regardless of visibility is also what
+        keeps the x-axis honest. Stop and restart it and the series splices
+        two sessions together with no gap drawn between them, while the first
+        reading back — both meters here are differential — averages the entire
+        absence into one point. A thirty-second CPU burn arrives as a single
+        spike, in the wrong place, at the wrong height.
+        """
+        full = self.visible if full is None else full
+        self.state["cpu"] = self._sample_cpu.sample()
+        self.state["memory"] = w95stat.memory()
+        self.state["temperature"] = w95stat.temperature()
+        self.state["rx"], self.state["tx"] = self._sample_net.sample()
+
+        self.cpu_series.push(self.state["cpu"])
+        self.mem_series.push(self.state["memory"]["percent"])
+        self.rx_series.push(self.state["rx"])
+        self.tx_series.push(self.state["tx"])
+        if not full:
+            return True
+
         self.state.update({
-            "cpu": self._sample_cpu.sample(),
-            "memory": w95stat.memory(),
             "disk": w95stat.disk("/"),
-            "temperature": w95stat.temperature(),
             "uptime": w95stat.uptime_seconds(),
             "load": w95stat.loadavg(),
             "battery": w95stat.battery(),
             "profile": w95stat.power_profile(),
             "boost": w95stat.cpu_boost(),
         })
-        self.state["rx"], self.state["tx"] = self._sample_net.sample()
         self.state.setdefault("cpu_info", w95stat.cpu_info())
         self.state.setdefault("host", w95stat.host_info())
 
-        self.cpu_series.push(self.state["cpu"])
-        self.mem_series.push(self.state["memory"]["percent"])
-        self.rx_series.push(self.state["rx"])
-        self.tx_series.push(self.state["tx"])
         for chart in self.charts:
             chart.queue_draw()
         for panel in self.panels:
@@ -1175,17 +1200,30 @@ class Monitor(Gtk.Window):
                                     % w95stat.human_duration(self.state["uptime"]))
         return True
 
+    def _prime_meters(self):
+        """Throw one reading away so the next one means what it says.
+
+        Only needed after Paused, which is the one state that really does stop
+        the clock. Both meters are differential, so the first sample after any
+        genuine gap covers the whole gap.
+        """
+        self._sample_cpu.sample()
+        self._sample_net.sample()
+
     def _restart_tick(self):
         if self.tick_source:
             GLib.source_remove(self.tick_source)
             self.tick_source = 0
-        if self.visible and self.speed:
+        if self.speed:
             self.tick_source = GLib.timeout_add(self.speed, self.sample)
 
     def _on_speed(self, widget, interval):
         if not widget.get_active():
             return
+        resuming = interval and not self.speed
         self.speed = interval
+        if resuming:
+            self._prime_meters()
         self._restart_tick()
         self.status.set_text(
             "Update speed: %s" % ("paused" if not interval
@@ -1195,7 +1233,7 @@ class Monitor(Gtk.Window):
         self.chart_row.set_visible(widget.get_active())
 
     def refresh_all(self):
-        self.sample()
+        self.sample(full=True)
         self.poller.refresh()
         self.status.set_text("Refreshed.")
 
@@ -1223,7 +1261,7 @@ class Monitor(Gtk.Window):
         self.chart_row.set_visible(self.show_charts.get_active())
         self.visible = True
         self.poller.pause(False)
-        self.sample()
+        self.sample(full=True)
         self._restart_tick()
         self.status.set_text("Ready")
 
@@ -1231,9 +1269,11 @@ class Monitor(Gtk.Window):
         if not self.visible:
             return
         self.visible = False
-        if self.tick_source:
-            GLib.source_remove(self.tick_source)
-            self.tick_source = 0
+        # The tick keeps running — see sample(). What stops is the poller,
+        # which is where the real cost is: bluetoothctl, checkupdates and a
+        # curl to the Claude API have no business firing at a hidden window,
+        # and unlike the charts they are point-in-time state with no history
+        # to miss.
         self.poller.pause(True)
         self.hide()
 
