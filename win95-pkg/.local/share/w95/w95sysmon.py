@@ -29,13 +29,16 @@ Four things worth knowing before reading on:
   script times out, and a field that blanks itself every time the Bluetooth
   daemon is slow is worse than one that is briefly stale.
 
-* **A control never writes a value the system already has.** Every radio and
-  check box on this page is *both* an input and an output — polled state writes
-  into it, and it writes into the system. That loop is how an early version of
-  this file silently changed the machine's power profile at startup: GTK emits
+* **A control never writes unless a person moved it.** Every radio and check
+  box on this page is *both* an input and an output — polled state writes into
+  it, and it writes into the system. That loop is how an early version of this
+  file silently changed the machine's power profile at startup: GTK emits
   ::toggled for programmatic changes too, so a sync looked exactly like a
-  click. Guard flags help, but the guarantee is `_commit()` below: re-read the
-  authority first, and do nothing if it already agrees.
+  click. Guard flags help but only cover the sync paths that existed when they
+  were written. `Panel.commit()` is the guarantee, and it is two independent
+  conditions: there must be a real input event in flight (`user_driven()` —
+  a programmatic `set_active()` has none), and the authority must be re-read
+  and actually disagree.
 """
 
 import math
@@ -331,16 +334,46 @@ class Panel(Gtk.Frame):
     def apply(self, key, value):
         """Called when a polled probe named `key` comes back."""
 
-    def commit(self, read, want, write):
-        """Apply a control's new value — but only if it is actually new.
+    @staticmethod
+    def user_driven():
+        """True only when we are inside a real input event.
 
-        `read` re-reads the authority (sysfs, pactl) at the moment of the
-        click. GTK emits ::toggled for programmatic changes as well as real
-        ones, so without this check a poll that syncs a radio to the machine's
-        state is indistinguishable from a user setting it, and the monitor ends
-        up writing back whatever it just read — or worse, whatever the group's
-        first member happened to be at construction time.
+        GTK emits ::toggled identically for a click and for `set_active()`, and
+        the one thing that separates them from inside the handler is whether
+        there is a current input event at all: a programmatic sync has none.
+
+        This is the structural form of the guard flags dotted around this file.
+        A flag protects the sync paths that exist when it is written; this
+        protects the ones added later too, which matters because the failure it
+        prevents is silent — the machine's power profile changing because a
+        window opened.
         """
+        event = Gtk.get_current_event()
+        if event is None:
+            return False
+        return event.type in (
+            Gdk.EventType.BUTTON_PRESS, Gdk.EventType.BUTTON_RELEASE,
+            Gdk.EventType.DOUBLE_BUTTON_PRESS, Gdk.EventType.KEY_PRESS,
+            Gdk.EventType.KEY_RELEASE, Gdk.EventType.TOUCH_END,
+        )
+
+    def commit(self, read, want, write):
+        """Apply a control's new value — but only if a person asked for it and
+        it is actually new.
+
+        Two independent conditions, because this is the one place in the app
+        that changes the machine rather than describing it:
+
+        * `user_driven()` — a poll syncing a control is not a click.
+        * `read()` — re-read the authority (sysfs, pactl) *now*, and do nothing
+          if it already agrees. Cheap, and it means even a genuine stray click
+          on the already-selected option is a no-op.
+
+        An early build had neither and silently switched the machine's power
+        profile at startup, just by constructing a radio group.
+        """
+        if not self.user_driven():
+            return False
         try:
             if read() == want:
                 return False
