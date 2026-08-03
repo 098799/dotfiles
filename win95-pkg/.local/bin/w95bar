@@ -283,9 +283,31 @@ class Bar(Gtk.Window):
         except Exception:
             return True
         self._render_workspaces(workspaces)
-        self._render_tasks(w95ipc.windows(tree))
+        self._render_tasks(self._tasks_here(tree, workspaces))
         self.show_all()
         return True
+
+    def _tasks_here(self, tree, workspaces):
+        """The windows this taskbar should show: the ones on screen, plus the
+        minimised ones.
+
+        Windows 95 had one desktop, so its taskbar could show everything. i3 has
+        ten, and listing all of them made the strip a directory of the whole
+        session -- every button too narrow to read a title, and no way to tell
+        what was actually in front of you. So the strip follows the desktop.
+
+        Keyed on *visible* workspaces rather than the focused one, because with
+        two monitors there is one focused workspace but two on screen, and a
+        single taskbar that hid the other screen's windows would be wrong.
+
+        Minimised windows (``_ws`` is None -- they live in the scratchpad) stay
+        regardless: in Win95 minimising a window is precisely the act of putting
+        it *into* the taskbar, so filtering them out would delete the only handle
+        you have left on them.
+        """
+        visible = {ws.get("name") for ws in workspaces if ws.get("visible")}
+        return [w for w in w95ipc.windows(tree)
+                if w.get("_ws") is None or w.get("_ws") in visible]
 
     def _render_workspaces(self, workspaces):
         for child in self.ws_box.get_children():

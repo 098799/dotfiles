@@ -3,8 +3,19 @@
 # fires on every reload. Matches on the full path so a bar belonging to a
 # different checkout (or a nested test session) is left alone.
 set -u
-self="$(cd "$(dirname "$0")" && pwd)/w95bar"
 
-pkill -f "^([^ ]*python3? )?$self" 2>/dev/null
+# Two paths, one script. This lives at ~/.local/bin/w95bar, a stow symlink into
+# ~/dotfiles/win95-pkg/.local/bin/w95bar, and the bar gets launched under
+# *either* spelling: exec_always uses the ~/.local/bin one, while `w95-switch`
+# and `w95` resolve $0 with readlink -f first and so launch the dotfiles one.
+# Matching only the path we were invoked under meant the running bar survived
+# the pkill, the fresh one hit its own "a taskbar is already up" guard and quit,
+# and every reload silently kept the old code on screen. Kill both spellings.
+self_logical="$(cd "$(dirname "$0")" && pwd)/w95bar"
+self_real="$(dirname "$(readlink -f "$0")")/w95bar"
+
+for path in "$self_logical" "$self_real"; do
+    pkill -f "^([^ ]*python3? )?$path" 2>/dev/null
+done
 sleep 0.2
-exec setsid -f "$self" >"${XDG_RUNTIME_DIR:-/tmp}/w95bar.log" 2>&1 </dev/null
+exec setsid -f "$self_real" >"${XDG_RUNTIME_DIR:-/tmp}/w95bar.log" 2>&1 </dev/null

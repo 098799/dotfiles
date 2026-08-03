@@ -98,8 +98,10 @@ cmd_on() {
     printf 'w95\n' >"$STATE"
     say "restarting i3 into i3-95 (layout is preserved)"
     restart_i3
-    pkill -f "bin/w95bar" 2>/dev/null
-    setsid -f "$BIN/w95bar" >"$HOME/.local/state/w95/bar.log" 2>&1 </dev/null
+    # Through w95-restart-bar, not a second hand-rolled launcher: it is what
+    # exec_always calls on every i3 reload, and having two of them start the bar
+    # under two different paths is what let a stale bar outlive the pkill.
+    "$BIN/w95-restart-bar"
     say "Windows 95 is up. \`w95-switch off\` to go back."
 }
 

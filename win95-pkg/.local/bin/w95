@@ -128,38 +128,6 @@ open(path, "w").write(text)
 PY
 }
 
-# ── XSETTINGS: the same swap, for the daemon that outranks settings.ini ────
-# Where xsettingsd is running it *is* the GTK theme: the XSETTINGS protocol
-# beats ~/.config/gtk-3.0/settings.ini for every app that is already open, and
-# for every one started afterwards. Without this, Thunar and friends stayed in
-# Adapta-Nokto — dark, modern, and nothing to do with Windows 95 — while
-# settings.ini underneath said Chicago95. Hosts with no xsettingsd (p340) never
-# saw it, which is exactly why it went unnoticed.
-xsettings_set() {
-    local file="$HOME/.config/xsettingsd/xsettingsd.conf"
-    [[ -f $file ]] || return 0
-    python3 - "$file" "$@" <<'PY'
-import re
-import sys
-
-path, *pairs = sys.argv[1:]
-lines = open(path).read().splitlines()
-for pair in pairs:
-    key, _, value = pair.partition(" ")
-    pattern = re.compile(r"^\s*%s\s+" % re.escape(key))
-    for i, line in enumerate(lines):
-        if pattern.match(line):
-            lines[i] = "%s %s" % (key, value)
-            break
-    else:
-        lines.append("%s %s" % (key, value))
-open(path, "w").write("\n".join(lines) + "\n")
-PY
-    # SIGHUP is how xsettingsd re-reads its config and pushes the change out to
-    # every client; without it the file is right and the screen is unchanged.
-    pkill -HUP -x xsettingsd 2>/dev/null || true
-}
-
 # ── Emacs ─────────────────────────────────────────────────────────────
 # Emacs is the one window that would otherwise sit on a Win95 desktop still
 # wearing gruvbox. Unlike GTK or alacritty there is no file Emacs re-reads, so
@@ -214,8 +182,6 @@ backup_gtk() {
     mkdir -p "$BACKUP"
     [[ -f $BACKUP/gtk-3.0-settings.ini ]] ||
         cp "$HOME/.config/gtk-3.0/settings.ini" "$BACKUP/gtk-3.0-settings.ini" 2>/dev/null || true
-    [[ -f $BACKUP/xsettingsd.conf ]] ||
-        cp "$HOME/.config/xsettingsd/xsettingsd.conf" "$BACKUP/xsettingsd.conf" 2>/dev/null || true
     [[ -f $BACKUP/palette ]] ||
         readlink -f "$PALETTE" >"$BACKUP/palette" 2>/dev/null || true
     # `theme` *generates* active-palette.toml rather than linking it, so the
@@ -232,16 +198,7 @@ cmd_on() {
     backup_claude_theme
 
     say "pointing i3 at the win95 palette and window chrome"
-    # win95-light.conf, not win95.conf: it is the one `theme` names ($palette-$mode)
-    # and it `include`s win95.conf for the client.* rules, so it is a superset.
-    # Pointing at the bare win95.conf left a host whose palette link disagreed with
-    # the one `theme light win95` produces, depending on which command ran last.
-    if [[ -e $I3DIR/colors.d/win95-light.conf ]]; then
-        ln -sfn "$I3DIR/colors.d/win95-light.conf" "$PALETTE"
-    else
-        warn "colors.d/win95-light.conf is missing — re-stow win95-pkg; using win95.conf"
-        ln -sfn "$I3DIR/colors.d/win95.conf" "$PALETTE"
-    fi
+    ln -sfn "$I3DIR/colors.d/win95.conf" "$PALETTE"
     ln -sfn "$I3DIR/chrome.d/win95.conf" "$CHROME"
 
     if [[ -d $(dirname "$ALACRITTY") ]]; then
@@ -259,16 +216,6 @@ cmd_on() {
         "gtk-application-prefer-dark-theme=false" \
         "gtk-xft-antialias=1" \
         "gtk-xft-hintstyle=hintfull"
-
-    # Same values again, in XSETTINGS spelling. No-op where xsettingsd is absent.
-    xsettings_set \
-        "Net/ThemeName \"Chicago95\"" \
-        "Net/IconThemeName \"Chicago95\"" \
-        "Gtk/CursorThemeName \"Chicago95_Standard_Cursors\"" \
-        "Gtk/FontName \"W95FA 11\"" \
-        "Gtk/ApplicationPreferDarkTheme 0" \
-        "Xft/Antialias 1" \
-        "Xft/HintStyle \"hintfull\""
 
     mkdir -p "$HOME/.icons/default"
     printf '[Icon Theme]\nInherits=Chicago95_Standard_Cursors\n' \
@@ -301,10 +248,6 @@ cmd_off() {
     fi
     if [[ -f $BACKUP/gtk-3.0-settings.ini ]]; then
         cp "$BACKUP/gtk-3.0-settings.ini" "$HOME/.config/gtk-3.0/settings.ini"
-    fi
-    if [[ -f $BACKUP/xsettingsd.conf ]]; then
-        cp "$BACKUP/xsettingsd.conf" "$HOME/.config/xsettingsd/xsettingsd.conf"
-        pkill -HUP -x xsettingsd 2>/dev/null || true
     fi
     ln -sfn "$I3DIR/chrome.d/stock.conf" "$CHROME"
     if [[ -f $BACKUP/alacritty-palette.toml ]]; then
