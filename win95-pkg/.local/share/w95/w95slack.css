@@ -136,6 +136,46 @@ pre,
     font-family: "Terminus", "Courier New", monospace !important;
 }
 
+/* ── the real sidebar theme variables ───────────────────────────────────
+ * Slack injects <style class="p-team_sidebar__theme"> holding the workspace's
+ * sidebar theme as `--p-team_sidebar__*` custom properties. The generic-sounding
+ * names (`--column_bg`, `--text_color`) that Slack's own theme docs use do not
+ * exist in the client -- overriding those was a no-op, which is why the sidebar
+ * kept a solarized palette (#073642 / #93A1A1) under a Win95 everything else. */
+:root,
+html,
+body {
+    --p-team_sidebar__nav-bg: #c0c0c0 !important;
+    --p-team_sidebar__text-color: #000000 !important;
+    --p-team_sidebar__text-color--opacity-30: rgba(0, 0, 0, 0.3) !important;
+    --p-team_sidebar__text-color--opacity-10: rgba(0, 0, 0, 0.1) !important;
+    --p-team_sidebar__text-color--mix-80: #404040 !important;
+    --p-team_sidebar__text-color--mix-10: #dfdfdf !important;
+    --p-team_sidebar__badge: #800000 !important;
+    --p-team_sidebar__badge-text-color: #ffffff !important;
+    --p-team_sidebar__color-focus-ring: 0 0 0 2px #000080 !important;
+}
+
+/* ── black text by default, everywhere in the client ────────────────────
+ * Deliberately blunt, and deliberately *here* -- early, so that every rule
+ * further down this file overrides it by simply coming later.
+ *
+ * The alternative was another list of container classes, and that list was
+ * already wrong twice: the DM list and the Activity view both came out looking
+ * completely empty, because their text is Slack's dark-mode `rgb(209,210,211)`
+ * and it was sitting on silver. Nothing was broken; it just could not be seen.
+ * Enumerating panes means the next pane Slack adds is invisible again, so invert
+ * the default instead and let the exceptions below name themselves: links go
+ * navy, timestamps and muted rows grey, the selected row white on navy. */
+.p-client_container,
+.p-client_container *,
+.p-ia4_client,
+.p-ia4_client *,
+.p-view_contents,
+.p-view_contents * {
+    color: #000000 !important;
+}
+
 /* ── flatten, then bevel ───────────────────────────────────────────────
  * Two passes on purpose. The blanket rule kills every radius and drop shadow
  * Slack draws, including on classes this file has never heard of; the rules
@@ -182,7 +222,15 @@ input[type="text"],
 input[type="search"],
 textarea,
 .c-texty_input,
-.p-message_input {
+.p-message_input,
+/* The composer's own container and the sidebar filter boxes ("Find a DM…").
+ * These keep a charcoal fill of their own even with the appearance flipped to
+ * light, and the composer is the single most-looked-at box in the app. */
+.p-message_input__input_container_unstyled,
+.c-wysiwyg_container,
+.c-filter_input,
+.c-filter_input__input,
+.p-degraded_list__loading {
     background: #ffffff !important;
     color: #000000 !important;
     border-top: 2px solid #808080 !important;

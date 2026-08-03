@@ -97,22 +97,50 @@ def start_slack():
 APPLY_JS = """
 (() => {
   const id = %(id)s, css = %(css)s;
+
+  // Slack's dark appearance is a class on <body>, and it brings a whole parallel
+  // stylesheet with it: charcoal surfaces on the composer, the filter inputs, the
+  // "Loading history" band, link-unfurl cards. Several of those are CSS-module
+  // classes with a build hash in the name (`container__ZH2Yv`, `bar__cFVGl`), so
+  // they cannot be targeted from a stylesheet that is meant to outlive a Slack
+  // release. Rather than chase them, take the dark rules out of play entirely and
+  // let the Win95 sheet sit on Slack's light theme, which is already close.
+  const lighten = () => {
+    const b = document.body;
+    if (!b) return;
+    if (b.classList.contains("sk-client-theme--dark")) {
+      // Remember that we were the ones who flipped it, so `off` can put Slack
+      // back to the appearance the user actually chose rather than guessing.
+      window.__w95SlackWasDark = true;
+      b.classList.remove("sk-client-theme--dark");
+      b.classList.add("sk-client-theme--light");
+    }
+  };
+
   const put = () => {
     if (!document.head) return false;
     let el = document.getElementById(id);
     if (!el) {
       el = document.createElement("style");
       el.id = id;
+      // Last child of <head>, so equal-specificity ties fall our way.
       document.head.appendChild(el);
     }
     if (el.textContent !== css) el.textContent = css;
-    // Slack rebuilds <head> on some navigations and would drop the tag with it.
+    lighten();
+    // One observer for both jobs: Slack rebuilds <head> on some navigations and
+    // would drop the tag with it, and React puts the dark class back whenever the
+    // appearance setting is re-read. Re-asserting from here is what makes the
+    // theme hold rather than flicker back a second after it is applied.
     if (!window.__w95SlackGuard) {
       window.__w95SlackGuard = new MutationObserver(() => {
         if (!document.getElementById(id)) put();
+        lighten();
       });
       window.__w95SlackGuard.observe(document.documentElement,
-                                     {childList: true, subtree: true});
+                                     {childList: true, subtree: true,
+                                      attributes: true,
+                                      attributeFilter: ["class"]});
     }
     return true;
   };
@@ -123,12 +151,19 @@ APPLY_JS = """
 
 REMOVE_JS = """
 (() => {
+  // Order matters: stop the observer first, or it re-asserts the light class and
+  // the dark theme flickers straight back off again.
   if (window.__w95SlackGuard) {
     window.__w95SlackGuard.disconnect();
     delete window.__w95SlackGuard;
   }
   const el = document.getElementById(%(id)s);
   if (el) el.remove();
+  if (window.__w95SlackWasDark && document.body) {
+    document.body.classList.remove("sk-client-theme--light");
+    document.body.classList.add("sk-client-theme--dark");
+    delete window.__w95SlackWasDark;
+  }
   return "ok";
 })()
 """

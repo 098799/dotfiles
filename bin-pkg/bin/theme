@@ -60,12 +60,22 @@ esac
 
 # Load the semantic UI palette (bg_main, accent, urgent, …) from the i3 colors
 # file so dunst/rofi/tmux/fzf all share one source of truth.
-declare -A COL
+# `=()` and not a bare `declare -A`: an associative array that was declared but
+# never assigned still counts as unset, so `${#COL[@]}` below trips `set -u` and
+# kills the script mid-way -- which is exactly how a half-applied Win95 desktop
+# happened (see the missing-palette check right after).
+declare -A COL=()
 i3_palette="$HOME/.config/i3/colors.d/$palette-$mode.conf"
-if [[ -f $i3_palette ]]; then
-    while read -r name hex; do COL[$name]=$hex; done < <(
-        awk '/^set \$/{n=$2; sub(/^\$/,"",n); print n, $3}' "$i3_palette")
+# A missing palette file is a broken install, not a theme without colours: it
+# means the package holding it was never (re-)stowed. Say so instead of
+# generating a colourless dunst/rofi/tmux and pointing i3 at a dangling link.
+if [[ ! -f $i3_palette ]]; then
+    printf 'theme: %s is missing — re-stow the package that ships it\n' \
+        "$i3_palette" >&2
+    exit 1
 fi
+while read -r name hex; do COL[$name]=$hex; done < <(
+    awk '/^set \$/{n=$2; sub(/^\$/,"",n); print n, $3}' "$i3_palette")
 # col <name> [fallback] — semantic color lookup
 col() { printf '%s' "${COL[$1]:-${2:-#000000}}"; }
 
@@ -102,12 +112,27 @@ if [[ -n $w95_mode ]]; then
     # means w95-switch is the one calling us, and has the WM in hand already.
     if [[ -z ${W95_NO_SWITCH:-} && -x $HOME/.local/bin/w95-switch ]] &&
         "$HOME/.local/bin/w95-switch" status 2>/dev/null | grep -q '^switchable: yes'; then
-        "$HOME/.local/bin/w95-switch" on >/dev/null 2>&1 || true
+        # Not `|| true`: w95-switch is what puts the patched WM on screen, and
+        # swallowing its failure is what turned a missing palette file into a
+        # silently half-dressed desktop instead of an error anyone could see.
+        "$HOME/.local/bin/w95-switch" on >/dev/null ||
+            { echo "theme: w95-switch on failed — desktop is not in Win95 mode" >&2; exit 1; }
     else
         "$HOME/.local/bin/w95" on >/dev/null 2>&1 || true
     fi
 else
     uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette"
+    # Slack is themed by injected CSS, not by a file, so nothing else here can
+    # undo it -- picking gruvbox from the rofi switcher would otherwise leave a
+    # Windows 95 Slack sitting in the middle of a gruvbox desktop.
+    #
+    # Unconditional rather than folded into the `w95 off` path above: that path is
+    # gated on active-chrome.conf still pointing at win95.conf, and the whole point
+    # here is to be the thing that cannot be skipped. It is a no-op when Slack is
+    # not running or not reachable, so the cost of calling it always is nothing.
+    if [[ -x $HOME/.local/bin/w95-slack ]]; then
+        "$HOME/.local/bin/w95-slack" off >/dev/null 2>&1 || true
+    fi
 fi
 
 if command -v gsettings >/dev/null; then
