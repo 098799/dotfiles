@@ -56,6 +56,27 @@ fi
 if [[ ! -e ~/.config/alacritty/active-font.toml ]]; then
     printf '[font]\nsize = 16\n' > ~/.config/alacritty/active-font.toml
 fi
+# The face override, owned by `w95 on`/`off`. Seeded empty: an import alacritty
+# cannot read is a startup error, and the default state is "no override".
+if [[ ! -e ~/.config/alacritty/active-fontface.toml ]]; then
+    printf '# no face override; alacritty.toml decides\n' \
+        > ~/.config/alacritty/active-fontface.toml
+fi
+
+# Windows 95 desktop. Re-stowed unconditionally when it is already installed:
+# every new palette, chrome file or w95-* script this package grows needs a fresh
+# symlink, and a host stowed before that commit keeps working *except* for the one
+# missing file -- `theme light win95` then dies half way through and leaves Win95
+# colours under stock i3. `--no-folding` because .config/i3 is a shared directory.
+if [[ -e ~/.local/bin/w95 ]]; then
+    echo "Re-stowing win95-pkg..."
+    stow -v -t ~ --no-folding win95-pkg
+    # w95-switch only ever repoints this symlink, it never creates it, and i3's
+    # `include` no-ops silently on a missing file. Seed it like active-palette.conf.
+    if [[ ! -e ~/.config/i3/active-keys.conf ]]; then
+        ln -sfn no-keys.conf ~/.config/i3/active-keys.conf
+    fi
+fi
 
 # Optional packages (uncomment as needed)
 # stow -v -t ~ emacs

@@ -2,6 +2,11 @@
 # The startup sound. Silent (exit 0) if the theme or a player is missing —
 # this runs from i3's exec and must never hold up a login.
 set -u
+# W95_QUIET=1 suppresses it. `w95 on` is idempotent and gets re-run whenever
+# anything it owns is being adjusted -- a font, a palette, one CSS file -- and a
+# startup chime on the fifth re-apply in a minute is not a startup chime, it is a
+# machine that appears to be rebooting on its own.
+[[ -n ${W95_QUIET:-} ]] && exit 0
 theme=${1:-desktop-login}
 for dir in "$HOME/.local/share/sounds/Chicago95/stereo" \
            "/usr/share/sounds/Chicago95/stereo"; do

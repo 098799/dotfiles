@@ -8,6 +8,12 @@ import = [
     "~/.config/alacritty/fallback-palette.toml",
     "~/.config/alacritty/active-palette.toml",
     "~/.config/alacritty/active-font.toml",
+    # Font *face*, kept apart from active-font.toml on purpose. The size scripts
+    # (small/middle/big/huge-font) overwrite active-font.toml wholesale with just
+    # a size, so a family written there is lost the next time the size changes.
+    # `w95 on`/`off` own this file; it is empty the rest of the time, which leaves
+    # the [font] section below in charge. Last, so it wins.
+    "~/.config/alacritty/active-fontface.toml",
 ]
 
 [cursor]
