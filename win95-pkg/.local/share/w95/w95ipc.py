@@ -138,6 +138,14 @@ def walk(node):
         yield from walk(kid)
 
 
+# Parts of the Win95 shell that happen to be windows. The taskbar itself lands
+# in a dockarea and is filtered below, but the System Monitor's drop-down panel
+# is an ordinary floating window as far as i3 is concerned. It does set
+# _NET_WM_STATE_SKIP_TASKBAR — which is exactly what this is — but i3's IPC
+# tree does not report window state, so the instance name is what we have.
+SHELL_INSTANCES = {"w95-sysmon-drop"}
+
+
 def windows(tree):
     """Every real client window, tagged with the workspace it lives on.
 
@@ -153,7 +161,9 @@ def windows(tree):
                 ws = None
         if node.get("type") == "dockarea":
             return  # panels and trays are not tasks — that includes us
-        if node.get("window") and node.get("name") is not None:
+        instance = (node.get("window_properties") or {}).get("instance")
+        if node.get("window") and node.get("name") is not None \
+                and instance not in SHELL_INSTANCES:
             node = dict(node)
             node["_ws"] = ws
             out.append(node)

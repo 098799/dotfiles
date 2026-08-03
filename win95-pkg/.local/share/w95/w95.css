@@ -190,6 +190,200 @@ button.w95-default {
     padding: 2px 10px;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   APPLICATION CHROME (System Monitor)
+   Menu bar, tabbed property sheet, group boxes, trackbars and a
+   sunken status bar — the rest of the Win95 widget set, built from
+   the same two bevels as everything above.
+   ───────────────────────────────────────────────────────────── */
+
+/* ── Menu bar: flat until you touch it, then navy ── */
+menubar {
+    background-color: #c0c0c0;
+    border: none;
+    padding: 0 1px;
+}
+menubar > menuitem {
+    padding: 3px 8px;
+    color: #000000;
+    border-radius: 0;
+    min-height: 0;
+}
+menubar > menuitem:hover,
+menubar > menuitem:selected {
+    background-color: #000080;
+    color: #ffffff;
+}
+menubar > menuitem:hover label,
+menubar > menuitem:selected label { color: #ffffff; }
+menubar > menuitem:disabled label { color: #808080; text-shadow: 1px 1px 0 #ffffff; }
+
+/* ── Drop-down menus: a raised plate, navy row highlight ── */
+menu, .w95-menu, popover.background {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    border-radius: 0;
+    padding: 2px;
+}
+menu menuitem {
+    padding: 3px 20px 3px 8px;
+    color: #000000;
+    border-radius: 0;
+    min-height: 0;
+}
+menu menuitem:hover, menu menuitem:selected { background-color: #000080; }
+menu menuitem:hover label, menu menuitem:selected label { color: #ffffff; }
+menu menuitem:disabled label { color: #808080; text-shadow: 1px 1px 0 #ffffff; }
+menu separator {
+    background-color: transparent;
+    border-top: 1px solid #808080;
+    border-bottom: 1px solid #ffffff;
+    margin: 3px 2px;
+    min-height: 0;
+    padding: 0;
+}
+
+/* ── Tabbed property sheet. The selected tab grows upward and its
+      bottom edge dissolves into the page, which is the whole trick. ── */
+notebook > header {
+    background-color: #c0c0c0;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+notebook > header > tabs > tab {
+    background-color: #c0c0c0;
+    background-image: none;
+    border: 1px solid;
+    border-color: #ffffff #000000 transparent #ffffff;
+    box-shadow: inset 1px 1px 0 #dfdfdf, inset -1px 0 0 #808080;
+    border-radius: 0;
+    padding: 3px 11px 2px 11px;
+    margin: 3px 0 0 0;
+    min-height: 0;
+    min-width: 0;
+    color: #000000;
+    font-weight: normal;
+}
+notebook > header > tabs > tab:checked {
+    margin-top: 0;
+    padding: 5px 13px 4px 13px;
+    font-weight: bold;
+}
+notebook > stack {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    padding: 8px;
+}
+
+/* ── Group box: a 1px etched rectangle with the caption over its top ── */
+frame.w95-group > border {
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    border-radius: 0;
+}
+frame.w95-group > label { padding: 0 4px; }
+
+/* ── The white sunken list of a property page ── */
+.w95-list {
+    background-color: #ffffff;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    padding: 3px;
+}
+.w95-list label { color: #000000; }
+.w95-key { color: #000080; }
+
+/* ── Trackbar (volume): sunken trough, raised rectangular thumb ── */
+scale { min-height: 0; min-width: 0; padding: 0; }
+scale trough {
+    background-color: #c0c0c0;
+    background-image: none;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    border-radius: 0;
+    min-height: 4px;
+    min-width: 4px;
+}
+scale highlight {
+    background-color: #000080;
+    background-image: none;
+    border-radius: 0;
+}
+scale slider {
+    background-color: #c0c0c0;
+    background-image: none;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    border-radius: 0;
+    min-width: 12px;
+    min-height: 22px;
+    margin: -10px -6px;
+}
+scale.vertical slider { min-width: 22px; min-height: 12px; }
+scale marks, scale marks indicator { color: #000000; }
+
+/* ── Check boxes and radios: white sunken well, black mark ── */
+check, radio {
+    background-color: #ffffff;
+    background-image: none;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+    border-radius: 0;
+    min-width: 12px;
+    min-height: 12px;
+    color: #000000;
+    -gtk-icon-shadow: none;
+}
+radio { border-radius: 50%; }
+check:disabled, radio:disabled { background-color: #c0c0c0; }
+/* The label half of a check box is a button as far as GTK is concerned, and
+   its theme paints a background once :checked — which reads as a grey bar
+   across the row. In Win95 only the little box ever changes. */
+checkbutton, radiobutton {
+    background-color: transparent;
+    background-image: none;
+    box-shadow: none;
+    border: none;
+    min-height: 0;
+    padding: 1px 0;
+}
+checkbutton:disabled label, radiobutton:disabled label {
+    color: #808080;
+    text-shadow: 1px 1px 0 #ffffff;
+}
+
+/* ── Status bar: sunken panes along the bottom edge ── */
+.w95-statusbar { background-color: #c0c0c0; padding: 2px; }
+.w95-pane {
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    padding: 1px 6px;
+}
+
+/* ── The chart well is black; nothing else in Win95 is. ── */
+.w95-screen {
+    background-color: #000000;
+    border: 1px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    box-shadow: inset 1px 1px 0 #000000, inset -1px -1px 0 #dfdfdf;
+}
+
+/* ── The drop-down panel's own caption (no WM decoration there) ── */
+.w95-panel {
+    background-color: #c0c0c0;
+    border: 1px solid;
+    border-color: #ffffff #000000 #000000 #ffffff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+}
+
 tooltip, tooltip.background {
     background-color: #ffffe1;
     border: 1px solid #000000;

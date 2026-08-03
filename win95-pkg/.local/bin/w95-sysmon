@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""w95-sysmon — the Windows 95 System Monitor, for the i3 desktop.
+
+Windows 95 really did ship a System Monitor (`sysmon.exe`) and a Resource Meter
+(`rsrcmtr.exe`): stacked scrolling charts, segmented gauges, a menu bar with an
+Update Speed submenu. This is that program, fed by the seventeen i3blocks
+scripts the Win95 taskbar replaced — so nothing from the status bar is lost
+when the status bar is.
+
+It is not a read-out. Every reading that had a click action in the bar has a
+control here: connect the headphones, switch the power profile, toggle CPU
+boost, bring a WireGuard tunnel up, drag the volume, switch Claude account.
+
+Two shapes, chosen in ~/.config/w95/settings (or from Options ▸ Display as):
+
+  sysmon_mode = drop     a quake console — full width, slides down from the
+                         top edge, sticky across workspaces, no WM decoration
+  sysmon_mode = window   an ordinary floating window the WM decorates (in
+                         Win95 mode, i3-95 gives it a real 95 caption)
+
+Either way one key runs the whole thing: press it to drop the panel in, press
+it again to send it away. The process stays resident and hidden between
+presses — polling paused — so the second press is instant.
+
+    w95-sysmon             toggle (this is what the keybinding runs)
+    w95-sysmon --hidden    start resident but invisible (for i3's exec)
+    w95-sysmon --mode drop|window    override the configured shape once
+"""
+
+import os
+import signal
+import socket
+import subprocess
+import sys
+import time
+
+
+def _share_dir():
+    """Where w95.css and the helper modules live.
+
+    Works both stowed (~/.local/share/w95) and straight out of the repo
+    checkout, so the sandbox can run the working tree without installing.
+    """
+    here = os.path.dirname(os.path.realpath(__file__))
+    for candidate in (
+        os.path.expanduser("~/.local/share/w95"),
+        os.path.join(here, "..", "share", "w95"),          # stow layout
+        os.path.join(here, "..", "..", "share", "w95"),    # repo layout
+    ):
+        candidate = os.path.normpath(candidate)
+        if os.path.exists(os.path.join(candidate, "w95.css")):
+            return candidate
+    sys.exit("w95-sysmon: cannot locate w95.css")
+
+
+SHARE = _share_dir()
+sys.path.insert(0, SHARE)
+
+
+# ── the toggle ──────────────────────────────────────────────────────────
+# Bound to one key, this has to be a toggle, and a toggle needs the running
+# instance to hear about the second press. The lock and the channel are the
+# same abstract socket: whoever binds it owns the window, everybody else is a
+# keypress being forwarded. Abstract (leading NUL) rather than a path because
+# the script gets launched under two spellings — ~/.local/bin/w95-sysmon and
+# the dotfiles original behind that symlink — and a path-keyed lock would let
+# the two of them run at once.
+
+def channel():
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+    return sock, "\0w95-sysmon" + os.environ.get("DISPLAY", ":0")
+
+
+def claim(sock, address):
+    """True if we are now the resident instance."""
+    try:
+        sock.bind(address)
+    except OSError:
+        return False
+    return True
+
+
+def signal_running(sock, address, message=b"toggle"):
+    try:
+        sock.sendto(message, address)
+        return True
+    except OSError:
+        return False
+
+
+def main():
+    argv = sys.argv[1:]
+    mode = None
+    if "--mode" in argv:
+        index = argv.index("--mode")
+        if index + 1 < len(argv):
+            mode = argv[index + 1]
+    start_hidden = "--hidden" in argv
+
+    sock, address = channel()
+    if not claim(sock, address):
+        # Somebody already owns the window: hand them the keypress and go.
+        if not signal_running(sock, address):
+            sys.exit("w95-sysmon: an instance is running but will not answer")
+        return
+
+    # Only now is GTK worth paying for — the forwarding path above should cost
+    # a few milliseconds, because it is on the critical path of every press.
+    import w95sysmon
+    w95sysmon.run(SHARE, sock, mode=mode, hidden=start_hidden)
+
+
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    main()

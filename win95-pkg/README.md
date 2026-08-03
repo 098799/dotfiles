@@ -30,6 +30,7 @@ plain `i3` session `w95-switch` refuses to do anything and tells you so.
 | GTK theme, icons, cursors | `~/.config/gtk-3.0/settings.ini` | `w95 on` / `off` |
 | Terminal palette | `~/.config/alacritty/active-palette.toml` | `w95 on` / `off` |
 | Taskbar + wallpaper | `w95bar`, `xsetroot` | `w95-autobar` (exec_always) |
+| Status readouts | `w95-sysmon` (`$mod+s`) | always available, both desktops |
 
 Everything is user-local except one root-owned **copy** in `/usr/share/xsessions`
 (LightDM ignores `~/.local/share/xsessions`):
@@ -98,6 +99,77 @@ Rows that fly out: Programs (every `.desktop` on the box, scrolling),
 Documents (home dirs + `RecentManager`), Settings (only the control panels
 that are actually installed, via `shutil.which`), Find (rofi modes).
 
+## System Monitor
+
+`w95bar` replaces i3bar, and with it goes the `bar {}` block — so Win95 mode
+has no i3blocks strip and no tray. `w95-sysmon` is where all of that went:
+
+    $mod+s        drop it in; press again to send it away
+
+It is a quake console. Full width, slides down from the top edge, sticky across
+workspaces, no decoration. The process stays **resident and hidden** between
+presses — that is what makes every press after the first instant — and pauses
+its polling while hidden, so nothing runs `checkupdates` at a window nobody is
+looking at. `Esc` and the X button hide it too; only File ▸ Exit really quits.
+
+Everything is on one page: three scrolling charts (processor, memory, network)
+over nine group boxes covering every block the bar had, plus `temp`, `keyboard`
+and `record`, which have scripts but were never enabled in `i3blocks/config`.
+
+And it is not a read-out. Every block that did something when you clicked it in
+the bar does it here from a real control:
+
+| | |
+|---|---|
+| Bluetooth | Connect/Disconnect per device, adapter power, battery level |
+| VPN | one row per `~/.config/wg/*.conf`, up and down |
+| Audio | volume trackbar, mute, mic mute, mixer |
+| Power | platform profile radios, CPU boost, battery estimate |
+| Claude | usage per account, and the account switcher |
+| System | htop, `df -h`, `pacman -Syu`, boot log, screenshot, keyboard layout |
+
+Two shapes, in `~/.config/w95/settings` or from Options ▸ Display as (which
+writes that file and restarts itself):
+
+```ini
+sysmon_mode = drop     # quake panel (default)
+sysmon_mode = window   # ordinary floating window; i3-95 gives it a caption
+sysmon_size = 62       # drop mode: percent of the screen it covers
+```
+
+The page reflows — five columns as a 2560px panel, two as an 1180px window —
+so both shapes get the same content without a second layout.
+
+### Where the numbers come from
+
+Split on "would I be copying a decision, or a formula?".
+
+*Formulas* are reimplemented natively in `w95stat.py`: percent busy, bytes per
+second, bytes free. They are sampled from `/proc` and `/sys` once a second on
+the main loop, because that is what the charts are made of and forking three
+shell scripts a second to get them would be absurd.
+
+*Decisions* are not. Which Claude accounts exist and how their usage is fetched,
+which WireGuard conf is "tomek2", how this laptop's SSID is spelled, whether
+`checkupdates` has been cached in the last hour — those stay in the i3blocks
+scripts, which are run as-is and parsed. The monitor and the bar cannot
+disagree, and pairing a new Bluetooth device is still done by adding a block
+script: `bt_devices()` reads the MAC and name back out of `bt-*.sh`.
+
+Everything that forks runs on a worker thread and lands back on the main loop.
+A probe that times out keeps the last good value rather than blanking the field,
+because `bluetoothctl` being slow is not news.
+
+### One trap worth knowing
+
+Every radio and check box on that page is *both* an input and an output: polled
+state writes into it, and it writes into the system. GTK emits `::toggled` for
+programmatic changes too, so a sync looks exactly like a click — which is how an
+early build of this silently changed the machine's power profile at startup,
+just by constructing a radio group. Guard flags are not enough on their own.
+`Panel.commit()` is the guarantee: re-read the authority (sysfs, pactl) at the
+moment of the click and do nothing if it already agrees.
+
 ## Safety
 
 The failure mode that matters is "the patched WM does not start and I have no
@@ -116,6 +188,11 @@ desktop". Three things prevent it:
   entry is untouched, and it ignores `~/.config/w95/wm` entirely.
 
 ## Keybindings
+
+`$mod+s` opens the System Monitor and lives in the **main** i3 config, not in
+`win95-keys.conf`, because it is useful in both desktops and because an include
+cannot take a key that is already bound. `cmon` moved from `$mod+s` to
+`$mod+Shift+s` to make room.
 
 `win95-keys.conf` is deliberately small. On this machine `$mod` is Mod4 and
 almost every `$mod+<letter>` is already bound, so the file only claims chords
