@@ -104,8 +104,20 @@ bindsym $mod+x exec emacsclient -c
 bindsym $mod+q exec thunar
 # Linear issue tracker TUI
 # bindsym $mod+s exec alacritty -e /home/tgrining/bin/linear
-# cmon monitor TUI (terminal closes when cmon exits)
-bindsym $mod+s exec env PATH=/home/tgrining/bin:/home/tgrining/.local/bin:$PATH alacritty -e /home/tgrining/bin/cmon
+# Win95 System Monitor: a quake-style panel that drops in from the top edge.
+# Press once to bring it in, press again to send it away — the process stays
+# resident and hidden in between, so every press after the first is instant.
+# Everything the i3blocks status bar used to display lives on that one page,
+# and everything it could be clicked for can be done from there.
+bindsym $mod+s exec --no-startup-id w95-sysmon
+# Start it hidden at login so its charts have history before the first time
+# you look. `exec`, never `exec_always`: a second invocation is a keypress
+# being handed to the resident instance, so a reload would toggle the panel
+# open every time you pressed $mod+Shift+c.
+exec --no-startup-id w95-sysmon --hidden
+# cmon monitor TUI (terminal closes when cmon exits). Moved off $mod+s, which
+# the System Monitor now owns.
+bindsym $mod+Shift+s exec env PATH=/home/tgrining/bin:/home/tgrining/.local/bin:$PATH alacritty -e /home/tgrining/bin/cmon
 
 # toggle tiling / floating
 bindsym $mod+Shift+space floating toggle
@@ -271,10 +283,10 @@ bindsym Ctrl+$mod1+l exec --no-startup-id $HOME/bin/lockscreen
 exec --no-startup-id xss-lock -- $HOME/bin/lockscreen
 
 bindsym Mod1+F4 kill
-bindsym Print exec --no-startup-id scrot -s
 # bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -l style=dash,width=3,color="red" -s
 bindsym $mod+$mod1+Shift+k --release exec --no-startup-id scrot
-bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -s
+bindsym $mod+$mod1+Shift+j --release exec --no-startup-id sh -c 'scrot -s - | xclip -selection clipboard -t image/png'
+bindsym $mod+$mod1+Shift+u --release exec --no-startup-id scrot -s
 bindsym $mod+$mod1+Shift+l --release exec --no-startup-id record-desktop
 bindsym $mod+$mod1+Shift+semicolon --release exec --no-startup-id record-window
 bindsym $mod+$mod1+Shift+c --release exec --no-startup-id $HOME/bin/autoclick
@@ -364,3 +376,34 @@ bindsym $mod+space exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ t
 exec --no-startup-id bluetoothctl power on
 exec --no-startup-id gammastep
 exec --no-startup-id espanso service start
+
+# Windows 95 keybindings, switched on and off by `w95-switch` (symlink into
+# win95-keys.conf or no-keys.conf). An include can only *add* bindings — i3
+# rejects a duplicate keybinding as a config error rather than overriding it —
+# so everything in there is chosen not to collide with the bindings above.
+include ~/.config/i3/active-keys.conf
+
+# Keep the Win95 taskbar/wallpaper in sync with ~/.config/w95/wm on every
+# start, reload and restart. No-op (and idempotent) in the stock desktop.
+exec_always --no-startup-id w95-autobar
+
+# Window chrome (border style + title font), swapped by `w95 on` / `w95 off`
+# between chrome.d/stock.conf and chrome.d/win95.conf. This include has to
+# come LAST: i3-95 can only draw a Win95 caption where i3 draws a decoration,
+# so Windows 95 mode needs `border normal`, which must beat the
+# `default_border pixel 10` set above.
+include ~/.config/i3/active-chrome.conf
+
+# The System Monitor ($mod+s). Both chrome files above carry a
+# `for_window [class=".*"] border …` catch-all to reborder windows that are
+# already on screen when the theme switches, and `for_window` rules are applied
+# in the order they were declared — so the only place a per-window border can
+# survive the switch is *after* that include. Hence: after the last line of the
+# file, on purpose.
+#
+# The drop-down variant is a bare panel, not a window: no decoration to argue
+# with, and sticky so it follows you rather than living on one workspace. In
+# `window` mode (Options ▸ Display as) the instance name differs, so it keeps
+# whatever caption the current chrome draws.
+for_window [class="W95sysmon"] floating enable
+for_window [instance="w95-sysmon-drop"] border none, sticky enable
