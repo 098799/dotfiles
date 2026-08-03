@@ -9,3 +9,10 @@ i3-pkg/.config/claude-cookies-*
 # Python bytecode — stow would otherwise symlink stale .pyc files into ~
 __pycache__/
 *.pyc
+
+# Local-only, synced between hosts by Syncthing but never published: this is a
+# public repo.
+#   ssh/            names a real host and its login user
+#   mr-reviewer-*   employer-internal tooling (ticket ids, internal hostnames)
+ssh/
+webkit/snippets/mr-reviewer-keys/
