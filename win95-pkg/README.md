@@ -30,6 +30,7 @@ plain `i3` session `w95-switch` refuses to do anything and tells you so.
 | GTK theme, icons, cursors | `~/.config/gtk-3.0/settings.ini` | `w95 on` / `off` |
 | Terminal palette | `~/.config/alacritty/active-palette.toml` | `w95 on` / `off` |
 | Taskbar + wallpaper | `w95bar`, `xsetroot` | `w95-autobar` (exec_always) |
+| Notification area | `w95tray.py`, inside `w95bar` | starts with the bar |
 | Status readouts | `w95-sysmon` (`$mod+s`) | always available, both desktops |
 
 Everything is user-local except one root-owned **copy** in `/usr/share/xsessions`
@@ -47,6 +48,24 @@ read a symlink target under `~` nor stat a `TryExec` binary there — and a
 `TryExec` that cannot be resolved makes the greeter **silently hide** the
 session entry. `Exec=` is fine pointing into `~`, because it only runs after
 login, as the user. Re-run the `install` above after changing the desktop file.
+
+### Notification area
+
+The sunken well left of the clock is a real XEmbed system tray, so nm-applet,
+the Nextcloud client, syncthing and anything else with a tray icon land there.
+Before it existed `_NET_SYSTEM_TRAY_S0` had no owner on this machine at all —
+i3's tray is part of i3bar, and Win95 mode has no `bar {}` block — so those apps
+had nowhere to draw and silently showed nothing. Check the owner with:
+
+    xprop -root _NET_SYSTEM_TRAY_S0
+
+It needs **python-xlib**; without it the bar still starts and just has no
+notification area. The protocol needs an X selection, raw `ClientMessage`
+delivery and a `MANAGER` broadcast, none of which PyGObject exposes —
+`Gdk.Window.add_filter` is not introspectable. Only the embedding half is GTK
+(`Gtk.Socket`). `w95tray.py` explains the rest, including why
+`_NET_SYSTEM_TRAY_VISUAL` is deliberately not advertised (no compositor) and why
+StatusNotifierItem is not implemented (everything here falls back to XEmbed).
 
 ### Window titles
 

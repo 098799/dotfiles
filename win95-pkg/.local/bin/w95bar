@@ -2,8 +2,12 @@
 """w95bar — a Windows 95 taskbar for i3.
 
 Start button, per-window task buttons, a workspace strip (i3's one concession
-to not being Windows), and a sunken clock tray. Talks to i3 over its IPC
-socket; redraws on window/workspace events.
+to not being Windows), and a sunken well holding the notification area and the
+clock. Talks to i3 over its IPC socket; redraws on window/workspace events.
+
+The notification area is a real XEmbed system tray (see w95tray.py) -- nothing
+else on this box hosts one, because i3's tray lives in i3bar and Win95 mode has
+no bar{} block.
 
 Run with no arguments. Kill and re-run to reload — it's stateless.
 """
@@ -45,6 +49,7 @@ import w95conf  # noqa: E402
 import w95draw  # noqa: E402
 import w95ipc  # noqa: E402
 import w95menu  # noqa: E402
+import w95tray  # noqa: E402
 
 BAR_HEIGHT = w95conf.BAR_HEIGHT
 MAX_TASK_WIDTH = 170
@@ -133,6 +138,9 @@ class Bar(Gtk.Window):
         tray = style(Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6), "w95-well")
         self.indicators = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         tray.pack_start(self.indicators, False, False, 0)
+        # The real notification area lives in that same box. Created here, but
+        # not started until the window is realized -- see main().
+        self.systray = w95tray.Tray(self.indicators, w95conf.ICON_SIZE)
         self.clock = Gtk.Label()
         self.clock.set_tooltip_text("")
         tray.pack_start(self.clock, False, False, 0)
@@ -468,6 +476,11 @@ def main():
     bar = Bar()
     bar.show_all()
 
+    # After show_all(), so the well has an X window for Gtk.Socket to reparent
+    # docked icons into. Claiming the selection any earlier means the first app
+    # to answer our MANAGER broadcast races the bar's own realization.
+    bar.systray.start()
+
     # Ctrl+Esc is *the* Start-menu key, but i3 owns the keyboard, so the
     # binding lives in i3's config and pokes us with SIGUSR1 from there.
     # GLib.unix_signal_add delivers it on the main loop, not in a handler,
@@ -481,7 +494,14 @@ def main():
         GLib.PRIORITY_DEFAULT, signal.SIGUSR2,
         lambda *_: (bar.reload_css(), True)[1],
     )
-    Gtk.main()
+    try:
+        Gtk.main()
+    finally:
+        # Hand the tray selection back on the way out. w95-restart-bar kills and
+        # relaunches, and without this the replacement finds the selection still
+        # owned by a dead window and stands down -- one restart and the
+        # notification area is gone until the next login.
+        bar.systray.stop()
 
 
 def claim_single_instance():
