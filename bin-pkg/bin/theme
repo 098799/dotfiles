@@ -344,6 +344,11 @@ printf '%s %s\n' "$mode" "$palette" >"$HOME/.config/theme/state"
 command -v notify-send >/dev/null && \
     notify-send -t 2000 -a theme "Theme switched" "$palette $mode" 2>/dev/null || true
 
+# Non-fatal: this is the last step and everything else is already themed, and
+# under `set -e` an Emacs face error here used to exit 1 -- which w95-switch
+# reads as "theme failed" and rolls the whole desktop back. Emacs being
+# grumpy about a face is not worth un-theming nine other programs.
 if emacsclient -e t >/dev/null 2>&1; then
-    emacsclient -n -e "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme '$emacs_theme t))" >/dev/null
+    emacsclient -n -e "(progn (mapc #'disable-theme custom-enabled-themes)(load-theme '$emacs_theme t))" >/dev/null ||
+        printf 'theme: warning: Emacs rejected %s (load-theme failed); desktop themed anyway\n' "$emacs_theme" >&2
 fi
