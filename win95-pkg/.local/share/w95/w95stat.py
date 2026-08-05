@@ -24,6 +24,7 @@ module stays runnable, and testable, from a plain shell:
     python3 w95stat.py        # dump every reading as text
 """
 
+import json
 import os
 import re
 import subprocess
@@ -651,38 +652,132 @@ _CLAUDE_ROW = re.compile(
 )
 
 
+# Where claude-usage.sh appends its samples. Same env override as the script,
+# so a throwaway history can be pointed at a sandbox instance.
+CLAUDE_HISTORY = (os.environ.get("CLAUDE_USAGE_HISTORY")
+                  or os.path.join(HOME, ".local", "state", "w95", "claude-usage.csv"))
+
+# Every field of a history row, in the order claude-usage.sh writes them.
+_HISTORY_COLUMNS = ("timestamp", "account", "five_h_util", "five_h_resets_in",
+                    "seven_d_util", "seven_d_resets_in", "scoped_util",
+                    "scoped_name")
+
+
 def claude_usage(timeout=25):
-    """Per-account Claude usage, parsed out of claude-usage.sh's pango line.
+    """Every Claude limit, per account, from claude-usage.sh --json.
 
     Not reimplemented: that script owns account discovery, the cookie/OAuth
     fallback, the credential shuffling and — importantly — a rate-limit rule
     about never refreshing an expired token on a timer. Re-deriving any of it
     here would be a second thing to keep right.
 
-    Its markup is one span per account, bolded for the active one:
-        <span foreground='#859900'><b>W:3%(4h6m)</b></span>
+    Each account comes back as
+
+        {"account", "label", "active",
+         "five_hour": {"percent", "resets", "resets_in"} or None,
+         "weekly":    {...} or None,
+         "scoped":    [{"name", "percent", ...}]}
+
+    with `percent`/`resets` also lifted to the top level, because the five-hour
+    window is what a caller that asks for "usage" means.
+
+    Running it is also what samples the history the charts read, so this is on
+    the poller's keep-alive list — see Poller.add(keep_alive=True).
     """
     path = script_path("claude-usage")
     if not path:
         return []
     try:
         raw = subprocess.run(
-            [path], capture_output=True, text=True, timeout=timeout,
-        ).stdout.splitlines()
+            [path, "--json"], capture_output=True, text=True, timeout=timeout,
+        ).stdout
     except (OSError, subprocess.SubprocessError):
         return []
-    if not raw:
+    if not raw.strip():
         return []
+    try:
+        accounts = json.loads(raw)
+    except ValueError:
+        # An older copy of the script that predates --json ignores the flag and
+        # prints its i3blocks line instead. Read that rather than showing
+        # nothing: five-hour only, no history, but the panel still fills.
+        return _claude_from_bar_line(raw.splitlines()[0])
+    for account in accounts:
+        five = account.get("five_hour") or {}
+        account.setdefault("colour", None)
+        account["percent"] = five.get("percent")
+        account["resets"] = five.get("resets", "")
+    return accounts
+
+
+def _claude_from_bar_line(line):
+    """The fallback parse: one pango span per account, bold for the active one.
+
+        <span foreground='#859900'><b>W:3%(4h6m)</b></span>
+    """
     accounts = []
-    for colour, bold, label, usage, resets in _CLAUDE_ROW.findall(raw[0]):
+    for colour, bold, label, usage, resets in _CLAUDE_ROW.findall(line):
+        percent = int(usage) if usage.isdigit() else None
         accounts.append({
-            "label": label.strip(),
-            "percent": int(usage) if usage.isdigit() else None,
-            "resets": resets or "",
-            "colour": colour,
+            "account": label.strip(), "label": label.strip(),
+            "percent": percent, "resets": resets or "", "colour": colour,
             "active": bool(bold),
+            "five_hour": {"percent": percent, "resets": resets or ""},
+            "weekly": None, "scoped": [],
         })
     return accounts
+
+
+def claude_history(hours=24, path=CLAUDE_HISTORY):
+    """The last `hours` of samples, as {account: [row, ...]} oldest first.
+
+    Rows are whatever claude-usage.sh appended: a timestamp (epoch seconds,
+    converted here) plus the percentages. Timestamps are written ISO-8601 and
+    the file is in time order, so the cutoff is a string comparison and only
+    the rows that survive it are ever parsed — at one sample per account every
+    two minutes the file runs to tens of thousands of lines.
+    """
+    cutoff = time.strftime("%Y-%m-%dT%H:%M:%S",
+                           time.localtime(time.time() - hours * 3600))
+    series = {}
+    try:
+        with open(path) as fh:
+            fh.readline()                       # header
+            for line in fh:
+                if line[:19] < cutoff:
+                    continue
+                parts = line.rstrip("\n").split(",")
+                if len(parts) < 5:
+                    continue
+                row = dict(zip(_HISTORY_COLUMNS, parts))
+                try:
+                    stamp = time.mktime(time.strptime(row["timestamp"],
+                                                      "%Y-%m-%dT%H:%M:%S"))
+                except ValueError:
+                    continue
+                series.setdefault(row["account"], []).append({
+                    "at": stamp,
+                    "five_hour": _percent(row.get("five_h_util")),
+                    "weekly": _percent(row.get("seven_d_util")),
+                    "scoped": _percent(row.get("scoped_util")),
+                    "scoped_name": row.get("scoped_name") or "",
+                })
+    except OSError:
+        return {}
+    return series
+
+
+def _percent(text):
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _dump_resets(window):
+    """" (2d11h)" for the text dump, "" when there is no reset time."""
+    resets = (window or {}).get("resets")
+    return " (%s)" % resets if resets else ""
 
 
 def claude_switch():
@@ -756,6 +851,12 @@ class Poller:
     A task that is still running is never submitted again — the failure mode
     otherwise is a wedged `bluetoothctl` accumulating one stuck worker per
     tick until the pool is full and *everything* stops updating.
+
+    Pausing stops every task but the keep-alive ones. A probe is keep-alive
+    only if skipping it would lose something that can't be recovered later:
+    the Claude sampler is, because its history is charted and a gap in it is
+    permanent, while `checkupdates` and `bluetoothctl info` are point-in-time
+    state that reads the same whenever it is next asked.
     """
 
     def __init__(self, dispatch, workers=4):
@@ -770,9 +871,9 @@ class Poller:
         self._paused = False
         self._thread = None
 
-    def add(self, key, fn, interval, on_result):
+    def add(self, key, fn, interval, on_result, keep_alive=False):
         self.tasks[key] = {"fn": fn, "interval": interval, "cb": on_result,
-                           "due": 0.0}
+                           "due": 0.0, "keep_alive": keep_alive}
 
     def start(self):
         if self._running:
@@ -787,11 +888,13 @@ class Poller:
         self._wake.set()
 
     def pause(self, paused=True):
-        """Stop probing while the window is hidden.
+        """Stop probing while the window is hidden — keep-alive tasks aside.
 
         The monitor is a glance-at tool: left resident for instant toggling, it
-        would otherwise keep running `checkupdates` and curling the Claude API
-        all day at a window nobody is looking at.
+        would otherwise keep running `checkupdates` at a window nobody is
+        looking at. The Claude sampler is the exception, and it is deliberate:
+        a usage chart drawn only from the minutes the panel happened to be open
+        would be mostly holes.
         """
         self._paused = paused
         if not paused:
@@ -807,12 +910,13 @@ class Poller:
     def _loop(self):
         while self._running:
             timeout = 1.0
-            if not self._paused:
-                now = time.monotonic()
-                for key, task in list(self.tasks.items()):
-                    if task["due"] <= now:
-                        task["due"] = now + task["interval"]
-                        self._submit(key, task)
+            now = time.monotonic()
+            for key, task in list(self.tasks.items()):
+                if self._paused and not task["keep_alive"]:
+                    continue
+                if task["due"] <= now:
+                    task["due"] = now + task["interval"]
+                    self._submit(key, task)
                     timeout = min(timeout, max(0.05, task["due"] - now))
             self._wake.wait(timeout)
             self._wake.clear()
@@ -871,4 +975,16 @@ if __name__ == "__main__":
     for name in ("network", "vpn", "bluetooth", "updates", "volume", "mic",
                  "power-profile", "cpu-boost", "battery", "uptime"):
         print("block %-14s %s" % (name, run_block(name)))
-    print("claude       %s" % claude_usage())
+    for account in claude_usage():
+        print("claude %-6s %s5h %s%%%s   7d %s%%%s   %s" % (
+            account["label"], "*" if account["active"] else " ",
+            (account.get("five_hour") or {}).get("percent"),
+            _dump_resets(account.get("five_hour")),
+            (account.get("weekly") or {}).get("percent"),
+            _dump_resets(account.get("weekly")),
+            "  ".join("%s %s%%" % (cap["name"], cap["percent"])
+                      for cap in account.get("scoped") or [])))
+    history = claude_history(24)
+    print("claude hist  %d accounts, %d samples in 24h (%s)" % (
+        len(history), sum(len(rows) for rows in history.values()),
+        CLAUDE_HISTORY))

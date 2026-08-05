@@ -155,18 +155,22 @@ Hidden, it splits what it keeps doing:
   thirty-second CPU burn arrived as a single spike, at the wrong height, in the
   wrong place. Measured cost of leaving it on: **60 ms of CPU per minute**,
   about 0.1% of one core, for three small reads under `/proc`.
-* **The probes stop.** `bluetoothctl`, `checkupdates` and a curl to the Claude
-  API have no business firing at a window nobody is looking at, and unlike the
-  charts they are point-in-time state with no history to miss.
+* **The probes stop.** `bluetoothctl` and `checkupdates` have no business
+  firing at a window nobody is looking at, and unlike the charts they are
+  point-in-time state with no history to miss.
+* **Except the Claude sampler**, which is the exception that proves the rule:
+  once its history is charted, a probe skipped is a hole that cannot be filled
+  in later. See *Claude quotas* below.
 
 Start it at login with `w95-sysmon --hidden` and the panel already knows the
 last few minutes the first time you open it. That has to be `exec`, never
 `exec_always`: a second invocation is a keypress being forwarded to the
 resident one, so a reload would pop the panel open every time.
 
-Everything is on one page: three scrolling charts (processor, memory, network)
-over nine group boxes covering every block the bar had, plus `temp`, `keyboard`
-and `record`, which have scripts but were never enabled in `i3blocks/config`.
+Everything is on one page: three scrolling charts (processor, memory, network),
+a row of Claude usage charts under them, then nine group boxes covering every
+block the bar had, plus `temp`, `keyboard` and `record`, which have scripts but
+were never enabled in `i3blocks/config`.
 
 And it is not a read-out. Every block that did something when you clicked it in
 the bar does it here from a real control:
@@ -177,7 +181,7 @@ the bar does it here from a real control:
 | VPN | one row per `~/.config/wg/*.conf`, up and down |
 | Audio | volume trackbar, mute, mic mute, mixer |
 | Power | platform profile radios, CPU boost, battery estimate |
-| Claude | usage per account, and the account switcher |
+| Claude | every quota per account, a week of history, and the account switcher |
 | System | htop, `df -h`, `pacman -Syu`, boot log, screenshot, keyboard layout |
 
 Two shapes, in `~/.config/w95/settings` or from Options ▸ Display as (which
@@ -211,6 +215,61 @@ script: `bt_devices()` reads the MAC and name back out of `bt-*.sh`.
 Everything that forks runs on a worker thread and lands back on the main loop.
 A probe that times out keeps the last good value rather than blanking the field,
 because `bluetoothctl` being slow is not news.
+
+### Claude quotas
+
+The bar block showed one number: the five-hour window of whichever account is
+signed in. That is the limit you hit most often, but it is not the one that
+ruins a week — so the panel shows every limit the usage document carries, per
+account, one gauge each:
+
+| | |
+|---|---|
+| `5h` | the five-hour window, the one the bar block showed |
+| `7d` | the weekly quota — seven days to refill, whatever you do |
+| *model* | the weekly quota for one model, e.g. Fable |
+
+The model-scoped one exists **only** inside the response's `limits` array:
+`seven_day_opus` and its siblings come back `null` even when the scoped limit
+is real and at 24%, so nothing else on this machine could see it.
+
+Three limits times four accounts is twelve rows, so the panel splits its
+accounts across two columns and takes two of the page's slots.
+
+Where those numbers have *been* is a second row of scopes, under the processor,
+memory and network ones: **one chart per account**, all three limits on it —
+five-hour green, weekly cyan, model-scoped yellow. One chart per account rather
+than one per limit because the question is always asked about an account ("can
+`work` finish this today?") and never about a limit across accounts. How far
+back they reach is Options ▸ Claude history (12 hours, 24 hours, 7 days) — its
+own setting, because Update Speed governs the ring buffers of the live strip
+charts and these are drawn from a file.
+
+The dashed diagonal is *pace*: where that account's weekly quota would be if it
+were spent evenly across the week. Above the line you run out before it
+refills; below it you don't. It is the same judgement the bar's colour makes,
+drawn rather than decided. Traces break where sampling stopped for more than 15
+minutes — a laptop that was shut all night did not use anything all night, and
+a line joined across the gap would say it did.
+
+The history is a CSV that `claude-usage.sh` appends to, one row per account per
+sample:
+
+    ~/.local/state/w95/claude-usage.csv
+
+Whoever asks for usage writes a row, at most one per account every 100 seconds:
+the i3blocks block in a normal session, the System Monitor in a Win95 one. The
+monitor keeps sampling while hidden — `claude_sample = 120` seconds in
+`~/.config/w95/settings`, `0` to only sample while the window is on screen —
+because the chart is only as good as the samples behind it. Cost is one cached
+HTTP call per account per two minutes, the cadence the mr-reviewer usage pusher
+settled on against the same endpoint. The file is trimmed to the last 14 days
+when it passes 4 MB; nothing else has to run.
+
+This is one row per *account*, not mr-reviewer's one row per *sample* with two
+positional columns per account and a "never reorder this list" warning on it —
+a row that names its own account survives an account being added, renamed or
+dropped, which on this laptop happens all the time.
 
 ### One trap worth knowing
 

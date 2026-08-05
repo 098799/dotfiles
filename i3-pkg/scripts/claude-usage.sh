@@ -2,10 +2,40 @@
 # Claude.ai usage script for i3blocks
 # Shows usage for every configured account, emphasises the active one
 # Right-click: rofi menu to switch account (also switches Claude Code credentials)
+#
+#   claude-usage.sh            the i3blocks line (five-hour window, active bold)
+#   claude-usage.sh --json     every window as JSON — what w95-sysmon reads
+#   claude-usage.sh --sample   fetch and record history, print nothing
+#
+# Whichever way it is called it appends to the usage history CSV (see "history"
+# below), so the sampling cadence is just "how often somebody asks".
 
 CONFIG_DIR="$HOME/.config"
 ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
+
+MODE=bar
+case "${1:-}" in
+    --json)   MODE=json ;;
+    --sample) MODE=sample ;;
+    "")       ;;
+    *) echo "claude-usage.sh: unknown option: $1" >&2; exit 2 ;;
+esac
+
+# How long a fetched response is reused. 120s rather than the old 300s because
+# the history below is now charted: at a 60s i3blocks tick that puts a sample
+# every two minutes, which is the cadence mr-reviewer's usage-pusher settled on
+# for the same endpoint.
+CACHE_TTL=${CLAUDE_USAGE_TTL:-120}
+
+# Append-only sample log, one row per account per sample — the Win95 System
+# Monitor charts it. Deliberately NOT mr-reviewer's wide layout (one row per
+# sample, two positional columns per account, "never reorder this list"): a row
+# that names its own account survives an account being added, renamed or
+# dropped, which on a laptop happens all the time.
+HISTORY_FILE="${CLAUDE_USAGE_HISTORY:-$HOME/.local/state/w95/claude-usage.csv}"
+HISTORY_GAP=${CLAUDE_USAGE_HISTORY_GAP:-100}    # seconds between rows per account
+HISTORY_DAYS=${CLAUDE_USAGE_HISTORY_DAYS:-14}
 
 # Accounts in display order: the three legacy ones first, then any extra
 # discovered from either a claude-cookies-<name> file in $CONFIG_DIR or a
@@ -133,13 +163,19 @@ PY
         2>/dev/null
 }
 
-# Fetch usage for a given account. Outputs: USAGE_INT COLOR RESET_STR (or "?" if unavailable)
+# The raw usage document for an account, from the 120s cache or from the wire.
 # Both sources return the same {"five_hour":{"utilization",…}} shape, so
-# everything below the fetch is source-agnostic.
-fetch_usage() {
+# everything above this line picks a transport and everything below it is
+# source-agnostic.
+fetch_response() {
     local acct="$1"
     local cookie_file="$CONFIG_DIR/claude-cookies-$acct"
     local cache_file="/tmp/.claude_usage_cache_$acct"
+
+    if [[ -f "$cache_file" ]] && [[ $(($(date +%s) - $(stat -c %Y "$cache_file"))) -lt $CACHE_TTL ]]; then
+        cat "$cache_file"
+        return
+    fi
 
     local org_id=""
     if [[ -f "$cookie_file" ]]; then
@@ -147,24 +183,28 @@ fetch_usage() {
     fi
 
     local response
-    if [[ -f "$cache_file" ]] && [[ $(($(date +%s) - $(stat -c %Y "$cache_file"))) -lt 300 ]]; then
-        response=$(cat "$cache_file")
+    if [[ -n "$org_id" ]]; then
+        response=$(curl -s "https://claude.ai/api/organizations/$org_id/usage" \
+            -H 'accept: application/json' \
+            -H 'content-type: application/json' \
+            -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36' \
+            -b "$cookie_file" \
+            2>/dev/null)
     else
-        if [[ -n "$org_id" ]]; then
-            response=$(curl -s "https://claude.ai/api/organizations/$org_id/usage" \
-                -H 'accept: application/json' \
-                -H 'content-type: application/json' \
-                -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36' \
-                -b "$cookie_file" \
-                2>/dev/null)
-        else
-            response=$(fetch_usage_oauth "$acct")
-        fi
-
-        if [[ -n "$response" ]] && echo "$response" | grep -q "five_hour"; then
-            echo "$response" > "$cache_file"
-        fi
+        response=$(fetch_usage_oauth "$acct")
     fi
+
+    if [[ -n "$response" ]] && echo "$response" | grep -q "five_hour"; then
+        echo "$response" > "$cache_file"
+    fi
+    printf '%s' "$response"
+}
+
+# Five-hour readout for the bar. Outputs: USAGE_INT COLOR RESET_STR (or "?" if unavailable)
+fetch_usage() {
+    local acct="$1"
+    local response
+    response=$(fetch_response "$acct")
 
     if [[ -z "$response" ]]; then
         echo "? #657b83"
@@ -246,6 +286,218 @@ format_account() {
     fi
 }
 
+# ── every window, and the history ───────────────────────────────────────
+# The bar only ever wanted the five-hour number, so everything else the usage
+# document carries — the weekly limit, the per-model weekly limit — was thrown
+# away here. The System Monitor charts all of them, so one pass hands the whole
+# document to python: it appends a history row per account (rate-limited to one
+# every $HISTORY_GAP seconds, so a 60s bar tick doesn't double up) and, in
+# --json mode, prints the structured readout.
+#
+# Responses arrive NUL-separated rather than as arguments because a usage
+# document is a few KB of JSON and this way nothing has to be quoted.
+walk_accounts() {
+    local acct active
+    for acct in "${ACCOUNTS[@]}"; do
+        [[ "$acct" == "$ACCOUNT" ]] && active=1 || active=0
+        printf '%s\0%s\0%s\0%s\0' \
+            "$acct" "${LABELS[$acct]:-${acct:0:1}}" "$active" "$(fetch_response "$acct")"
+    done
+}
+
+# Held in a variable and run with `python3 -c`, not fed on stdin: stdin is
+# where the account stream arrives.
+PY_EMIT=$(cat <<'PY'
+import json, os, sys, time
+from datetime import datetime, timezone
+
+MODE = os.environ.get("CLAUDE_USAGE_MODE", "sample")
+PATH = os.path.expanduser(os.environ["CLAUDE_USAGE_HISTORY"])
+GAP = int(os.environ["CLAUDE_USAGE_HISTORY_GAP"])
+DAYS = int(os.environ["CLAUDE_USAGE_HISTORY_DAYS"])
+MAX_BYTES = 4 << 20
+HEADER = ("timestamp,account,five_h_util,five_h_resets_in,"
+          "seven_d_util,seven_d_resets_in,scoped_util,scoped_name\n")
+
+
+def seconds_left(stamp):
+    if not stamp:
+        return None
+    try:
+        when = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return max(0, int(when.timestamp() - time.time()))
+
+
+def human(seconds):
+    """"2d10h", "4h6m", "12m" — the bar's spelling, with days for the weekly."""
+    if seconds is None:
+        return ""
+    if seconds <= 0:
+        return "soon"
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    if days:
+        return "%dd%dh" % (days, hours)
+    if hours:
+        return "%dh%dm" % (hours, rest // 60)
+    return "%dm" % (rest // 60)
+
+
+def window(node):
+    if not isinstance(node, dict) or node.get("utilization") is None:
+        return None
+    left = seconds_left(node.get("resets_at"))
+    return {"percent": int(round(node["utilization"])),
+            "resets_in": left, "resets": human(left)}
+
+
+def scoped(document):
+    """The per-model weekly caps, out of the `limits` array.
+
+    They have no top-level key of their own — seven_day_opus and friends are
+    null even when `limits` carries a weekly_scoped entry for Opus — so this is
+    the only place the model-specific weekly quota can be read.
+    """
+    out = []
+    for limit in document.get("limits") or []:
+        if limit.get("kind") != "weekly_scoped" or limit.get("percent") is None:
+            continue
+        model = ((limit.get("scope") or {}).get("model") or {})
+        left = seconds_left(limit.get("resets_at"))
+        out.append({"name": model.get("display_name") or "scoped",
+                    "percent": int(round(limit["percent"])),
+                    "resets_in": left, "resets": human(left)})
+    return out
+
+
+def last_seen(accounts):
+    """When each account last got a row, from the tail of the file.
+
+    Only the tail: at one row per account every two minutes this file is tens
+    of thousands of lines, and all that is wanted is the last row of each.
+    """
+    seen = {}
+    try:
+        size = os.path.getsize(PATH)
+        with open(PATH) as fh:
+            fh.seek(max(0, size - 65536))
+            lines = fh.read().splitlines()[1:]
+    except OSError:
+        return seen
+    for line in lines:
+        parts = line.split(",")
+        if len(parts) > 1 and parts[1] in accounts:
+            seen[parts[1]] = parts[0]
+    return seen
+
+
+def trim():
+    """Keep the file bounded without a cron job: rewrite it when it gets big,
+    dropping everything older than DAYS. ISO-8601 sorts lexicographically, so
+    the cutoff is a string comparison and no row has to be parsed."""
+    try:
+        if os.path.getsize(PATH) < MAX_BYTES:
+            return
+        cutoff = datetime.fromtimestamp(time.time() - DAYS * 86400).isoformat(" ")[:19]
+        cutoff = cutoff.replace(" ", "T")
+        with open(PATH) as fh:
+            fh.readline()
+            keep = [line for line in fh if line[:19] >= cutoff]
+        with open(PATH + ".tmp", "w") as fh:
+            fh.write(HEADER)
+            fh.writelines(keep)
+        os.replace(PATH + ".tmp", PATH)
+    except OSError:
+        pass
+
+
+chunks = sys.stdin.buffer.read().split(b"\0")
+accounts = []
+for i in range(0, len(chunks) - 1, 4):
+    name, tag, active, body = chunks[i:i + 4]
+    try:
+        document = json.loads(body.decode("utf-8", "replace")) if body.strip() else {}
+    except ValueError:
+        document = {}
+    if not isinstance(document, dict):
+        document = {}
+    caps = scoped(document)
+    accounts.append({
+        "account": name.decode(),
+        "label": tag.decode(),
+        "active": active == b"1",
+        "five_hour": window(document.get("five_hour")),
+        "weekly": window(document.get("seven_day")),
+        "scoped": caps,
+    })
+
+# History. A row per account, at most one every GAP seconds — the bar ticks
+# every 60s and the monitor polls on its own schedule, and both land here.
+now = datetime.now()
+stamp = now.strftime("%Y-%m-%dT%H:%M:%S")
+seen = last_seen({a["account"] for a in accounts})
+rows = []
+for account in accounts:
+    if account["five_hour"] is None and account["weekly"] is None:
+        continue                       # a failed probe is not a zero reading
+    previous = seen.get(account["account"])
+    if previous:
+        try:
+            age = (now - datetime.strptime(previous, "%Y-%m-%dT%H:%M:%S")).total_seconds()
+        except ValueError:
+            age = GAP
+        if age < GAP:
+            continue
+
+    def cell(node, key):
+        return "" if not node else str(node[key] if node[key] is not None else "")
+
+    cap = (account["scoped"] or [None])[0]
+    rows.append(",".join([
+        stamp, account["account"],
+        cell(account["five_hour"], "percent"), cell(account["five_hour"], "resets_in"),
+        cell(account["weekly"], "percent"), cell(account["weekly"], "resets_in"),
+        cell(cap, "percent"), (cap or {}).get("name", "").replace(",", " "),
+    ]))
+
+if rows:
+    try:
+        os.makedirs(os.path.dirname(PATH), exist_ok=True)
+        fresh = not os.path.exists(PATH)
+        # O_APPEND, one short write for the whole pass: the bar and the monitor
+        # can both be in here at once, and appends that small do not interleave.
+        with open(PATH, "a") as fh:
+            if fresh:
+                fh.write(HEADER)
+            fh.write("\n".join(rows) + "\n")
+        trim()
+    except OSError:
+        pass
+
+if MODE == "json":
+    json.dump(accounts, sys.stdout)
+    sys.stdout.write("\n")
+PY
+)
+
+emit() {
+    walk_accounts | \
+    CLAUDE_USAGE_MODE="$1" \
+    CLAUDE_USAGE_HISTORY="$HISTORY_FILE" \
+    CLAUDE_USAGE_HISTORY_GAP="$HISTORY_GAP" \
+    CLAUDE_USAGE_HISTORY_DAYS="$HISTORY_DAYS" \
+    python3 -c "$PY_EMIT"
+}
+
+if [[ "$MODE" != bar ]]; then
+    emit "$MODE"
+    exit 0
+fi
+
 # Fetch + render every configured account
 SPANS=""
 SHORT=""
@@ -259,3 +511,8 @@ done
 
 echo " 󰚩 ${SPANS}"
 echo "󰚩 ${SHORT}"
+
+# Record the sample last, and only after the block's own two lines are out:
+# i3blocks reads this until EOF, so anything slow belongs behind the output,
+# not in front of it. Every response it needs is already in the 120s cache.
+emit sample

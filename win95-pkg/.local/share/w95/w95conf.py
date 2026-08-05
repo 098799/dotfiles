@@ -10,6 +10,8 @@ Config lives at ~/.config/w95/settings, `key = value` per line, # comments:
     font_size  = 15      # px, overrides the size derived from bar_height
     sysmon_mode = drop   # System Monitor: `drop` (quake panel) or `window`
     sysmon_size = 62     # drop mode: percent of the screen it covers
+    claude_sample = 120  # seconds between Claude usage samples; 0 = only while
+                         # the System Monitor is on screen
 """
 
 import os
@@ -21,6 +23,7 @@ DEFAULTS = {
     "font_size": 0,  # 0 = derive from bar_height
     "sysmon_mode": "drop",
     "sysmon_size": 62,
+    "claude_sample": 120,
 }
 
 
@@ -67,6 +70,15 @@ BIG_FONT_PT = max(11, round(FONT_SIZE * 0.95))
 # top edge; `window` is an ordinary floating window the WM decorates.
 SYSMON_MODE = _V["sysmon_mode"] if _V["sysmon_mode"] in ("drop", "window") else "drop"
 SYSMON_SIZE = max(30, min(100, _V["sysmon_size"])) / 100.0
+
+# How often the resident monitor samples Claude usage into its history — the
+# one probe that keeps running while the window is hidden, because the chart is
+# drawn from the samples and a gap in them cannot be filled in later. 120s is
+# what the mr-reviewer usage pusher settled on against the same endpoint; 60s
+# is the floor, and 0 turns background sampling off entirely (the chart then
+# only gains points while the monitor is on screen, or from the i3blocks bar
+# block in non-Win95 sessions).
+CLAUDE_SAMPLE = 0 if _V["claude_sample"] <= 0 else max(60, _V["claude_sample"])
 
 
 def write(key, value):

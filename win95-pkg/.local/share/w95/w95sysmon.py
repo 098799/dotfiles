@@ -307,6 +307,170 @@ class Chart(Gtk.DrawingArea):
         return False
 
 
+def _span_label(seconds):
+    if seconds >= 86400:
+        return "%d days" % round(seconds / 86400.0)
+    return "%d hours" % round(seconds / 3600.0)
+
+
+def _sample_cadence():
+    """How often the usage history gets a row, in words."""
+    if not w95conf.CLAUDE_SAMPLE:
+        return "while this window is open"
+    if w95conf.CLAUDE_SAMPLE % 60:
+        return "%ds" % w95conf.CLAUDE_SAMPLE
+    return "%d min" % (w95conf.CLAUDE_SAMPLE // 60)
+
+
+class TimeChart(Gtk.DrawingArea):
+    """The same phosphor screen as Chart, plotted against wall-clock time.
+
+    A strip chart draws its ring buffer straight across: one sample, one pixel
+    column, and time is implied. A Claude limit moves over hours or days and is
+    sampled every couple of minutes by whoever asked last, so the samples are
+    irregular and sparse — the x axis has to be real seconds, or a laptop that
+    was asleep all night would draw the night as a steep line.
+
+    Gaps are honest for the same reason: nothing was sampled while the machine
+    was off, and a trace that leaps the hole would read as usage that never
+    happened. The traces simply break.
+    """
+
+    GAP = 900               # a hole this wide means nobody was sampling
+
+    def __init__(self, span=86400, height=104):
+        super().__init__()
+        self.span = span
+        self.title = ""
+        self.series = []    # [{"name", "colour", "points": [(epoch, pct)], "fill": bool}]
+        self.pace = None    # (start epoch, end epoch) of the live limit window
+        self.empty = "No history yet — sampling every %s" % _sample_cadence()
+        style(self, "w95-screen")
+        self.set_size_request(-1, height)
+        self.connect("draw", self._draw)
+
+    def update(self, series, pace=None, title="", span=None):
+        self.series = series
+        self.pace = pace
+        self.title = title
+        if span:
+            self.span = span
+        self.queue_draw()
+
+    def _draw(self, widget, cr):
+        w = widget.get_allocated_width()
+        h = widget.get_allocated_height()
+        x0, y0, x1, y1 = 3, 3, w - 3, h - 3
+        if x1 <= x0 or y1 <= y0:
+            return False
+
+        cr.set_source_rgb(0, 0, 0)
+        cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+        cr.fill()
+        cr.save()
+        cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+        cr.clip()
+
+        cr.set_source_rgb(*DKGREEN)
+        cr.set_line_width(1)
+        for i in range(1, 4):
+            y = y0 + (y1 - y0) * i / 4.0
+            cr.move_to(x0, int(y) + 0.5)
+            cr.line_to(x1, int(y) + 0.5)
+        for i in range(1, 10):
+            x = x0 + (x1 - x0) * i / 10.0
+            cr.move_to(int(x) + 0.5, y0)
+            cr.line_to(int(x) + 0.5, y1)
+        cr.stroke()
+
+        now = time.time()
+        left = now - self.span
+
+        def place(at, value):
+            return (x1 - (x1 - x0) * (now - at) / float(self.span),
+                    y1 - (y1 - y0) * min(1.0, max(0.0, value / 100.0)))
+
+        # The pace line: where the limit would be if it were spent evenly
+        # across its window. Above it you are burning faster than the window
+        # refills; below it you will not run out. It is the same judgement the
+        # bar's colour makes, drawn instead of decided.
+        if self.pace and self.pace[1] > self.pace[0]:
+            start, end = self.pace
+            first, last = max(start, left), min(now, end)
+            if last > first:
+                def spent(when):
+                    return 100.0 * (when - start) / (end - start)
+
+                cr.set_source_rgba(0.0, 0.6, 0.0, 0.9)
+                cr.set_dash([2, 3])
+                cr.move_to(*place(first, spent(first)))
+                cr.line_to(*place(last, spent(last)))
+                cr.stroke()
+                cr.set_dash([])
+
+        for entry in self.series:
+            points = [(at, value) for at, value in entry["points"]
+                      if at >= left and value is not None]
+            if len(points) < 2:
+                continue
+            colour = entry["colour"]
+            cr.set_source_rgba(colour[0], colour[1], colour[2], 0.9)
+            cr.set_line_width(1.4)
+            for run in self._runs(points):
+                if len(run) < 2:
+                    continue
+                cr.move_to(*place(*run[0]))
+                for at, value in run[1:]:
+                    cr.line_to(*place(at, value))
+                cr.stroke_preserve()
+                if entry.get("fill"):
+                    cr.line_to(*place(run[-1][0], 0))
+                    cr.line_to(*place(run[0][0], 0))
+                    cr.close_path()
+                    cr.set_source_rgba(colour[0], colour[1], colour[2], 0.16)
+                    cr.fill()
+                    cr.set_source_rgba(colour[0], colour[1], colour[2], 0.9)
+                else:
+                    cr.new_path()
+
+        cr.restore()
+
+        size = max(8, w95conf.FONT_SIZE - 4)
+        layout = PangoCairo.create_layout(cr)
+        drawn = [e for e in self.series if len(e["points"]) >= 2]
+        parts = ['<span foreground="#c0c0c0">%s</span>'
+                 % GLib.markup_escape_text(self.title)]
+        for entry in drawn:
+            colour = entry["colour"]
+            parts.append('<span foreground="#%02x%02x%02x">%s</span>' % (
+                int(colour[0] * 255), int(colour[1] * 255), int(colour[2] * 255),
+                GLib.markup_escape_text(entry["name"])))
+        if not drawn:
+            parts.append('<span foreground="#008000">%s</span>'
+                         % GLib.markup_escape_text(self.empty))
+        layout.set_markup('<span font_desc="W95FA %d">%s</span>'
+                          % (size, "   ".join(parts)), -1)
+        cr.move_to(x0 + 4, y0 + 2)
+        PangoCairo.show_layout(cr, layout)
+
+        layout.set_markup('<span font_desc="W95FA %d" foreground="#008000">100%%</span>'
+                          % size, -1)
+        tw, _ = layout.get_pixel_size()
+        cr.move_to(x1 - tw - 4, y0 + 2)
+        PangoCairo.show_layout(cr, layout)
+        return False
+
+    def _runs(self, points):
+        """Split a series wherever sampling stopped for longer than GAP."""
+        run = [points[0]]
+        for point in points[1:]:
+            if point[0] - run[-1][0] > self.GAP:
+                yield run
+                run = []
+            run.append(point)
+        yield run
+
+
 # ── panels ──────────────────────────────────────────────────────────────
 
 class Panel(Gtk.Frame):
@@ -826,23 +990,55 @@ class PowerPanel(Panel):
 
 
 class ClaudePanel(Panel):
-    TITLE = "Claude — five-hour window"
+    """Every limit an account is under, and how it got there.
+
+    The bar block this grew out of showed one number — the five-hour window of
+    whichever account was signed in. That is the limit you hit most often, but
+    it is not the one that ruins a week: the weekly quota refills seven days
+    later whatever you do, and the model-scoped weekly quota underneath it is
+    invisible everywhere else (`seven_day_opus` and friends come back null even
+    when the scoped limit is real — it only exists inside the `limits` array).
+    So all of them get a gauge here, and a trace in ClaudeCharts.
+    """
+
+    TITLE = "Claude — usage limits"
+
+    # key in the account dict, tag in the gauge column, and the length of the
+    # limit's own window.
+    WINDOWS = [
+        ("five_hour", "5h", 5 * 3600),
+        ("weekly", "7d", 7 * 86400),
+    ]
 
     def build(self):
-        self.table = grid(4)
-        self.body.pack_start(self.table, False, False, 0)
+        self.accounts = []
+        self.rows = {}
+        self.layout = []                       # what self.rows was built for
+
+        # Two grids side by side. Three limits per account stacks up fast —
+        # four accounts is twelve rows, twice the height of any other panel on
+        # the page — and the page has width to spare. Split down the middle it
+        # is six rows, and the panel simply takes two FlowBox slots.
+        self.tables = [grid(2), grid(2)]
+        columns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        for table in self.tables:
+            table.set_hexpand(True)
+            columns.pack_start(table, True, True, 0)
+        self.body.pack_start(columns, False, False, 0)
+
         self.note = label("Fetching...", dim=True)
         self.note.set_ellipsize(Pango.EllipsizeMode.END)
         self.body.pack_start(self.note, False, False, 0)
+
         self.body.pack_start(button_row(
             button("Switch...", w95stat.claude_switch, 80),
             button("Refresh", self._refresh, 80),
         ), False, False, 0)
-        self.rows = {}
 
     def _refresh(self):
         self.note.set_text("Fetching...")
         self.app.poller.refresh("claude")
+        self.app.poller.refresh("claude_history")
 
     def apply(self, key, value):
         if key != "claude":
@@ -850,34 +1046,209 @@ class ClaudePanel(Panel):
         if not value:
             self.note.set_text("No Claude accounts configured.")
             return
-        for index, account in enumerate(value):
-            row = self.rows.get(account["label"])
-            if row is None:
-                name = label(account["label"], bold=True, chars=2)
-                self.table.attach(name, 0, index, 1, 1)
-                gauge = Gauge(colour=NAVY, warn=(0.80, MAROON), height=16)
+        self.accounts = value
+        self._fill_rows()
+
+    # ── the gauges ──────────────────────────────────────────────────────
+    def _fill_rows(self):
+        """One row per limit, per account: 5h, 7d, then any scoped weekly.
+
+        Rebuilt from scratch whenever that set changes rather than patched in
+        place — a scoped limit appears the first time you use the model it
+        scopes, which would otherwise have to be inserted between two rows that
+        already exist.
+        """
+        # Keyed by account name, not by the label: two accounts whose names
+        # start with the same letter get the same letter, and a row dictionary
+        # keyed on that would hand them each other's gauges.
+        half = (len(self.accounts) + 1) // 2
+        layout = [(account["account"], key, tag, index >= half)
+                  for index, account in enumerate(self.accounts)
+                  for key, tag in self._limits(account)]
+        if layout != self.layout:
+            for table in self.tables:
+                for child in table.get_children():
+                    table.remove(child)
+            self.rows = {}
+            self.layout = layout
+            rows_used = [0, 0]
+            for name_key, key, tag, right in layout:
+                table = self.tables[1 if right else 0]
+                index = rows_used[1 if right else 0]
+                rows_used[1 if right else 0] += 1
+                name = label("", bold=True, chars=2)
+                table.attach(name, 0, index, 1, 1)
+                table.attach(label(tag, dim=True, chars=5), 1, index, 1, 1)
+                # A width floor, not a width: hexpand still shares out the
+                # slack. Without it the two columns squeeze the gauges to
+                # nothing and the panel becomes a table of numbers.
+                gauge = Gauge(colour=NAVY if key == "five_hour" else TEAL,
+                              warn=(0.80, MAROON), height=15, width=120)
                 gauge.set_hexpand(True)
-                self.table.attach(gauge, 1, index, 1, 1)
-                readout = label("—", chars=17)
-                self.table.attach(readout, 2, index, 1, 1)
-                row = self.rows[account["label"]] = {"name": name, "gauge": gauge,
-                                                     "readout": readout}
-                self.table.show_all()
-            percent = account["percent"]
-            row["gauge"].set_fraction((percent or 0) / 100.0)
-            row["name"].set_markup("<b>%s</b>" % account["label"] if account["active"]
-                                   else account["label"])
-            text = "%d%%" % percent if percent is not None else "n/a"
-            if account["resets"]:
-                text += " · %s left" % account["resets"]
-            if account["active"]:
-                text += " ←"
-            row["readout"].set_text(text)
+                table.attach(gauge, 2, index, 1, 1)
+                readout = label("—", chars=16)
+                table.attach(readout, 3, index, 1, 1)
+                self.rows[(name_key, key, tag)] = {"name": name, "gauge": gauge,
+                                                   "readout": readout}
+                table.show_all()
+            # An odd number of accounts leaves the second column empty; an
+            # empty grid still claims half the panel, so it goes away.
+            self.tables[1].set_visible(rows_used[1] > 0)
+
+        for account in self.accounts:
+            first = True
+            for key, tag in self._limits(account):
+                row = self.rows[(account["account"], key, tag)]
+                # The account is named once, against its first limit; the rows
+                # under it are that same account continued.
+                row["name"].set_markup(
+                    ("<b>%s</b>" % account["label"]) if account["active"] and first
+                    else (account["label"] if first else ""))
+                window = self._window(account, key, tag)
+                percent = (window or {}).get("percent")
+                row["gauge"].set_fraction((percent or 0) / 100.0)
+                text = "%d%%" % percent if percent is not None else "n/a"
+                if (window or {}).get("resets"):
+                    text += " · %s" % window["resets"]
+                row["readout"].set_text(text)
+                first = False
+
         self.note.set_text("Bold is the account Claude Code is signed in as.")
+
+    @staticmethod
+    def _limits(account):
+        """(key, tag) per limit: the two fixed windows always, scoped as found.
+
+        The fixed two stay even when the probe came back empty — an account
+        whose token expired should read "n/a", not vanish from the panel.
+        """
+        out = [(key, tag) for key, tag, _window in ClaudePanel.WINDOWS]
+        out.extend(("scoped", cap["name"]) for cap in account.get("scoped") or [])
+        return out
+
+    @staticmethod
+    def _window(account, key, tag):
+        if key != "scoped":
+            return account.get(key)
+        for cap in account.get("scoped") or []:
+            if cap["name"] == tag:
+                return cap
+        return None
 
 
 PANELS = [ResourcesPanel, ComputerPanel, StoragePanel, ConnectionPanel,
           TunnelPanel, BluetoothPanel, AudioPanel, PowerPanel, ClaudePanel]
+
+
+class ClaudeCharts(Gtk.Box):
+    """A second row of strip charts: one per Claude account, all three limits.
+
+    The gauges in the panel say where each limit stands now; these say how it
+    got there, which is the half that decides whether to keep going. One chart
+    per account rather than one chart per limit, because the question is always
+    asked about an account ("can `work` finish this today?") and never about a
+    limit across accounts.
+
+    The row is built from whatever accounts the probe found, so it grows a
+    chart when a new `~/claude-<name>` login appears — the same discovery
+    claude-usage.sh does for the bar.
+    """
+
+    SPANS = [("_12 Hours", 12 * 3600), ("_24 Hours", 24 * 3600),
+             ("_7 Days", 7 * 86400)]
+    # (key, tag, colour) — the same three limits the panel gauges, in the
+    # phosphors of a period monitor: the five-hour window is the one you watch.
+    TRACES = [("five_hour", "5h", GREEN), ("weekly", "7d", CYAN),
+              ("scoped", None, YELLOW)]
+
+    def __init__(self, span=24 * 3600, height=CHART_HEIGHT):
+        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
+        self.set_homogeneous(True)
+        self.span = span
+        self.height = height
+        self.accounts = []
+        self.history = {}
+        self.charts = {}
+        self.order = []
+        self.placeholder = TimeChart(span=span, height=height)
+        self.placeholder.title = "Claude"
+        self.pack_start(self.placeholder, True, True, 0)
+
+    def set_span(self, span):
+        self.span = span
+        self._draw()
+
+    def tick(self):
+        """Nothing to sample: these are drawn from the history file, which the
+        poller re-reads on its own schedule."""
+
+    def apply(self, key, value):
+        if key == "claude":
+            self.accounts = value
+        elif key == "claude_history":
+            self.history = value
+        else:
+            return
+        self._sync()
+        self._draw()
+
+    def _sync(self):
+        order = [account["account"] for account in self.accounts]
+        if order == self.order:
+            return
+        self.order = order
+        for child in self.get_children():
+            self.remove(child)
+        self.charts = {}
+        if not order:
+            self.pack_start(self.placeholder, True, True, 0)
+            self.placeholder.show()
+            return
+        for name in order:
+            chart = TimeChart(span=self.span, height=self.height)
+            self.charts[name] = chart
+            self.pack_start(chart, True, True, 0)
+            chart.show()
+
+    def _draw(self):
+        for account in self.accounts:
+            chart = self.charts.get(account["account"])
+            if chart is None:
+                continue
+            samples = self.history.get(account["account"], [])
+            series = []
+            for key, tag, colour in self.TRACES:
+                window = ClaudePanel._window(account, key,
+                                             tag or self._scoped_name(account))
+                if window is None and key == "scoped":
+                    continue
+                current = (window or {}).get("percent")
+                series.append({
+                    "name": "%s %s" % (tag or self._scoped_name(account),
+                                       "%d%%" % current if current is not None else "n/a"),
+                    "colour": colour,
+                    "points": [(row["at"], row[key]) for row in samples],
+                    # Only the five-hour trace is filled: three filled traces
+                    # in one 100%-tall chart is a stack of translucent slabs
+                    # nobody can read.
+                    "fill": key == "five_hour",
+                })
+            # Pace follows the weekly window, not the five-hour one: the
+            # five-hour refills itself four times a day whatever you do, and
+            # the weekly is the one you can still lose.
+            pace = None
+            left = (account.get("weekly") or {}).get("resets_in")
+            if left:
+                end = time.time() + left
+                pace = (end - 7 * 86400, end)
+            chart.update(series, pace=pace, span=self.span,
+                         title="%s%s" % (account["account"],
+                                         " ←" if account.get("active") else ""))
+
+    @staticmethod
+    def _scoped_name(account):
+        caps = account.get("scoped") or []
+        return caps[0]["name"] if caps else "model"
 
 
 # ── the window ──────────────────────────────────────────────────────────
@@ -889,6 +1260,7 @@ class Monitor(Gtk.Window):
         self.mode = mode or w95conf.SYSMON_MODE
         self.visible = False
         self.speed = DEFAULT_SPEED
+        self.claude_span = 24 * 3600
         self.tick_source = 0
         self.slide_source = 0
         self.state = {}
@@ -946,6 +1318,11 @@ class Monitor(Gtk.Window):
 
     # ── chrome ──────────────────────────────────────────────────────────
     def _build(self):
+        # Before the menu bar, which carries the span radios that drive it:
+        # setting a radio active during construction emits ::toggled, and the
+        # handler must not find half a window.
+        self.claude_row = ClaudeCharts(span=self.claude_span)
+
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         if self.mode == "drop":
             style(root, "w95-panel")
@@ -960,6 +1337,11 @@ class Monitor(Gtk.Window):
         # scopes — which is the one part of the page that gets better the more
         # room it has, rather than just emptier.
         page.pack_start(self._charts(), True, True, 0)
+        # The Claude row keeps its natural height instead of taking a share of
+        # the slack: the strip charts above are live at one sample a second and
+        # get better with every pixel, while these are drawn from samples two
+        # minutes apart and are perfectly readable at their floor.
+        page.pack_start(self.claude_row, False, False, 0)
 
         # A FlowBox rather than a fixed grid: the same page has to work at
         # 2560px wide as a drop-down panel and at 1180px as a window, and this
@@ -986,6 +1368,10 @@ class Monitor(Gtk.Window):
             flow.add(panel)
             self.panels.append(panel)
         page.pack_start(flow, False, False, 0)
+
+        # Everything a probe result is handed to. The Claude chart row is not a
+        # panel and is not in the flow, but it wants the same deliveries.
+        self.sinks = self.panels + [self.claude_row]
 
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -1045,13 +1431,21 @@ class Monitor(Gtk.Window):
             item.connect("activate", lambda *_: callback())
             return item
 
-        def menu(title, entries):
-            item = Gtk.MenuItem(label=title, use_underline=True)
+        def popup_for(entries):
             popup = style(Gtk.Menu(), "w95-menu")
             for entry in entries:
                 popup.append(entry if entry is not None else Gtk.SeparatorMenuItem())
-            item.set_submenu(popup)
+            return popup
+
+        def menu(title, entries):
+            item = Gtk.MenuItem(label=title, use_underline=True)
+            item.set_submenu(popup_for(entries))
             bar.append(item)
+
+        def submenu(title, entries):
+            item = Gtk.MenuItem(label=title, use_underline=True)
+            item.set_submenu(popup_for(entries))
+            return item
 
         menu("_File", [
             action("_Refresh Now", self.refresh_all, "F5"),
@@ -1078,9 +1472,24 @@ class Monitor(Gtk.Window):
             item.set_active(interval == self.speed)
             item.connect("toggled", self._on_speed, interval)
             speeds.append(item)
+        # The Claude charts are drawn from a file of samples, not from the ring
+        # buffers the speeds above govern, so how far back they reach is its own
+        # setting — Update Speed would be the wrong knob for it.
+        spans, group_item = [], None
+        for title, seconds in ClaudeCharts.SPANS:
+            item = Gtk.RadioMenuItem(label=title, use_underline=True)
+            if group_item is None:
+                group_item = item
+            else:
+                item.join_group(group_item)
+            item.set_active(seconds == self.claude_span)
+            item.connect("toggled", self._on_claude_span, seconds)
+            spans.append(item)
+
         menu("_Options", speeds + [None,
              action("Drop-down _panel", lambda: self._set_mode("drop")),
-             action("_Window", lambda: self._set_mode("window"))])
+             action("_Window", lambda: self._set_mode("window")), None,
+             submenu("Claude _history", spans)])
 
         menu("_Help", [action("_About System Monitor...", self._about)])
         return bar
@@ -1130,7 +1539,16 @@ class Monitor(Gtk.Window):
         self.poller.add("misc", self._probe_misc, 5, self._deliver("misc"))
         self.poller.add("updates", lambda: w95stat.run_block("updates", timeout=60),
                         900, self._deliver("updates"))
-        self.poller.add("claude", w95stat.claude_usage, 180, self._deliver("claude"))
+        # Claude is two tasks with different reasons to run. The usage probe is
+        # also the sampler that fills the history file, so it keeps its cadence
+        # while the window is hidden (see w95conf.CLAUDE_SAMPLE); reading that
+        # file back for the chart is pure local I/O and only worth doing when
+        # somebody is looking at it.
+        self.poller.add("claude", w95stat.claude_usage,
+                        w95conf.CLAUDE_SAMPLE or 180, self._deliver("claude"),
+                        keep_alive=bool(w95conf.CLAUDE_SAMPLE))
+        self.poller.add("claude_history", lambda: w95stat.claude_history(7 * 24),
+                        60, self._deliver("claude_history"))
         self.poller.pause(True)
         self.poller.start()
 
@@ -1143,8 +1561,8 @@ class Monitor(Gtk.Window):
             # A probe that timed out returns None; keeping the last good value
             # beats blanking the field every time bluetoothd is slow.
             if value is not None:
-                for panel in self.panels:
-                    panel.apply(key, value)
+                for sink in self.sinks:
+                    sink.apply(key, value)
             return False
         return deliver
 
@@ -1224,8 +1642,8 @@ class Monitor(Gtk.Window):
 
         for chart in self.charts:
             chart.queue_draw()
-        for panel in self.panels:
-            panel.tick()
+        for sink in self.sinks:
+            sink.tick()
 
         now = time.localtime()
         self.status_clock.set_text(time.strftime("%a %d %b %Y  %H:%M:%S", now))
@@ -1264,6 +1682,15 @@ class Monitor(Gtk.Window):
 
     def _on_charts(self, widget):
         self.chart_row.set_visible(widget.get_active())
+        self.claude_row.set_visible(widget.get_active())
+
+    def _on_claude_span(self, widget, seconds):
+        if not widget.get_active():
+            return
+        self.claude_span = seconds
+        self.claude_row.set_span(seconds)
+        if hasattr(self, "status"):     # the status bar is built after the menu
+            self.status.set_text("Claude history: last %s" % _span_label(seconds))
 
     def refresh_all(self):
         self.sample(full=True)
@@ -1292,6 +1719,7 @@ class Monitor(Gtk.Window):
             self.show_all()
             self.present()
         self.chart_row.set_visible(self.show_charts.get_active())
+        self.claude_row.set_visible(self.show_charts.get_active())
         self.visible = True
         self.poller.pause(False)
         self.sample(full=True)
