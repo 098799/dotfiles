@@ -76,6 +76,14 @@ if [[ -e ~/.local/bin/w95 ]]; then
     if [[ ! -e ~/.config/i3/active-keys.conf ]]; then
         ln -sfn no-keys.conf ~/.config/i3/active-keys.conf
     fi
+    # This package's slack.desktop shadows /usr/share/applications/slack.desktop by
+    # desktop-file ID, so the system entry stops backing x-scheme-handler/slack --
+    # and the local mimeinfo.cache only lists it once update-desktop-database has
+    # run. Without this, `xdg-open slack://...` (the SSO "Open Slack" handoff) hits
+    # "No Apps available". Cheap and idempotent, so run it on every re-stow.
+    if command -v update-desktop-database &> /dev/null; then
+        update-desktop-database ~/.local/share/applications
+    fi
 fi
 
 # Optional packages (uncomment as needed)
