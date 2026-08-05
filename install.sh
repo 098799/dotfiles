@@ -84,6 +84,18 @@ if [[ -e ~/.local/bin/w95 ]]; then
     if command -v update-desktop-database &> /dev/null; then
         update-desktop-database ~/.local/share/applications
     fi
+    # LightDM reads /usr/share/xsessions only -- it runs before login and never
+    # looks at ~/.local/share/xsessions, so the stowed copy is decorative and the
+    # root-owned one is what actually launches the session. It was installed by
+    # hand, so nothing here keeps it in step; warn rather than silently booting a
+    # stale Exec= line. Needs root, so it stays a warning, not a fix.
+    _w95_xs=win95-pkg/.local/share/xsessions/i3-w95.desktop
+    if [[ -e /usr/share/xsessions/i3-w95.desktop ]] \
+       && ! cmp -s "$_w95_xs" /usr/share/xsessions/i3-w95.desktop; then
+        echo "  WARNING: /usr/share/xsessions/i3-w95.desktop differs from $_w95_xs"
+        echo "           sudo cp $PWD/$_w95_xs /usr/share/xsessions/i3-w95.desktop"
+    fi
+    unset _w95_xs
 fi
 
 # Optional packages (uncomment as needed)
