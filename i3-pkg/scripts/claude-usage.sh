@@ -59,8 +59,41 @@ for _d in "$HOME"/claude-*; do
     [[ " ${ACCOUNTS[*]} " == *" $_name "* ]] || ACCOUNTS+=("$_name")
 done
 declare -A LABELS=([work]=W [private]=P [builder]=B)
+
+# Auto-label the discovered accounts by initial, lengthening the prefix until no
+# two of them collide: `sales` and `success` both wanted "S", and the bar read
+# "S:3% S:81%" with nothing to say which was which. The length is chosen once
+# and applied to all of them, so they stay the same width and a new account
+# widens the set rather than making one odd label longer than its neighbours.
+# Only the bar cares — rcmon, cmon and the System Monitor key everything by
+# account name (the monitor's fallback bar-line parse is the one exception, and
+# that only runs against a copy of this script older than --json).
+_cap() { printf '%s%s' "$(printf '%s' "${1:0:1}" | tr '[:lower:]' '[:upper:]')" "${1:1:$2-1}"; }
+
+_auto=()
 for _a in "${ACCOUNTS[@]}"; do
-    [[ -n "${LABELS[$_a]}" ]] || LABELS[$_a]=$(printf '%s' "${_a:0:1}" | tr '[:lower:]' '[:upper:]')
+    [[ -n "${LABELS[$_a]}" ]] || _auto+=("$_a")
+done
+
+_len=1
+while :; do
+    _seen=" ${LABELS[work]} ${LABELS[private]} ${LABELS[builder]} "
+    _clash=0
+    for _a in "${_auto[@]}"; do
+        _cand=$(_cap "$_a" "$_len")
+        if [[ " $_seen " == *" $_cand "* ]]; then _clash=1; break; fi
+        _seen="$_seen$_cand "
+    done
+    # Stop when unique, or when the longest name has nothing left to give.
+    (( _clash == 0 )) && break
+    _max=0
+    for _a in "${_auto[@]}"; do (( ${#_a} > _max )) && _max=${#_a}; done
+    (( _len >= _max )) && break
+    _len=$((_len + 1))
+done
+
+for _a in "${_auto[@]}"; do
+    LABELS[$_a]=$(_cap "$_a" "$_len")
 done
 
 # Get current account (default to first configured)
