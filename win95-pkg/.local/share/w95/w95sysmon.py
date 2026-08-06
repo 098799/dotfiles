@@ -78,6 +78,11 @@ DEFAULT_SPEED = 1000
 
 CHART_SAMPLES = 150     # about 2½ minutes of history at Normal speed
 CHART_HEIGHT = 110      # a floor, not a size — the charts grow into the slack
+# The Claude strip charts get a taller floor than the live ones above them.
+# They are not the same picture at a different size: a live trace is 2½ minutes
+# of one number, while these carry three limits and a pace line over as much as
+# a week, and at 110px the three traces sit on top of each other.
+CLAUDE_CHART_HEIGHT = 180
 PANEL_WIDTH = 430       # the width a panel wants; the grid reflows around it
 SLIDE_MS = 130          # how long the drop-down takes to arrive
 
@@ -1010,16 +1015,19 @@ class ClaudePanel(Panel):
         ("weekly", "7d", 7 * 86400),
     ]
 
+    # Grids side by side. Three limits per account stacks up fast — five
+    # accounts is fifteen rows, three times the height of anything else on the
+    # page — and the page has width to spare at 2560px. Dealt three ways that
+    # is six rows, and the panel spends the width it has instead of the height
+    # it hasn't. Two was enough at four accounts; `success` made it eight rows.
+    COLUMNS = 3
+
     def build(self):
         self.accounts = []
         self.rows = {}
         self.layout = []                       # what self.rows was built for
 
-        # Two grids side by side. Three limits per account stacks up fast —
-        # four accounts is twelve rows, twice the height of any other panel on
-        # the page — and the page has width to spare. Split down the middle it
-        # is six rows, and the panel simply takes two FlowBox slots.
-        self.tables = [grid(2), grid(2)]
+        self.tables = [grid(2) for _ in range(self.COLUMNS)]
         columns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         for table in self.tables:
             table.set_hexpand(True)
@@ -1058,42 +1066,42 @@ class ClaudePanel(Panel):
         scopes, which would otherwise have to be inserted between two rows that
         already exist.
         """
-        # Keyed by account name, not by the label: two accounts whose names
-        # start with the same letter get the same letter, and a row dictionary
-        # keyed on that would hand them each other's gauges.
-        half = (len(self.accounts) + 1) // 2
-        layout = [(account["account"], key, tag, index >= half)
-                  for index, account in enumerate(self.accounts)
-                  for key, tag in self._limits(account)]
+        layout = self._deal()
         if layout != self.layout:
             for table in self.tables:
                 for child in table.get_children():
                     table.remove(child)
             self.rows = {}
             self.layout = layout
-            rows_used = [0, 0]
-            for name_key, key, tag, right in layout:
-                table = self.tables[1 if right else 0]
-                index = rows_used[1 if right else 0]
-                rows_used[1 if right else 0] += 1
+            rows_used = [0] * self.COLUMNS
+            for name_key, key, tag, column in layout:
+                table = self.tables[column]
+                index = rows_used[column]
+                rows_used[column] += 1
                 name = label("", bold=True, chars=2)
                 table.attach(name, 0, index, 1, 1)
                 table.attach(label(tag, dim=True, chars=5), 1, index, 1, 1)
                 # A width floor, not a width: hexpand still shares out the
-                # slack. Without it the two columns squeeze the gauges to
-                # nothing and the panel becomes a table of numbers.
+                # slack. Without it the columns squeeze the gauges to nothing
+                # and the panel becomes a table of numbers. 90 rather than the
+                # old 120 because there are three columns to fit now, and the
+                # window mode is only 1180px wide.
                 gauge = Gauge(colour=NAVY if key == "five_hour" else TEAL,
-                              warn=(0.80, MAROON), height=15, width=120)
+                              warn=(0.80, MAROON), height=15, width=90)
                 gauge.set_hexpand(True)
                 table.attach(gauge, 2, index, 1, 1)
-                readout = label("—", chars=16)
+                readout = label("—", chars=13)
                 table.attach(readout, 3, index, 1, 1)
                 self.rows[(name_key, key, tag)] = {"name": name, "gauge": gauge,
                                                    "readout": readout}
                 table.show_all()
-            # An odd number of accounts leaves the second column empty; an
-            # empty grid still claims half the panel, so it goes away.
-            self.tables[1].set_visible(rows_used[1] > 0)
+            # Fewer accounts than columns leaves the tail empty, and an empty
+            # grid still claims its share of the panel. set_no_show_all as well
+            # as hiding it: the window calls show_all() every time the panel is
+            # shown, which would otherwise bring the empty column straight back.
+            for table, used in zip(self.tables, rows_used):
+                table.set_no_show_all(used == 0)
+                table.set_visible(used > 0)
 
         for account in self.accounts:
             first = True
@@ -1114,6 +1122,35 @@ class ClaudePanel(Panel):
                 first = False
 
         self.note.set_text("Bold is the account Claude Code is signed in as.")
+
+    def _deal(self):
+        """(account, key, tag, column) per row — whole accounts, in order,
+        dealt across COLUMNS grids and balanced by ROWS rather than by account.
+
+        An account is two rows or three depending on whether it has a scoped
+        weekly limit yet, so dealing by account count alone can leave one column
+        half again as tall as its neighbours. An account is never split across a
+        column boundary: the name is written once, against its first limit, and
+        a continuation row at the top of the next column would have nothing to
+        say whose it was.
+
+        Keyed by account name rather than by the label, here and in self.rows:
+        two accounts whose names start with the same letter share a label
+        (`sales`/`success` are Sa/Su only because the bar goes out of its way),
+        and a row dictionary keyed on that would hand them each other's gauges.
+        """
+        limits = [(account["account"], self._limits(account))
+                  for account in self.accounts]
+        total = sum(len(rows) for _, rows in limits)
+        target = max(1, -(-total // self.COLUMNS))     # ceil: rows per column
+        layout, column, used = [], 0, 0
+        for name, rows in limits:
+            if used >= target and column < self.COLUMNS - 1:
+                column += 1
+                used = 0
+            layout.extend((name, key, tag, column) for key, tag in rows)
+            used += len(rows)
+        return layout
 
     @staticmethod
     def _limits(account):
@@ -1161,7 +1198,7 @@ class ClaudeCharts(Gtk.Box):
     TRACES = [("five_hour", "5h", GREEN), ("weekly", "7d", CYAN),
               ("scoped", None, YELLOW)]
 
-    def __init__(self, span=24 * 3600, height=CHART_HEIGHT):
+    def __init__(self, span=24 * 3600, height=CLAUDE_CHART_HEIGHT):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=7)
         self.set_homogeneous(True)
         self.span = span
@@ -1337,11 +1374,13 @@ class Monitor(Gtk.Window):
         # scopes — which is the one part of the page that gets better the more
         # room it has, rather than just emptier.
         page.pack_start(self._charts(), True, True, 0)
-        # The Claude row keeps its natural height instead of taking a share of
-        # the slack: the strip charts above are live at one sample a second and
-        # get better with every pixel, while these are drawn from samples two
-        # minutes apart and are perfectly readable at their floor.
-        page.pack_start(self.claude_row, False, False, 0)
+        # The Claude row takes a share of the slack too, rather than sitting at
+        # its floor while the live charts above swallow everything. It used to:
+        # the argument was that samples two minutes apart don't earn pixels the
+        # way a one-second trace does. But these are the charts that get read
+        # when the question is "can this account finish the week", and squeezed
+        # to 110px three traces and a pace line are one thick line.
+        page.pack_start(self.claude_row, True, True, 0)
 
         # A FlowBox rather than a fixed grid: the same page has to work at
         # 2560px wide as a drop-down panel and at 1180px as a window, and this

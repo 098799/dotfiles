@@ -9,7 +9,7 @@ Config lives at ~/.config/w95/settings, `key = value` per line, # comments:
     bar_height = 38      # px, the taskbar; everything else scales off it
     font_size  = 15      # px, overrides the size derived from bar_height
     sysmon_mode = drop   # System Monitor: `drop` (quake panel) or `window`
-    sysmon_size = 62     # drop mode: percent of the screen it covers
+    sysmon_size = 80     # drop mode: percent of the screen it covers
     claude_sample = 120  # seconds between Claude usage samples; 0 = only while
                          # the System Monitor is on screen
 """
@@ -22,7 +22,9 @@ DEFAULTS = {
     "bar_height": 38,
     "font_size": 0,  # 0 = derive from bar_height
     "sysmon_mode": "drop",
-    "sysmon_size": 62,
+    # 62 left a fifth of the screen empty under a panel that had to scroll to
+    # show its charts; the drop panel is opened to be read, not glanced past.
+    "sysmon_size": 80,
     "claude_sample": 120,
 }
 
