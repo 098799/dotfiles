@@ -1136,7 +1136,7 @@ class ClaudePanel(Panel):
 
         Keyed by account name rather than by the label, here and in self.rows:
         two accounts whose names start with the same letter share a label
-        (`sales`/`success` are Sa/Su only because the bar goes out of its way),
+        (`sales`/`success` are S/CS only because claude-usage.sh pins them),
         and a row dictionary keyed on that would hand them each other's gauges.
         """
         limits = [(account["account"], self._limits(account))

@@ -58,11 +58,14 @@ for _d in "$HOME"/claude-*; do
     [[ "$_name" == "prim" ]] && continue
     [[ " ${ACCOUNTS[*]} " == *" $_name "* ]] || ACCOUNTS+=("$_name")
 done
-declare -A LABELS=([work]=W [private]=P [builder]=B)
+# `sales` and `success` are pinned rather than auto-labelled: the auto rule
+# below would give them Sa/Su, and CS (customer success) is what those two are
+# actually called, so S/CS reads right even though it isn't a prefix.
+declare -A LABELS=([work]=W [private]=P [builder]=B [sales]=S [success]=CS)
 
-# Auto-label the discovered accounts by initial, lengthening the prefix until no
-# two of them collide: `sales` and `success` both wanted "S", and the bar read
-# "S:3% S:81%" with nothing to say which was which. The length is chosen once
+# Auto-label the remaining discovered accounts by initial, lengthening the prefix
+# until no two of them collide: `sales` and `success` both wanted "S", and the bar
+# read "S:3% S:81%" with nothing to say which was which. The length is chosen once
 # and applied to all of them, so they stay the same width and a new account
 # widens the set rather than making one odd label longer than its neighbours.
 # Only the bar cares — rcmon, cmon and the System Monitor key everything by
@@ -77,7 +80,12 @@ done
 
 _len=1
 while :; do
-    _seen=" ${LABELS[work]} ${LABELS[private]} ${LABELS[builder]} "
+    # Seed with every pinned label, not just the legacy three — an account that
+    # auto-labels to "S" or "CS" would otherwise collide with sales/success.
+    _seen=" "
+    for _a in "${ACCOUNTS[@]}"; do
+        [[ -n "${LABELS[$_a]}" ]] && _seen="$_seen${LABELS[$_a]} "
+    done
     _clash=0
     for _a in "${_auto[@]}"; do
         _cand=$(_cap "$_a" "$_len")
