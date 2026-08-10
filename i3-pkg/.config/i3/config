@@ -330,7 +330,7 @@ exec autokey-gtk
 exec thunar --daemon
 exec --no-startup-id xsettingsd
 exec syncthing
-exec nextcloud
+# exec nextcloud  # disabled 2026-08-10
 
 # exec --no-startup-id /usr/lib/gnome-settings-daemon/gsd-xsettings
 # exec gnome-settings-daemon
