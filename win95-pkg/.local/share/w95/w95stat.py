@@ -27,6 +27,7 @@ module stays runnable, and testable, from a plain shell:
 import json
 import os
 import re
+import shlex
 import subprocess
 import threading
 import time
@@ -526,6 +527,62 @@ def set_cpu_boost(on):
     return shell("echo %d | sudo -n tee %s >/dev/null" % (1 if on else 0, BOOST_PATH))
 
 
+# ── battery charge limit ────────────────────────────────────────────────
+# TLP owns the firmware thresholds, so writing sysfs alone would hold only
+# until the next AC event, when TLP re-applies whatever its config says. The
+# values therefore live in a TLP drop-in that this module is the sole writer
+# of, and /etc/tlp.conf deliberately leaves both thresholds commented out:
+# tlp.conf overrides tlp.d, so uncommenting either one there would pin the
+# toggle with no visible reason why.
+
+CHARGE_DROPIN = "/etc/tlp.d/95-w95-charge-limit.conf"
+CHARGE_LIMITED = (75, 80)    # kinder to a battery that lives on the charger
+CHARGE_FULL = (95, 100)      # the whole capacity, for a day away from it
+
+CHARGE_HEADER = (
+    "# Battery charge limit -- rewritten by the w95 System Monitor "
+    '"Power" panel.\n'
+    "# Edit by hand if you like; the toggle only ever replaces this whole "
+    "file.\n"
+    "# Full charge: %d/%d.  Longevity limit: %d/%d.\n" % (CHARGE_FULL + CHARGE_LIMITED))
+
+
+def charge_limit():
+    """The main battery's stop threshold, or None where there is no knob.
+
+    Read from sysfs rather than from the drop-in, because sysfs is what the
+    firmware is actually doing — a hand-edited config that has not been applied
+    yet should read as the old value, not the new one.
+    """
+    for path in sorted(_glob("/sys/class/power_supply/BAT*")):
+        stop = _read(os.path.join(path, "charge_control_end_threshold"))
+        if not stop:
+            continue
+        try:
+            stop = int(stop)
+        except ValueError:
+            return None
+        return {"stop": stop, "full": stop >= 100,
+                "name": os.path.basename(path)}
+    return None
+
+
+def set_charge_limit(full, name="BAT0"):
+    """Move the threshold now, and make it survive the next plug-in.
+
+    `tlp setcharge` writes the firmware immediately; the drop-in is what TLP
+    reads back on every later AC/battery event. Both are needed — either one
+    alone gives a toggle that quietly forgets.
+    """
+    start, stop = CHARGE_FULL if full else CHARGE_LIMITED
+    body = "%sSTART_CHARGE_THRESH_%s=%d\nSTOP_CHARGE_THRESH_%s=%d\n" % (
+        CHARGE_HEADER, name, start, name, stop)
+    return shell(
+        "printf '%%s' %s | sudo -n tee %s >/dev/null && "
+        "sudo -n tlp setcharge %d %d %s >/dev/null 2>&1"
+        % (shlex.quote(body), shlex.quote(CHARGE_DROPIN), start, stop, name))
+
+
 # ── bluetooth ───────────────────────────────────────────────────────────
 
 def bt_devices():
@@ -961,6 +1018,7 @@ if __name__ == "__main__":
     print("cpu info     %(model)s (%(cores)d threads)" % cpu_info())
     print("host         %(host)s  %(kernel)s  %(arch)s" % host_info())
     print("battery      %s" % battery())
+    print("charge limit %s" % charge_limit())
     print("sink         %s" % sink())
     print("source       %s" % source())
     print("profile      %s" % power_profile())

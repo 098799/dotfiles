@@ -907,8 +907,18 @@ class PowerPanel(Panel):
         self.body.pack_start(self.gauge, False, False, 0)
         table = grid()
         self.fields = {name: Field(table, row, name) for row, name in
-                       enumerate(["Charge", "Status", "Remaining"])}
+                       enumerate(["Charge", "Status", "Remaining", "Charges to"])}
         self.body.pack_start(table, False, False, 0)
+
+        self.limit = Gtk.CheckButton(label="Charge all the way to 100%")
+        self._limit_guard = False
+        self.limit.set_tooltip_text(
+            "Off, the battery stops at %d%% to age more slowly. On, it fills "
+            "completely -- for a day away from the charger.\n"
+            "Written to %s, so it survives unplugging and reboots."
+            % (w95stat.CHARGE_LIMITED[1], w95stat.CHARGE_DROPIN))
+        self.limit.connect("toggled", self._on_limit)
+        self.body.pack_start(self.limit, False, False, 0)
         self.body.pack_start(style(Gtk.Box(), "w95-sep"), False, False, 0)
 
         self.profiles = {}
@@ -956,6 +966,22 @@ class PowerPanel(Panel):
         self.commit(w95stat.cpu_boost, want, lambda: w95stat.set_cpu_boost(want))
         w95stat.refresh_bar(13)
 
+    def _on_limit(self, widget):
+        if self._limit_guard:
+            return
+        want = widget.get_active()
+        name = (self.app.state.get("charge_limit") or {}).get("name", "BAT0")
+        if self.commit(lambda: (w95stat.charge_limit() or {})["full"], want,
+                       lambda: w95stat.set_charge_limit(want, name)):
+            # tee, then tlp, then the firmware settling: slower than the poll
+            # that would otherwise re-read the old value and tick the box back.
+            GLib.timeout_add(1200, self._resync_limit)
+
+    def _resync_limit(self):
+        self.app.state["charge_limit"] = w95stat.charge_limit()
+        self.tick()
+        return False
+
     def tick(self):
         state = self.app.state
         battery = state.get("battery")
@@ -974,6 +1000,18 @@ class PowerPanel(Panel):
                     else "on AC power")
         else:
             self.fields["Charge"].set("no battery")
+
+        limit = state.get("charge_limit")
+        if limit is None:
+            self.fields["Charges to"].set("not adjustable")
+            self.limit.set_sensitive(False)
+        else:
+            self.fields["Charges to"].set(
+                "100% (no limit)" if limit["full"] else "%d%%" % limit["stop"])
+            if limit["full"] != self.limit.get_active():
+                self._limit_guard = True
+                self.limit.set_active(limit["full"])
+                self._limit_guard = False
 
         profile = state.get("profile")
         if profile:
@@ -1673,6 +1711,7 @@ class Monitor(Gtk.Window):
             "uptime": w95stat.uptime_seconds(),
             "load": w95stat.loadavg(),
             "battery": w95stat.battery(),
+            "charge_limit": w95stat.charge_limit(),
             "profile": w95stat.power_profile(),
             "boost": w95stat.cpu_boost(),
         })

@@ -96,6 +96,18 @@ if [[ -e ~/.local/bin/w95 ]]; then
         echo "           sudo cp $PWD/$_w95_xs /usr/share/xsessions/i3-w95.desktop"
     fi
     unset _w95_xs
+    # The System Monitor's Power panel toggles the battery charge limit by
+    # rewriting /etc/tlp.d/95-w95-charge-limit.conf, which it creates on first
+    # use -- so there is nothing to install. The one thing that breaks it is a
+    # threshold left uncommented in /etc/tlp.conf: that file overrides
+    # everything in tlp.d, so the checkbox would move, report success, and
+    # change nothing. Needs root to fix, so it stays a warning.
+    if command -v tlp &> /dev/null \
+       && grep -qE '^[[:space:]]*(START|STOP)_CHARGE_THRESH_' /etc/tlp.conf 2>/dev/null; then
+        echo "  WARNING: /etc/tlp.conf sets a charge threshold; it overrides /etc/tlp.d"
+        echo "           and pins the System Monitor's charge-limit toggle."
+        echo "           Comment out START_/STOP_CHARGE_THRESH_* there, then: sudo tlp start"
+    fi
 fi
 
 # Optional packages (uncomment as needed)
