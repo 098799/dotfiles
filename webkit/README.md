@@ -31,11 +31,19 @@ Reference implementations, in order of how much they have been polished:
 
 - systemd **user** units in `deploy/*.service`, `WorkingDirectory=%h/<app>`,
   uvicorn on `127.0.0.1:<port>`. Linger is on for both p14s and p340.
-- Tailnet: `tailscale serve --bg --https=<port> http://127.0.0.1:<port>`.
-  Ports in use: see **`APPS.md`** — the canonical per-host app/port registry
-  (the list that used to sit here had drifted). Update it with every port
-  change. **TLS with the bare short hostname fails SNI** — always hand over
-  the full `rcmon.tail0c4bc8.ts.net:PORT`.
+- Tailnet: **do not use `tailscale serve`.** That layer was deleted from p340
+  on 2026-08-17 — it was a second access path nobody watched, it put two names
+  on one box, and the node rename that fixed the naming silently broke every
+  PWA installed through it. A new app gets a vhost and nothing else:
+  `~/apps/ops/newapp-public.sh <name> <port>` writes the `<name>.p340.grining.eu`
+  server block (wildcard cert already issued, DNS needs no work) and the app
+  binds `127.0.0.1:<port>`. The `allow 100.64.0.0/10; deny all` in that block
+  is the entire security model, so **never bind `0.0.0.0` or the tailscale IP**
+  — that walks around the gate onto the LAN.
+  Ports in use: see **`~/apps/REGISTRY.md`** — the canonical per-host app/port
+  registry. Update it in the same commit as any port change.
+  The one surviving `serve` mapping in the fleet is p14s → `:38000`, which is
+  the only address rcmon federation has for the laptop; see the registry.
 - Public mirror (`*.grining.eu`) lives on the Hetzner VPS, ssh alias
   `bae_llm`, app in `/opt/<app>`, plain venv (no uv there), `www-data`,
   uvicorn behind nginx. Two scripts, keep this split:
