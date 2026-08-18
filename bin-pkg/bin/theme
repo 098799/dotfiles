@@ -6,6 +6,16 @@ usage() {
     exit 2
 }
 
+# Under `set -e` any failing step abandons the rest of the switch, and this
+# script is nearly always run from a rofi entry piped into `sh` -- so stderr
+# goes nowhere and the only symptom is a desktop that is half one theme and
+# half the other, with nothing to say which half ran. Name the line that died,
+# on screen as well as on stderr, so a half switch reports itself.
+trap 'rc=$?; printf "theme: failed at line %s (exit %s) — the desktop is half-themed; re-run\n" "$LINENO" "$rc" >&2;
+      command -v notify-send >/dev/null &&
+          notify-send -u critical -a theme "Theme switch failed" "line $LINENO (exit $rc) — desktop is half-themed" 2>/dev/null
+      exit $rc' ERR
+
 [[ $# -eq 2 ]] || usage
 mode=$1
 palette=$2
@@ -33,21 +43,31 @@ fi
 # it. Without this the palette changed while the taskbar, the desktop icons,
 # the window chrome and the patched WM all stayed, which is neither look.
 # Runs first so the settings below land on top of whatever `w95 off` restored.
-# Keyed on active-chrome.conf, not active-palette.conf: this script rewrites
-# the palette link itself, so by the time anyone looked at it the marker was
-# already gone and you were left with gruvbox colours under Win95 chrome, a
-# Win95 taskbar and a Win95 terminal. Nothing but `w95` touches the chrome link.
-if [[ -z $w95_mode ]] &&
-    [[ $(readlink -f "$HOME/.config/i3/active-chrome.conf" 2>/dev/null) == *win95.conf ]] &&
-    [[ -x $HOME/.local/bin/w95 ]]; then
+#
+# Three markers, ORed, and the OR is the fix: keying this on active-chrome.conf
+# alone meant one interrupted switch (chrome already back to stock.conf, the WM
+# and the taskbar still Win95) turned into a desktop no repeat could clean --
+# every later `dark-gruv` saw a stock chrome link, decided there was nothing to
+# leave, and repainted the colours around a Win95 shell that nothing was ever
+# going to take down. Any one of the three still saying "Win95" means we are
+# leaving it, and `w95 off` / `w95-switch off` are both idempotent, so the worst
+# an over-eager match can do is run a no-op.
+leaving_w95=
+if [[ -z $w95_mode ]] && [[ -x $HOME/.local/bin/w95 ]] &&
+    { [[ $(readlink -f "$HOME/.config/i3/active-chrome.conf" 2>/dev/null) == *win95.conf ]] ||
+        [[ $(cat "$HOME/.config/w95/wm" 2>/dev/null) == w95 ]] ||
+        pgrep -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' >/dev/null 2>&1; }; then
+    leaving_w95=1
+    # ~/.config/w95/wm goes first, before `w95 off` -- not later, when the WM is
+    # swapped. `w95 off` finishes with an `i3-msg reload`, i3 answers a reload by
+    # re-running every exec_always, and the last one is w95-autobar, which starts
+    # or stops the taskbar according to exactly this file. Flipping it afterwards
+    # meant `w95 off` killed the taskbar and then immediately reloaded i3 into
+    # starting it again -- so the one unmistakably Win95 thing on the screen
+    # survived the switch, sat on top of the new theme, and stayed there.
+    mkdir -p "$HOME/.config/w95"
+    printf 'stock\n' >"$HOME/.config/w95/wm"
     "$HOME/.local/bin/w95" off >/dev/null 2>&1 || true
-    # The window manager is switched separately from the look, so drop back to
-    # stock i3 too -- otherwise the caption buttons stay Win95 under gruvbox.
-    # W95_NO_SWITCH is set by w95-switch itself, which calls us to repaint --
-    # without it the two would call each other until the stack ran out.
-    if [[ -z ${W95_NO_SWITCH:-} && -x $HOME/.local/bin/w95-switch ]]; then
-        "$HOME/.local/bin/w95-switch" off >/dev/null 2>&1 || true
-    fi
 fi
 
 case $palette:$mode in
@@ -106,28 +126,26 @@ fi
 # the generic paths as well would immediately overwrite them with Adapta and
 # a generated Alacritty palette.
 if [[ -n $w95_mode ]]; then
-    # Symmetric with the exit path above, which already calls `w95-switch off`:
-    # without this, `theme light win95` dressed the desktop but left stock i3
-    # running, so there were no Win95 caption buttons on any window. W95_NO_SWITCH
-    # means w95-switch is the one calling us, and has the WM in hand already.
-    if [[ -z ${W95_NO_SWITCH:-} && -x $HOME/.local/bin/w95-switch ]] &&
-        "$HOME/.local/bin/w95-switch" status 2>/dev/null | grep -q '^switchable: yes'; then
-        # Not `|| true`: w95-switch is what puts the patched WM on screen, and
-        # swallowing its failure is what turned a missing palette file into a
-        # silently half-dressed desktop instead of an error anyone could see.
-        "$HOME/.local/bin/w95-switch" on >/dev/null ||
-            { echo "theme: w95-switch on failed — desktop is not in Win95 mode" >&2; exit 1; }
-    else
-        "$HOME/.local/bin/w95" on >/dev/null 2>&1 || true
-    fi
+    # Same reason as the `stock` write on the exit path: `w95 on` ends in an
+    # `i3-msg reload`, and w95-autobar reads this file to decide whether there
+    # should be a taskbar. Set before, not after, or the reload tears down the
+    # bar that `w95 on` just put up.
+    mkdir -p "$HOME/.config/w95"
+    printf 'w95\n' >"$HOME/.config/w95/wm"
+    "$HOME/.local/bin/w95" on >/dev/null 2>&1 || true
 else
-    uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette"
+    # A failing combiner must not abandon the other nine programs: `set -e`
+    # would stop the switch here, and everything below -- i3, dunst, rofi, tmux,
+    # fzf, bat, btop, the wallpaper, the state file -- would keep the old theme
+    # while the terminal took the new one.
+    uv run ~/dotfiles/alacritty/combiner.py "$mode" "$palette" ||
+        printf 'theme: warning: the Alacritty combiner failed; terminals keep their old palette\n' >&2
     # Slack is themed by injected CSS, not by a file, so nothing else here can
     # undo it -- picking gruvbox from the rofi switcher would otherwise leave a
     # Windows 95 Slack sitting in the middle of a gruvbox desktop.
     #
-    # Unconditional rather than folded into the `w95 off` path above: that path is
-    # gated on active-chrome.conf still pointing at win95.conf, and the whole point
+    # Unconditional rather than folded into the `w95 off` path above: that path
+    # only fires when it can still tell Windows 95 was on, and the whole point
     # here is to be the thing that cannot be skipped. It is a no-op when Slack is
     # not running or not reachable, so the cost of calling it always is nothing.
     if [[ -x $HOME/.local/bin/w95-slack ]]; then
@@ -339,6 +357,47 @@ fi
 
 # ---- persist the choice so it survives logout (see theme-restore) ----
 printf '%s %s\n' "$mode" "$palette" >"$HOME/.config/theme/state"
+
+# ---- swap the window manager, last ----
+# The look and the WM are two separate things, and this is where the WM half
+# happens: `--wm-only` writes ~/.config/w95/wm and restarts i3, and does not
+# repaint anything.
+#
+# Last, and `--wm-only`, for two reasons that were each a bug of their own:
+#
+#  * `w95-switch off` with no argument repaints from ~/.config/theme/prew95 --
+#    the theme you were on *before* Windows 95, not the one you just asked for.
+#    Picking dark-gruv out of the rofi switcher therefore ran a whole second
+#    `theme` with the wrong palette, and the two runs then raced file by file
+#    over the wallpaper, Emacs, Alacritty and the state file. It also ran the
+#    `uv run` combiner twice and restarted i3 in the middle, which is most of
+#    why leaving Win95 took the better part of a minute.
+#  * i3 restarting mid-script meant it came up reading whatever palette link
+#    `w95 off` had restored from its (first-ever, stale) backup, and only the
+#    `i3-msg reload` further down put the requested one back.
+#
+# Everything above has already been written by the time we get here, so the
+# restart brings the WM up reading the finished theme, once.
+if [[ -z ${W95_NO_SWITCH:-} && -x $HOME/.local/bin/w95-switch ]] &&
+    "$HOME/.local/bin/w95-switch" status 2>/dev/null | grep -q '^switchable: yes'; then
+    if [[ -n $w95_mode ]]; then
+        # Loud but not fatal. w95-switch is what puts the patched WM on screen
+        # and swallowing its failure is what turned a missing palette file into
+        # a silently half-dressed desktop -- but the only steps left below are
+        # the notification and Emacs, and killing those buys nothing. (It used
+        # to have to exit non-zero: `w95-switch on` read this script's status to
+        # decide whether to roll the assets back. It no longer calls us.)
+        "$HOME/.local/bin/w95-switch" on --wm-only >/dev/null ||
+            echo "theme: w95-switch on failed — the look is Win95, the WM is not" >&2
+    elif [[ -n $leaving_w95 ]]; then
+        "$HOME/.local/bin/w95-switch" off --wm-only >/dev/null 2>&1 || true
+    fi
+elif [[ -n $w95_mode ]]; then
+    # No i3-session wrapper: the assets are on but the patched WM cannot be,
+    # so say so rather than leaving windows with no caption buttons and no
+    # explanation. `w95 on` already ran; this is only the WM half missing.
+    echo "theme: not in the i3-session wrapper — Win95 look applied, but the WM stays stock" >&2
+fi
 
 # ---- desktop notification ----
 command -v notify-send >/dev/null && \

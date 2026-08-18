@@ -77,22 +77,28 @@ restart_i3() {
 
 cmd_on() {
     preflight
-    say "applying Windows 95 assets, palette and GTK settings"
-    # Through `theme`, not `w95` directly: `w95 on` dresses the desktop, but
-    # dunst, rofi, tmux, fzf and bat are generated from the semantic palette
-    # and only `theme` knows how to do that. Calling w95 alone left the Start
-    # menu and every notification in gruvbox.
-    if [[ -x $HOME/bin/theme ]]; then
-        # `theme` calls `w95 on` about half way through, so a failure after that
-        # point leaves Win95 colours, GTK theme and window chrome on top of stock
-        # i3 -- no taskbar, no caption buttons, and `status` still saying "stock".
-        # Undo the assets before reporting, so a failure is a no-op like preflight.
-        if ! W95_NO_SWITCH=1 "$HOME/bin/theme" light win95 >/dev/null; then
-            "$BIN/w95" off >/dev/null 2>&1 || true
-            die "theme light win95 failed — Win95 assets rolled back"
+    # --wm-only: the caller is `theme`, which has already painted everything and
+    # only wants the window manager swapped. Repainting here would be a second
+    # full `theme` run inside the first one.
+    if [[ ${1:-} != --wm-only ]]; then
+        say "applying Windows 95 assets, palette and GTK settings"
+        # Through `theme`, not `w95` directly: `w95 on` dresses the desktop, but
+        # dunst, rofi, tmux, fzf and bat are generated from the semantic palette
+        # and only `theme` knows how to do that. Calling w95 alone left the Start
+        # menu and every notification in gruvbox.
+        if [[ -x $HOME/bin/theme ]]; then
+            # `theme` calls `w95 on` about half way through, so a failure after
+            # that point leaves Win95 colours, GTK theme and window chrome on top
+            # of stock i3 -- no taskbar, no caption buttons, and `status` still
+            # saying "stock". Undo the assets before reporting, so a failure is a
+            # no-op like preflight.
+            if ! W95_NO_SWITCH=1 "$HOME/bin/theme" light win95 >/dev/null; then
+                "$BIN/w95" off >/dev/null 2>&1 || true
+                die "theme light win95 failed — Win95 assets rolled back"
+            fi
+        else
+            "$BIN/w95" on >/dev/null || die "w95 on failed"
         fi
-    else
-        "$BIN/w95" on >/dev/null || die "w95 on failed"
     fi
     mkdir -p "$(dirname "$STATE")"
     printf 'w95\n' >"$STATE"
@@ -107,14 +113,22 @@ cmd_on() {
 
 cmd_off() {
     printf 'stock\n' >"$STATE"
-    pkill -f "bin/w95bar" 2>/dev/null
-    # Repaint everything back to whatever we were on before Windows 95, which
-    # `theme` stashed in prew95 on the way in. This also runs `w95 off`.
-    prev=$(cat "$HOME/.config/theme/prew95" 2>/dev/null || echo "dark gruvbox")
-    if [[ -x $HOME/bin/theme ]]; then
-        W95_NO_SWITCH=1 "$HOME/bin/theme" $prev >/dev/null 2>&1 || true
-    else
-        "$BIN/w95" off >/dev/null 2>&1
+    pkill -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' 2>/dev/null
+    # --wm-only: `theme` is the caller and has already repainted -- to the
+    # palette the user actually picked. Repainting here would undo that with
+    # prew95 (the theme from *before* Windows 95), which is how choosing
+    # dark-gruv out of the rofi switcher used to run a second, whole `theme` for
+    # a different palette, race the first one file by file, and take most of a
+    # minute doing it.
+    if [[ ${1:-} != --wm-only ]]; then
+        # Repaint back to whatever we were on before Windows 95, which `theme`
+        # stashed in prew95 on the way in. This also runs `w95 off`.
+        prev=$(cat "$HOME/.config/theme/prew95" 2>/dev/null || echo "dark gruvbox")
+        if [[ -x $HOME/bin/theme ]]; then
+            W95_NO_SWITCH=1 "$HOME/bin/theme" $prev >/dev/null 2>&1 || true
+        else
+            "$BIN/w95" off >/dev/null 2>&1
+        fi
     fi
     say "restarting i3 into stock i3"
     restart_i3
@@ -122,8 +136,8 @@ cmd_off() {
 }
 
 case "${1:-status}" in
-on) cmd_on ;;
-off) cmd_off ;;
+on) shift; cmd_on "$@" ;;
+off) shift; cmd_off "$@" ;;
 toggle) [[ $(current) == w95 ]] && cmd_off || cmd_on ;;
 status)
     printf 'state    : %s\n' "$(current)"
@@ -132,7 +146,7 @@ status)
         "$(readlink -f "/proc/$(wm_pid)/exe" 2>/dev/null || echo 'no window manager found')"
     printf 'i3-95    : %s\n' "$([[ -x $I3_95 ]] && echo built || echo 'not built (w95 wm install)')"
     printf 'keys     : %s\n' "$(basename "$(readlink -f "$KEYS" 2>/dev/null)" 2>/dev/null || echo none)"
-    printf 'taskbar  : %s\n' "$(pgrep -f 'bin/w95bar' >/dev/null && echo running || echo stopped)"
+    printf 'taskbar  : %s\n' "$(pgrep -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' >/dev/null && echo running || echo stopped)"
     printf 'switchable: %s\n' "$(under_wrapper && echo yes || echo 'no — not in the i3-session wrapper')"
     ;;
 *) sed -n '2,10p' "$(readlink -f "$0")" | sed 's/^# \?//'; exit 1 ;;

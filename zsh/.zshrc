@@ -311,6 +311,158 @@ klif() {
 }
 
 #---------------------------------------------------------------------------
+# tmux + claude
+#---------------------------------------------------------------------------
+
+# claw [home] [claude args...] — start a tmux session named after the current
+# directory and run `claude --dangerously-skip-permissions` in it.
+# `claw --help` prints the usage plus the homes it found.
+
+# Account tags are the ones on the i3 bar and the w95 System Monitor. Source of
+# truth is the LABELS map in ~/dotfiles/i3-pkg/scripts/claude-usage.sh — keep
+# these in step with it. There, "work" is ~/claude-prim under its legacy name
+# and "private" is the real HOME, so claw translates prim → work.
+typeset -gA CLAW_TAGS=([work]=W [private]=P [builder]=B [sales]=S [success]=CS)
+
+# From the passwd entry, not $HOME: a nested claw (inside a session that already
+# overrode HOME) must still find the homes next to the real one.
+_claw_root() { getent passwd "$(id -un)" | cut -d: -f6; }
+
+# A real home has a .claude/ inside — that also keeps `claw memory` (a backup
+# dir) from being read as a home instead of as a prompt for claude.
+_claw_homes() {
+  local -a h; h=($(_claw_root)/claude-*/.claude(/N:h:t))
+  print -l -- "${h[@]#claude-}"
+}
+
+# Tag for a home suffix; "" means the real HOME, whose account the bar switches
+# by copying credentials into ~/.claude, so read the bar's active-account file.
+_claw_tag() {
+  local acct="$1"
+  [[ "$acct" == prim ]] && acct=work
+  if [[ -z "$acct" ]]; then
+    local f="$(_claw_root)/.config/claude-active-account"
+    [[ -r "$f" ]] && acct="${$(<"$f")//[[:space:]]/}"
+    [[ -n "$acct" ]] || acct=private
+  fi
+  print -r -- "${CLAW_TAGS[$acct]:-${(U)acct[1,1]}}"
+}
+
+_claw_help() {
+  local root="$(_claw_root)" h
+  print -r -- "claw — claude --dangerously-skip-permissions in a fresh tmux session"
+  print -r -- ""
+  print -r -- "usage: claw [home|main] [claude args...]"
+  print -r -- "       claw --help | -h"
+  print -r -- ""
+  print -r -- "The session is named after the current directory plus the account tag the i3"
+  print -r -- "bar uses, so \`tmux ls\` says which account every session is on:"
+  print -r -- "       ~/legartis4 + builder  ->  legartis4-B"
+  print -r -- "A name already in use gets a numeric suffix: legartis4-B-2, legartis4-B-3, …"
+  print -r -- ""
+  print -r -- "homes (tab-completes):"
+  printf '       %-10s %-3s %s\n' "<none>" "$(_claw_tag)" "\$HOME as it is — active account: $(
+      f="$root/.config/claude-active-account"; [[ -r $f ]] && print -rn -- "${$(<$f)//[[:space:]]/}" || print -rn -- private)"
+  for h in $(_claw_homes); do
+    printf '       %-10s %-3s %s\n' "$h" "$(_claw_tag "$h")" "HOME=$root/claude-$h"
+  done
+  print -r -- ""
+  print -r -- "With NO home named, the account is chosen by usage — the same selector"
+  print -r -- "cmon/cherd's \"C\" spawns use (\`claude-account explain\` shows why). \`claw main\`"
+  print -r -- "opts out and uses \$HOME as it is."
+  print -r -- ""
+  print -r -- "Every other word goes to claude, in any order — the home is picked out"
+  print -r -- "wherever it sits, so these are the same:"
+  print -r -- "       claw builder -c            claw -c builder"
+  print -r -- ""
+  print -r -- "claude's own flags still work, the short ones included:"
+  print -r -- "       -c, --continue             resume the last session in this directory"
+  print -r -- "       -r, --resume               pick a session from the list"
+  print -r -- "       claw \"fix the flaky test\"  start on a prompt"
+  print -r -- "Full set: \`claude --help\`."
+}
+
+# Repo-relative selector, shared with cmon/cherd's "C" spawns — see
+# services/backend/util/util/linear-viewer/claude_accounts.py. Overridable for a
+# checkout somewhere else; silently unused if the repo isn't there.
+: ${LEGARTIS_REPO:=$HOME/legartis}
+
+claw() {
+  local root="$(_claw_root)"
+
+  if [[ "$1" == (--help|-h) ]]; then
+    _claw_help
+    return 0
+  fi
+
+  # The home may sit anywhere in the line, so `claw -c builder` works as well as
+  # `claw builder -c`. Only a whole argument matching a real home counts; every
+  # other word keeps its order and goes to claude. "main" is a name too — it means
+  # the real $HOME, and it has to be matched here or it would be passed to claude
+  # as a prompt.
+  local chome="" cname="" a picked=""
+  local -a rest
+  for a in "$@"; do
+    if [[ -z "$chome" && -z "$cname" && "$a" == main ]]; then
+      cname=main
+    elif [[ -z "$chome" && "$cname" != main && -d "$root/claude-$a/.claude" ]]; then
+      cname="$a"; chome="$root/claude-$a"
+    else
+      rest+=("$a")
+    fi
+  done
+  set -- "${rest[@]}"
+
+  # No account named: ask the selector, exactly as a "C" spawn does, and let it
+  # count this session as in-flight load so a second claw a minute later lands
+  # somewhere else. `claw main` opts out; so does an unreachable selector, which
+  # leaves $HOME alone — i.e. the behaviour claw had before it could choose.
+  if [[ -z "$cname" ]]; then
+    picked="$("$LEGARTIS_REPO"/tools/claude-account pick --home --commit 2>/dev/null)" || picked=""
+    if [[ -n "$picked" && -d "$picked/.claude" ]]; then
+      chome="$picked"
+      cname="${picked:t}"          # /home/x/claude-prim -> claude-prim
+      cname="${cname#claude-}"     #                     -> prim
+    fi
+  fi
+
+  local base="${PWD:t}"
+  base="${base//[.:[:space:]]/-}"   # tmux gives "." and ":" a special meaning
+  [[ -n "$base" ]] || base="claude"
+  # "main" is the real $HOME, whose tag the i3 bar derives from the active-account
+  # file — that is what _claw_tag does with an empty name, so don't tag it "M".
+  base="${base}-$(_claw_tag "${cname:#main}")"
+
+  local name="$base" n=2
+  while tmux has-session -t "=$name" 2>/dev/null; do
+    name="${base}-$((n++))"
+  done
+
+  local cmd="claude --dangerously-skip-permissions"
+  (( $# )) && cmd+=" ${(q)@}"
+
+  # -e keeps HOME set for every pane of the session, not just the first command.
+  # Must be a real array: "${chome:+-e HOME=$chome}" collapses into one word,
+  # which tmux ignores silently instead of rejecting.
+  local -a envopt
+  [[ -n "$chome" ]] && envopt=(-e "HOME=$chome")
+
+  tmux new-session -d -s "$name" -c "$PWD" "${envopt[@]}" "$cmd" || return
+  if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "=$name"
+  else
+    tmux attach-session -t "=$name"
+  fi
+}
+
+_claw() {
+  local -a homes
+  homes=($(_claw_root)/claude-*/.claude(/N:h:t))
+  _describe 'claude home' "${homes[@]#claude-}"
+}
+(( $+functions[compdef] )) && compdef _claw claw
+
+#---------------------------------------------------------------------------
 # External tools
 #---------------------------------------------------------------------------
 

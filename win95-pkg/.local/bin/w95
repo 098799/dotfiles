@@ -288,17 +288,68 @@ restore_emacs_theme() {
         >/dev/null 2>&1 || true
 }
 
+# The X cursor theme. Not part of gtk_set: Xcursor is not GTK, and every app
+# that is not a GTK app -- rofi, the root window, Emacs, alacritty, Chromium --
+# takes its pointer from ~/.icons/default/index.theme and from nothing else.
+# `on` used to write this file and `off` never touched it, so the one thing on
+# the desktop that followed the mouse everywhere stayed Windows 95 for good, no
+# matter how many times you picked gruvbox afterwards.
+CURSOR_INDEX="$HOME/.icons/default/index.theme"
+
+cursor_is_w95() {
+    grep -qi 'Chicago95' "$CURSOR_INDEX" 2>/dev/null
+}
+
+backup_cursor() {
+    # Nothing to remember once we are already wearing Chicago95: that would
+    # record our own choice as its own predecessor. Same guard, and for the
+    # same reason, as backup_emacs_theme.
+    cursor_is_w95 && return 0
+    mkdir -p "$BACKUP"
+    if [[ -f $CURSOR_INDEX ]]; then
+        cp "$CURSOR_INDEX" "$BACKUP/cursor-index.theme"
+    else
+        # No file at all is a state in its own right -- X then falls back to
+        # the system default -- and it has to be restorable as such.
+        rm -f "$BACKUP/cursor-index.theme"
+        : >"$BACKUP/cursor-absent"
+    fi
+}
+
+restore_cursor() {
+    if [[ -f $BACKUP/cursor-index.theme ]]; then
+        mkdir -p "$(dirname "$CURSOR_INDEX")"
+        cp "$BACKUP/cursor-index.theme" "$CURSOR_INDEX"
+    elif [[ -f $BACKUP/cursor-absent ]]; then
+        rm -f "$CURSOR_INDEX"
+    elif cursor_is_w95; then
+        # No note either way, but the file on disk is demonstrably ours. An
+        # Adwaita pointer is a far better guess than leaving Windows 95 on a
+        # gruvbox desktop, which is the one outcome we know is wrong.
+        printf '[Icon Theme]\nInherits=Adwaita\n' >"$CURSOR_INDEX"
+    fi
+}
+
+# Deliberately re-recorded on every `on`, not written once and kept forever.
+# The `[[ -f … ]] ||` guards these used to carry meant the backup was whatever
+# the desktop looked like the *first* time Windows 95 was ever switched on --
+# so `off` restored an August GTK theme, icon set and terminal palette to a
+# machine that had changed themes a dozen times since. The case guards are what
+# keep Windows 95 from being recorded as its own predecessor; this is the same
+# fix backup_emacs_theme already carries, and for the same reason.
 backup_gtk() {
     mkdir -p "$BACKUP"
-    [[ -f $BACKUP/gtk-3.0-settings.ini ]] ||
+    grep -q 'Chicago95' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null ||
         cp "$HOME/.config/gtk-3.0/settings.ini" "$BACKUP/gtk-3.0-settings.ini" 2>/dev/null || true
-    [[ -f $BACKUP/xsettingsd.conf ]] ||
+    grep -q 'Chicago95' "$HOME/.config/xsettingsd/xsettingsd.conf" 2>/dev/null ||
         cp "$HOME/.config/xsettingsd/xsettingsd.conf" "$BACKUP/xsettingsd.conf" 2>/dev/null || true
-    [[ -f $BACKUP/palette ]] ||
-        readlink -f "$PALETTE" >"$BACKUP/palette" 2>/dev/null || true
+    case $(readlink -f "$PALETTE" 2>/dev/null) in
+        *win95*) ;;
+        ?*) readlink -f "$PALETTE" >"$BACKUP/palette" ;;
+    esac
     # `theme` *generates* active-palette.toml rather than linking it, so the
     # terminal palette has to be copied aside, not remembered by name.
-    [[ -f $BACKUP/alacritty-palette.toml ]] ||
+    grep -q 'Windows 95' "$ALACRITTY" 2>/dev/null ||
         cp "$ALACRITTY" "$BACKUP/alacritty-palette.toml" 2>/dev/null || true
 }
 
@@ -306,6 +357,7 @@ backup_gtk() {
 cmd_on() {
     install_assets
     backup_gtk
+    backup_cursor
     backup_emacs_theme
     backup_claude_theme
 
@@ -360,9 +412,8 @@ cmd_on() {
         "Xft/Antialias 1" \
         "Xft/HintStyle \"hintfull\""
 
-    mkdir -p "$HOME/.icons/default"
-    printf '[Icon Theme]\nInherits=Chicago95_Standard_Cursors\n' \
-        >"$HOME/.icons/default/index.theme"
+    mkdir -p "$(dirname "$CURSOR_INDEX")"
+    printf '[Icon Theme]\nInherits=Chicago95_Standard_Cursors\n' >"$CURSOR_INDEX"
 
     say "dressing Emacs in the win95 theme"
     emacs_theme_set win95
@@ -405,6 +456,10 @@ cmd_off() {
         pkill -HUP -x xsettingsd 2>/dev/null || true
     fi
     ln -sfn "$I3DIR/chrome.d/stock.conf" "$CHROME"
+    # The pointer. Xcursor reads ~/.icons/default/index.theme once per client at
+    # startup, so this fixes every app opened from here on; anything still up
+    # keeps the Win95 pointer until it is restarted. That is X, not us.
+    restore_cursor
     # Cleared rather than restored from a backup: the pre-Win95 state is the
     # absence of an override, and the size the user has since chosen with
     # `big-font` lives in active-font.toml, which was never touched.
@@ -419,11 +474,11 @@ cmd_off() {
     if [[ -x $PKG/.local/bin/w95-slack ]]; then
         "$PKG/.local/bin/w95-slack" off >/dev/null 2>&1 || true
     fi
-    pkill -f "bin/w95bar" 2>/dev/null || true
+    pkill -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' 2>/dev/null || true
     # The icons go too. They are an override-redirect window the WM knows
     # nothing about, so nothing else will ever clean them up -- leaving them
     # running put a teal desktop with Win95 icons underneath a gruvbox session.
-    pkill -f "bin/w95-desktop" 2>/dev/null || true
+    pkill -f '^([^ ]*python3? )?[^ ]*bin/w95-desktop( |$)' 2>/dev/null || true
     if command -v i3-msg >/dev/null && i3-msg -t get_version >/dev/null 2>&1; then
         i3-msg -q reload
         i3-msg -q '[class=".*"] border pixel 10'
@@ -436,10 +491,12 @@ cmd_status() {
     printf 'chrome  : %s\n' "$(basename "$(readlink -f "$CHROME" 2>/dev/null)" 2>/dev/null || echo '(none)')"
     printf 'gtk     : %s\n' \
         "$(sed -n 's/^gtk-theme-name=//p' "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null)"
+    printf 'cursor  : %s\n' \
+        "$(sed -n 's/^Inherits=//p' "$CURSOR_INDEX" 2>/dev/null || echo '(none)')"
     printf 'terminal: %s\n' \
         "$(grep -q 'Windows 95' "$ALACRITTY" 2>/dev/null && echo win95 || echo stock)"
     printf 'taskbar : %s\n' \
-        "$(pgrep -f 'bin/w95bar' >/dev/null && echo running || echo stopped)"
+        "$(pgrep -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' >/dev/null && echo running || echo stopped)"
     printf 'wm      : %s\n' "$(i3 --version 2>/dev/null)"
     printf 'i3-95   : %s\n' \
         "$([[ -x $HOME/.local/bin/i3-95 ]] && echo installed || echo 'not built (w95 wm)')"

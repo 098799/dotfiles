@@ -152,6 +152,13 @@ What the museum build taught, all of it baked into the snippet:
 - Wikidata's label service sometimes returns the bare QID instead of a name.
   Always have a fallback (the Wikipedia article title) *and* a repair pass —
   26 painters shipped as "Q44007 · 15" before anyone noticed.
+- **Django template comments are single-line.** A multi-line `{# … #}` is not
+  a comment at all — Django parses its contents, so any `{% … %}` you wrote
+  inside as documentation actually executes. `keys.html` shipped with its
+  own `{% include "_keys.html" %}` example inside such a header and 500'd
+  pypen on adoption (fixed 2026-08-18). Use `{% comment %}…{% endcomment %}`.
+  Jinja is fine with multi-line `{# #}`; Django is not, and these snippets
+  now get used by both.
 - Inline `<script>` in a Jinja block runs **before** anything included at the
   end of `<body>`. If page code needs the shared layer, wire it on
   `DOMContentLoaded` (and call it directly after a soft nav, where the layer

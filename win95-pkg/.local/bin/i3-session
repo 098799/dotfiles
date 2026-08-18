@@ -65,7 +65,7 @@ while :; do
     # Tear the rest of the shell down too. Without this you land in stock i3
     # still wearing the Win95 palette, with an orphaned taskbar that the next
     # startup would stack a second copy on top of.
-    pkill -f "bin/w95bar" 2>/dev/null
+    pkill -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' 2>/dev/null
     "$HOME/.local/bin/w95" off >/dev/null 2>&1
     # Drop i3's accumulated restart arguments: the saved layout belongs to the
     # process that just crashed and replaying it could reproduce the crash.

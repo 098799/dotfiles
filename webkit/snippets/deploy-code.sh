@@ -1,8 +1,8 @@
 #!/bin/bash
-# Deploy museum *code* from rcmon (canonical repo) to bae_llm public mirror.
+# Deploy museum *code* from p340 (canonical repo) to bae_llm public mirror.
 # Content (db snapshot + images) travels separately via museum-public-sync.sh.
 # The bae venv (/opt/museum/.venv, excluded) only needs updating if the web
-# app grows a new dependency - thumbs/ingest run on rcmon only.
+# app grows a new dependency - thumbs/ingest run on p340 only.
 set -e
 rsync -a --delete --exclude .venv --exclude data --exclude .git \
   --exclude .playwright-mcp --exclude .pytest_cache \

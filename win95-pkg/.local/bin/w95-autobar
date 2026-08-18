@@ -20,7 +20,7 @@ if [[ $state == w95 ]]; then
         >>"$HOME/.local/state/w95/bar.log" 2>&1 </dev/null
     xsetroot -solid '#008080' 2>/dev/null
 else
-    pkill -f "bin/w95bar" 2>/dev/null
+    pkill -f '^([^ ]*python3? )?[^ ]*bin/w95bar( |$)' 2>/dev/null
     # Hand the desktop back to whatever feh was showing.
     [[ -x $HOME/.fehbg ]] && "$HOME/.fehbg" 2>/dev/null
 fi
