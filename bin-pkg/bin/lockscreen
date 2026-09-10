@@ -14,6 +14,14 @@ wp=$(grep -oE '/[^ ]+\.(png|jpg|jpeg|webp)' "$HOME/.fehbg" 2>/dev/null | tail -1
 
 export XSECURELOCK_NO_PAM_RHOST=1
 
+# picom unmaps windows in an order xsecurelock reads as compositor
+# misbehaviour, so its obscurer window flashes
+# "INCOMPATIBLE COMPOSITOR, PLEASE FIX!" for a frame or two at every lock.
+# Upstream's own fix for picom (xsecurelock README, 'Known issues') is to
+# drop the obscurer. It is only a backstop against a compositor unmapping
+# the locker window; the grabs and the PAM conversation are untouched.
+export XSECURELOCK_COMPOSITE_OBSCURER=0
+
 # Under Windows 95 the wallpaper saver is wrong twice over: the desktop is a
 # flat teal with no image to dim, and the era had actual screensavers. Detected
 # from the palette symlink rather than ~/.config/w95/wm, because that file

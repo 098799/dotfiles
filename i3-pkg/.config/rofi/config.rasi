@@ -20,12 +20,16 @@ configuration {
     border-color:                @base01;
 }
 
+/* Rounded to match picom's 10px window corners, and a little wider than the
+   default so long command lines do not truncate. picom draws the shadow. */
 window {
     background-color:            @background;
     border:                      2px;
     border-color:                @base01;
-    border-radius:               0px;
+    border-radius:               12px;
     padding:                     0px;
+    width:                       46%;
+    y-offset:                    -6%;
 }
 
 mainbox {
@@ -37,7 +41,8 @@ mainbox {
 inputbar {
     background-color:            @background-alt;
     text-color:                  @foreground;
-    padding:                     8px 12px;
+    padding:                     10px 14px;
+    border-radius:               10px 10px 0px 0px;
     children:                    [ prompt, entry ];
 }
 
@@ -56,7 +61,7 @@ entry {
 
 listview {
     background-color:            transparent;
-    padding:                     4px;
+    padding:                     6px;
     columns:                     1;
     lines:                       8;
     fixed-height:                false;
@@ -64,11 +69,12 @@ listview {
     scrollbar:                   false;
 }
 
+/* The selected row is a rounded pill, not a full-width slab. */
 element {
     background-color:            transparent;
     text-color:                  @foreground;
-    padding:                     6px 12px;
-    border-radius:               0px;
+    padding:                     7px 12px;
+    border-radius:               8px;
 }
 
 element normal.normal {

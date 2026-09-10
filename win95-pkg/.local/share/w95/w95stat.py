@@ -404,6 +404,68 @@ def wifi_signal(iface):
     return max(0, min(100, int((int(match.group(1)) + 100) * 2)))
 
 
+def wifi_rates(iface):
+    """Rx/tx PHY rates as {"rx": (mbit, mcs_or_None), "tx": ...}, or None.
+
+    Signal strength alone hides the failure this exists to show. The MT7925
+    firmware wedges its *receive* chain: rx pins at VHT-MCS 0 (13 MBit/s) while
+    tx still negotiates MCS 9 (400 MBit/s), at an unchanged -40 dBm. The Signal
+    gauge reads full, throughput is ~1% of the link, and nothing else on this
+    panel would give it away. Seeing "13 / 400" is the whole diagnosis.
+    """
+    out = _run(["iw", "dev", iface, "link"])
+    rates = {}
+    for direction in ("rx", "tx"):
+        match = re.search(r"^\s*%s bitrate:\s*([\d.]+) MBit/s(.*)$" % direction,
+                          out, re.M)
+        if not match:
+            continue
+        mcs = re.search(r"MCS (\d+)", match.group(2))
+        rates[direction] = (float(match.group(1)),
+                            int(mcs.group(1)) if mcs else None)
+    return rates or None
+
+
+def wifi_driver(iface):
+    """The kernel module bound to the NIC, e.g. "mt7925e"."""
+    try:
+        return os.path.basename(
+            os.readlink("/sys/class/net/%s/device/driver" % iface))
+    except OSError:
+        return None
+
+
+def reset_wifi(iface):
+    """Reload the wireless driver, rebooting the card's firmware.
+
+    The only thing that clears the rx-MCS-0 wedge: re-associating, switching AP
+    and a NetworkManager reconnect all leave the firmware as it was. Measured
+    21 Aug 2026 -- 190 KB/s and 821 ms RTT before, 13-16 MB/s and 8 ms after.
+
+    Passwordless via /etc/sudoers.d/wifi-reset, which grants exactly the two
+    mt7925e modprobe lines. In a terminal because the link goes away for ~10s
+    and the before/after rates are worth watching.
+    """
+    module = wifi_driver(iface)
+    if not module:
+        return False
+    return term(
+        "echo Before:; iw dev {i} link | grep bitrate; echo; "
+        "echo Reloading {m}...; "
+        "sudo modprobe -r {m} && sleep 2 && sudo modprobe {m} || "
+        "{{ echo FAILED; exit 1; }}; "
+        "for _ in $(seq 20); do "
+        "iw dev {i} link 2>/dev/null | grep -q bitrate && break; sleep 1; done; "
+        "echo; echo After:; iw dev {i} link | grep bitrate".format(i=iface,
+                                                                  m=module))
+
+
+def wifi_rescan(iface):
+    """Ask NetworkManager for a fresh scan, then show what it found."""
+    return term("nmcli dev wifi rescan ifname %s 2>/dev/null; sleep 2; "
+                "nmcli dev wifi list ifname %s" % (iface, iface))
+
+
 # ── uptime, host ────────────────────────────────────────────────────────
 
 def uptime_seconds():

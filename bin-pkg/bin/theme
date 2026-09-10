@@ -201,45 +201,13 @@ if [[ -f $claude_settings ]]; then
     jq --arg t "$mode" '.theme = $t' "$claude_settings" >"$tmp" && mv "$tmp" "$claude_settings"
 fi
 
-wallpaper_dir=$HOME/Pictures/wallpapers
-wallpaper=""
-# Prefer numbered variants ($palette-$mode-1.png, -2, …) and pick one at random
-# so each theme switch / login can rotate between several wallpapers. The choice
-# is baked into ~/.fehbg, so an i3 reload replays the same pick (no re-roll on reload).
-variants=()
-for ext in png jpg jpeg; do
-    for cand in "$wallpaper_dir/$palette-$mode"-*."$ext"; do
-        [[ -f $cand ]] && variants+=("$cand")
-    done
-done
-if (( ${#variants[@]} )); then
-    wallpaper="${variants[RANDOM % ${#variants[@]}]}"
-fi
-# fall back to the legacy single file $palette-$mode.<ext>
-if [[ -z $wallpaper ]]; then
-    for ext in png jpg jpeg; do
-        cand="$wallpaper_dir/$palette-$mode.$ext"
-        if [[ -f $cand ]]; then wallpaper=$cand; break; fi
-    done
-fi
-# fall back to a per-mode wallpaper, then the existing default
-if [[ -z $wallpaper ]]; then
-    for ext in png jpg jpeg; do
-        cand="$wallpaper_dir/$mode.$ext"
-        if [[ -f $cand ]]; then wallpaper=$cand; break; fi
-    done
-fi
-if [[ -z $wallpaper && -f $HOME/Pictures/legartis-escher.png ]]; then
-    wallpaper=$HOME/Pictures/legartis-escher.png
-fi
-# Win95 has no wallpaper -- it is a flat teal root with icons on top, and
-# feh would paint straight over both.
-[[ -n $w95_mode ]] && wallpaper=""
-if [[ -n $wallpaper ]] && command -v feh >/dev/null; then
-    feh --no-fehbg --bg-scale "$wallpaper"
-    printf '#!/bin/sh\nfeh --no-fehbg --bg-scale %q\n' "$wallpaper" >"$HOME/.fehbg"
-    chmod +x "$HOME/.fehbg"
-fi
+# Wallpaper selection lives in ~/bin/wallpaper-pick, because a screen-layout
+# change alters the aspect ratio without touching the theme -- the
+# ~/.screenlayout/*.sh scripts call the same script so a 21:9 image never ends
+# up squashed onto the laptop panel. It reads ~/.config/theme/state when run
+# with no arguments, but state is only written further down, so pass the pair
+# we are switching to. win95 is handled inside (it has no wallpaper at all).
+"$HOME/bin/wallpaper-pick" "$mode" "$palette" || true
 
 i3_colors_dir=$HOME/.config/i3/colors.d
 if [[ -d $i3_colors_dir ]]; then

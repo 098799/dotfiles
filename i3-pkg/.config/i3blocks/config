@@ -21,6 +21,10 @@ interval=60
 command=~/scripts/cpu.sh
 interval=5
 
+[temp]
+command=~/scripts/temp.sh
+interval=5
+
 [memory]
 command=~/scripts/memory.sh
 interval=10
@@ -75,6 +79,11 @@ signal=11
 command=~/scripts/cpu-boost.sh
 interval=30
 signal=13
+
+[cpu-cap]
+command=~/scripts/cpu-cap.sh
+interval=30
+signal=14
 
 [power-profile]
 command=~/scripts/power-profile.sh

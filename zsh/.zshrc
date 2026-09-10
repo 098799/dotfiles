@@ -462,6 +462,19 @@ _claw() {
 }
 (( $+functions[compdef] )) && compdef _claw claw
 
+# fable [home] [claude args...] — claw on Fable 5.1 at low effort. Same account
+# picking, same tmux naming; any later --model/--effort on the line wins because
+# claude takes the last occurrence.
+fable() {
+  if [[ "$1" == (--help|-h) ]]; then
+    print -r -- "fable — claw with --model claude-fable-5-1 --effort low"
+    print -r -- "usage: fable [home|main] [claude args...]   (see claw --help)"
+    return 0
+  fi
+  claw "$@" --model claude-fable-5-1 --effort low
+}
+(( $+functions[compdef] )) && compdef _claw fable
+
 #---------------------------------------------------------------------------
 # External tools
 #---------------------------------------------------------------------------

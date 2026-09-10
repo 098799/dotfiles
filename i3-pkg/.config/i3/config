@@ -252,6 +252,21 @@ bindsym $mod+Shift+v restart
 bindsym $mod+Shift+x exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -b 'Yes, exit i3' 'i3-msg exit'"
 
 # resize window (you can also use the mouse for that)
+#
+# Three step sizes on every key: plain = 10 px, Shift = 50 px, Ctrl = 2 px.
+# The hjkl-style keys keep the original meaning (edge on the right/bottom):
+#   j / Left   shrink width      semicolon / Right  grow width
+#   l / Up     shrink height     k / Down           grow height
+# Floating windows get a few extras. `width`/`height` only move the right and
+# bottom edges, so the window creeps toward the bottom-right when you grow it.
+#   plus / minus         grow / shrink ALL four edges at once (stays centred)
+#   Shift+plus / minus   the same by 50 px per edge
+#   Ctrl+plus / minus    the same by 2 px per edge
+#   h / n / u / m        grow the LEFT / DOWN / UP / RIGHT edge only (Shift = 50 px)
+#   c                    move the window to the centre of the screen
+#   1 / 2 / 3            presets: 50% / 75% / 90% of the screen, centred
+# Tiling windows only understand width/height, so plus/minus and the edge keys
+# fall back to the nearest tiling equivalent there.
 mode "resize" {
         bindsym j resize shrink width 10 px or 10 ppt
         bindsym k resize grow height 10 px or 10 ppt
@@ -261,8 +276,63 @@ mode "resize" {
         bindsym Down resize grow height 10 px or 10 ppt
         bindsym Up resize shrink height 10 px or 10 ppt
         bindsym Right resize grow width 10 px or 10 ppt
+
+        # big steps
+        bindsym Shift+j resize shrink width 50 px or 20 ppt
+        bindsym Shift+k resize grow height 50 px or 20 ppt
+        bindsym Shift+l resize shrink height 50 px or 20 ppt
+        bindsym Shift+semicolon resize grow width 50 px or 20 ppt
+        bindsym Shift+Left resize shrink width 50 px or 20 ppt
+        bindsym Shift+Down resize grow height 50 px or 20 ppt
+        bindsym Shift+Up resize shrink height 50 px or 20 ppt
+        bindsym Shift+Right resize grow width 50 px or 20 ppt
+
+        # fine steps
+        bindsym Ctrl+j resize shrink width 2 px or 2 ppt
+        bindsym Ctrl+k resize grow height 2 px or 2 ppt
+        bindsym Ctrl+l resize shrink height 2 px or 2 ppt
+        bindsym Ctrl+semicolon resize grow width 2 px or 2 ppt
+        bindsym Ctrl+Left resize shrink width 2 px or 2 ppt
+        bindsym Ctrl+Down resize grow height 2 px or 2 ppt
+        bindsym Ctrl+Up resize shrink height 2 px or 2 ppt
+        bindsym Ctrl+Right resize grow width 2 px or 2 ppt
+
+        # all four edges at once (floating stays centred)
+        bindsym plus resize grow left 10 px; resize grow right 10 px; resize grow up 10 px; resize grow down 10 px
+        bindsym minus resize shrink left 10 px; resize shrink right 10 px; resize shrink up 10 px; resize shrink down 10 px
+        bindsym Shift+plus resize grow left 50 px; resize grow right 50 px; resize grow up 50 px; resize grow down 50 px
+        bindsym Shift+minus resize shrink left 50 px; resize shrink right 50 px; resize shrink up 50 px; resize shrink down 50 px
+        bindsym Ctrl+plus resize grow left 2 px; resize grow right 2 px; resize grow up 2 px; resize grow down 2 px
+        bindsym Ctrl+minus resize shrink left 2 px; resize shrink right 2 px; resize shrink up 2 px; resize shrink down 2 px
+        # the same on the keypad
+        bindsym KP_Add resize grow left 10 px; resize grow right 10 px; resize grow up 10 px; resize grow down 10 px
+        bindsym KP_Subtract resize shrink left 10 px; resize shrink right 10 px; resize shrink up 10 px; resize shrink down 10 px
+        bindsym Shift+KP_Add resize grow left 50 px; resize grow right 50 px; resize grow up 50 px; resize grow down 50 px
+        bindsym Shift+KP_Subtract resize shrink left 50 px; resize shrink right 50 px; resize shrink up 50 px; resize shrink down 50 px
+
+        # one edge at a time: h=left n=down u=up m=right
+        bindsym h resize grow left 10 px or 10 ppt
+        bindsym n resize grow down 10 px or 10 ppt
+        bindsym u resize grow up 10 px or 10 ppt
+        bindsym m resize grow right 10 px or 10 ppt
+        bindsym Shift+h resize grow left 50 px or 20 ppt
+        bindsym Shift+n resize grow down 50 px or 20 ppt
+        bindsym Shift+u resize grow up 50 px or 20 ppt
+        bindsym Shift+m resize grow right 50 px or 20 ppt
+        bindsym Ctrl+h resize shrink left 10 px or 10 ppt
+        bindsym Ctrl+n resize shrink down 10 px or 10 ppt
+        bindsym Ctrl+u resize shrink up 10 px or 10 ppt
+        bindsym Ctrl+m resize shrink right 10 px or 10 ppt
+
+        # floating presets and centring
+        bindsym c move position center
+        bindsym 1 resize set 50 ppt 50 ppt; move position center
+        bindsym 2 resize set 75 ppt 75 ppt; move position center
+        bindsym 3 resize set 90 ppt 90 ppt; move position center
+
         bindsym Return mode "default"
         bindsym Escape mode "default"
+        bindsym $mod+Shift+w mode "default"
 }
 
 # exec_always --no-startup-id $HOME/.config/polybar/launch.sh
@@ -282,14 +352,34 @@ exec_always --no-startup-id sh -c '[ -x "$HOME/.fehbg" ] && "$HOME/.fehbg"'
 bindsym Ctrl+$mod1+l exec --no-startup-id $HOME/bin/lockscreen
 exec --no-startup-id xss-lock -- $HOME/bin/lockscreen
 
+# Compositor. Was never in this config: the instance that had been running was
+# started by hand (and with `--backend xrender`, which overrode the config's
+# glx and silently disabled dual_kawase blur). No flags here on purpose —
+# everything lives in ~/.config/picom.conf.
+exec --no-startup-id picom
+
 bindsym Mod1+F4 kill
 # bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -l style=dash,width=3,color="red" -s
 bindsym $mod+$mod1+Shift+k --release exec --no-startup-id scrot
 bindsym $mod+$mod1+Shift+j --release exec --no-startup-id sh -c 'scrot -s - | xclip -selection clipboard -t image/png'
-bindsym $mod+$mod1+Shift+u --release exec --no-startup-id scrot -s
+# Was $mod+Alt+Shift+u, which line 219 already uses for 'workspace 7, focus
+# output DP-2'. i3 lets the later binding win silently, so that workspace
+# jump had been dead. Moved here; $mod+Alt+Shift+s was free.
+bindsym $mod+$mod1+Shift+s --release exec --no-startup-id scrot -s
 bindsym $mod+$mod1+Shift+l --release exec --no-startup-id record-desktop
 bindsym $mod+$mod1+Shift+semicolon --release exec --no-startup-id record-window
 bindsym $mod+$mod1+Shift+c --release exec --no-startup-id $HOME/bin/autoclick
+
+# Notification control. dunst dropped its own [shortcuts] section in 1.7, so
+# the combos that used to live in dunstrc are bound here instead.
+#
+# NOT on Alt+space / Ctrl+Alt+space, where dunstrc had them: Alt+space is
+# espanso's search bar. An i3 bindsym takes an X grab on the key, so espanso
+# would simply stop receiving it — with no error anywhere. $mod+` is free.
+bindsym $mod+grave          exec --no-startup-id dunstctl close
+bindsym $mod+Shift+grave    exec --no-startup-id dunstctl close-all
+bindsym Ctrl+Mod4+h         exec --no-startup-id dunstctl history-pop
+bindsym Ctrl+Mod1+c         exec --no-startup-id dunstctl context
 # bindsym $mod+m --release exec --no-startup-id scrot
 
 bindsym $mod+b workspace back_and_forth
@@ -307,19 +397,26 @@ bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
 # Looks
 # smart_gaps on
-# smart_borders on
-# set $gaps_inner 25
-# set $gaps_outer -5
-# gaps inner $gaps_inner
-# gaps outer $gaps_outer
+# Gaps, re-enabled 7 Sep 2026. picom's rounded corners and shadows need a few
+# pixels of wallpaper between tiles to read as anything at all; with abutting
+# tiles it composites invisibly. 10px, not the 25 this used to be.
+# $mod+Alt+g kills the inner gap instantly, $mod+Alt+Shift+g restores it.
+set $gaps_inner 10
+set $gaps_outer 0
+gaps inner $gaps_inner
+gaps outer $gaps_outer
+smart_gaps off
 
-default_border pixel 10
+# Was pixel 10 — with a gap outside it as well, that read as a slab. 4px is
+# still an unmistakable focus indicator against the gruvbox border colours.
+default_border pixel 4
 default_floating_border normal
+title_align center
 
-# bindsym $mod+p       gaps inner all set 0
-# bindsym $mod+o       gaps inner all set $gaps_inner
-# bindsym $mod+Shift+p gaps outer all set 0
-# bindsym $mod+Shift+o gaps outer all set $gaps_outer
+# NOT on $mod+p / $mod+o as the old commented block had them — both are live
+# workspace switches (lines ~216-217) and a later binding silently wins.
+bindsym $mod+$mod1+g       gaps inner all set 0
+bindsym $mod+$mod1+Shift+g gaps inner all set $gaps_inner
 
 # bindsym $mod1+Control+Right workspace next
 # bindsym $mod1+Control+Left workspace prev

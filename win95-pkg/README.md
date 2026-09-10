@@ -181,8 +181,20 @@ the bar does it here from a real control:
 | VPN | one row per `~/.config/wg/*.conf`, up and down |
 | Audio | volume trackbar, mute, mic mute, mixer |
 | Power | platform profile radios, CPU boost, battery estimate |
+| Connection | nmtui, rescan, and Reset adapter -- reloads the wifi driver |
 | Claude | every quota per account, a week of history, and the account switcher |
 | System | htop, `df -h`, `pacman -Syu`, boot log, screenshot, keyboard layout |
+
+Connection carries a **Rate** row and a **Reset adapter** button because of one
+specific failure. The MT7925 firmware wedges its *receive* chain: rx pins at
+VHT-MCS 0 (13 MBit/s) while tx still negotiates MCS 9 (400 MBit/s), at an
+unchanged -40 dBm. Signal reads 100%, throughput is ~1% of the link, and
+nothing else on the page would show it -- so the row prints both directions,
+`13 / 400 MBit/s  rx stuck`, and says which half failed. Reconnecting does not
+clear it and neither does roaming to another AP, because neither restarts the
+firmware; only reloading the module does. Passwordless via
+`/etc/sudoers.d/wifi-reset`, which grants exactly two `modprobe` lines and no
+wildcard. The same menu hangs off a right-click on the bar's network block.
 
 Two shapes, in `~/.config/w95/settings` or from Options ▸ Display as (which
 writes that file and restarts itself):

@@ -681,13 +681,35 @@ class ConnectionPanel(Panel):
     def build(self):
         table = grid()
         self.fields = {name: Field(table, row, name) for row, name in
-                       enumerate(["Adapter", "Network", "Address", "Signal"])}
+                       enumerate(["Adapter", "Network", "Address", "Signal", "Rate"])}
         self.body.pack_start(table, False, False, 0)
         self.signal = Gauge(colour=TEAL)
         self.body.pack_start(self.signal, False, False, 0)
+        self.iface = None
         self.body.pack_start(button_row(
             button("Networks...", lambda: w95stat.term("nmtui", hold=False), 92),
+            button("Rescan", self._rescan, 70),
+            button("Reset adapter", self._reset, 100),
         ), False, False, 0)
+
+    def _wireless(self):
+        """The wireless interface name, or None when we are on a cable."""
+        return self.iface
+
+    def _rescan(self):
+        if self.iface:
+            w95stat.wifi_rescan(self.iface)
+
+    def _reset(self):
+        """Reload the driver. Deliberately unguarded by Panel.commit(): that
+        exists to stop a *poll* from changing the machine, and this is only ever
+        reachable from a click."""
+        if self.iface:
+            w95stat.reset_wifi(self.iface)
+            # The card is gone for ~10s; re-read once it is plausibly back so
+            # the panel doesn't sit on "no adapter up" until the next 10s poll.
+            GLib.timeout_add_seconds(14, lambda: (
+                self.app.poller.refresh("network"), False)[1])
 
     def apply(self, key, value):
         if key != "network" or not value:
@@ -701,6 +723,24 @@ class ConnectionPanel(Panel):
         strength = value["signal"]
         self.fields["Signal"].set("%d%%" % strength if strength is not None else "n/a")
         self.signal.set_fraction((strength or 0) / 100.0)
+        self.iface = link["name"] if link and link["wireless"] else None
+        self.fields["Rate"].set(self._rate_text(value.get("rates")))
+
+    @staticmethod
+    def _rate_text(rates):
+        """"13 / 400 MBit/s  rx stuck" -- rx first, because rx is the half that
+        fails. A wedged card reads full signal and a healthy tx rate, so the
+        asymmetry is the only thing on screen that gives it away; say so rather
+        than leaving two numbers to be compared by eye."""
+        if not rates:
+            return None
+        rx, tx = rates.get("rx"), rates.get("tx")
+        if not (rx and tx):
+            return None
+        text = "%g / %g MBit/s" % (rx[0], tx[0])
+        if rx[1] == 0 and (tx[1] or 0) >= 4:
+            text += "  rx stuck"
+        return text
 
 
 class TunnelPanel(Panel):
@@ -1647,9 +1687,10 @@ class Monitor(Gtk.Window):
     def _probe_network():
         link = w95stat.network_link()
         full, _short, _colour = w95stat.run_block("network")
+        wireless = link["name"] if link and link["wireless"] else None
         return {"link": link, "name": full,
-                "signal": w95stat.wifi_signal(link["name"])
-                if link and link["wireless"] else None}
+                "signal": w95stat.wifi_signal(wireless) if wireless else None,
+                "rates": w95stat.wifi_rates(wireless) if wireless else None}
 
     @staticmethod
     def _probe_vpn():

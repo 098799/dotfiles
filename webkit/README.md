@@ -95,10 +95,21 @@ From xarchive's and igarchive's READMEs, which are the best in the fleet:
 - **Token-less is a decision, not a default.** pod, xarchive, igarchive and
   sandbox hold public content and have none, on purpose, so `/feed.xml` works in
   any reader. Say so in the registry row.
-- **Every state-changing route checks the origin**, token or not: refuse when
-  `Sec-Fetch-Site` is `cross-site` (or `Origin` is another host). Without it,
-  any web page open on a tailnet device can POST to the app — igarchive's
-  irreversible delete and chess's agent launcher were both reachable that way.
+- **Every state-changing route checks the origin**, token or not. Allow a
+  write only when `Sec-Fetch-Site` is `same-origin` or `none`, or — header
+  absent, i.e. not a browser — when there is no `Origin` or it is the app's
+  own. **Refuse `same-site` too, not only `cross-site`**: every app lives
+  under `*.grining.eu`, so to a browser sandbox's agent-written exhibits,
+  pod, xarchive and the public museum are all the *same site* as rcmon, and
+  a `SameSite=Lax` cookie is attached to their requests. On 2026-09-10 that
+  was shown live against rcmon (a page read the transcript stream and typed
+  into an agent), and health and genesis were open the same way. Reference:
+  `foreign_origin()` in `~/rcmon/rcmon/server.py`, `~/jobs/app/auth.py`.
+  Since 2026-09-10 nginx enforces the same rule for every p340 vhost (a map
+  in `00-http.conf` + the per-server include) — keep the app-level check
+  anyway; the front door is one layer, and bae has no such rule.
+- **Probe every verb.** health's PATCH and DELETE had no token check at all
+  until 2026-09-10, because the auth audit only tried GET and POST.
 - **Nothing an unauthenticated client can reach may start an agent** with
   `--dangerously-skip-permissions`. Give it an allow-list instead (chess tutor).
 - Turn off `/docs` and `/openapi.json` (`FastAPI(docs_url=None, redoc_url=None,
@@ -147,7 +158,11 @@ Still true from the July version, all proven on a Poco F7 Ultra:
      museum `web.py`); never cache media (HTTP caching does that).
    - New deploy → waiting worker → "refresh" toast → `SKIP_WAITING` + reload.
      A separately installed PWA on the same server (health's Pac) needs its own
-     toast.
+     toast. Guard the reload (`if (!reloading) { reloading = true; … }`) and do
+     not reload on the *first* install — pod reloaded every cold visit.
+   - A service worker is not compulsory. For an app that is useless offline,
+     xarchive's **build-id banner** is simpler: the page carries the build id,
+     polls `/version`, and shows "out of date — reload" when it changes.
    - **Icons: committed, byte-stable PNGs** — 192, 512 and a 512 maskable —
      plus `"id": "/"` in the manifest. SVG-only icons make Android re-mint the
      WebAPK; a single 64 px icon makes the app uninstallable (pokedex).
@@ -196,13 +211,22 @@ ExecStart=/usr/bin/uv run --no-sync uvicorn app.web:app --host 127.0.0.1 --port 
 # left chess down 14 days and jobs 11 (2026-08-27).
 Restart=always
 RestartSec=3
-# workers also: Nice=10, MemoryMax=…, AllowedCPUs=0-7 for CPU-heavy ones (pod)
+# workers also: Nice=10, MemoryMax=…, and CPUAffinity=0-7 for CPU-heavy ones.
+# Not AllowedCPUs=: user units have no cpuset delegation, so it does nothing
+# (pod's TTS worker was unconfined), and OMP_NUM_THREADS does not bind onnxruntime.
 
 [Install]
 WantedBy=default.target
 ```
 
 Bind **127.0.0.1**, always (rule 5c). Check `is-enabled` **and** `is-active`.
+
+**nginx prefix locations redirect.** `location /audio/ { proxy_pass …; }`
+makes nginx answer `/audio` with a 301 to `/audio/`; if the app also owns
+`/audio` and redirects `/audio/` back, the page loops (pod's Audio tab, 09-10).
+Add `location = /audio` for the page. And run uvicorn with
+`--proxy-headers --forwarded-allow-ips 127.0.0.1`, or its redirects say
+`http://`.
 
 **Vhost** — a server block in `/etc/nginx/conf.d/p340-grining.conf` (copy an
 existing one; keep `~/apps/ops/p340-grining.nginx.conf` identical), or its own
@@ -306,8 +330,12 @@ not yet for its hardening. `sandbox.grining.eu` is the reference for a CSP.
 - **Agent shells have `HOME=/home/tgrining/claude-prim`.** Git then has no
   identity (`Author identity unknown`) and `~` points elsewhere: use absolute
   paths, and `HOME=/home/tgrining git commit …`.
-- **Tests never touch the live DB** (chess's `test_web.py` did), and never pin
-  absolute dates against `now()` (weekends' test failed from 2 Aug on).
+- **Tests never touch the live DB** (chess's `test_web.py` did; pod's suite
+  had one test reading it, and monkeypatching `get_db` alone leaks), and never
+  pin absolute dates against `now()` (weekends' test failed from 2 Aug on).
+- **Probes and QA run against a copy**, never the live app: pod's
+  `tools/probe.py` defaulted to the live library and left its test notes in
+  the real DB. Copy the DB, start the app on a spare port, point the probe there.
 - SQLite timestamps as `YYYY-MM-DD HH:MM:SS` UTC (a space, not `T`), or string
   comparison breaks.
 - Never copy a scratch folder into `/srv` whole: relevancy-map shipped an
