@@ -138,6 +138,33 @@ Still true from the July version, all proven on a Poco F7 Ultra:
   ~20 KB, move it to `/static/<name>.<version>.css|js` served with
   `Cache-Control: public, max-age=31536000, immutable`. Still no build step.
 
+### Fleet UX conventions (2026-09-10)
+
+Tomek moves between ~20 of these apps on one phone. Where apps disagree for
+no reason he pays for it: on 2026-09-10 the "new version" prompt had eleven
+wordings in two positions, and settings lived in seven different places (five
+apps had none). Each app keeps its own look; these are the parts that must
+behave the same. **Copy from the app named** — it does the thing best today.
+
+| thing | the convention | copy from |
+|---|---|---|
+| **Header** | ≤ 56 px. Left: what this screen answers, with its freshness (`348 unread · newest 12m ago`, `Today`). Right: at most two icon buttons. The app's name alone is not a header — an installed PWA already shows its icon. | xarchive, health |
+| **Bottom nav** | Fixed, 3–5 destinations, icon **and** label, sentence case, ≥ 11 px, ≥ 56 px tall + `env(safe-area-inset-bottom)`, active tab in the accent, counts as a small badge. More than 5 → a "More" tab, never 6–7 squeezed tabs or icon-only tabs. | pod |
+| **Settings** | One place: the **last nav tab, labelled "Settings"** (gear). No nav? A gear in the header. Theme chooser first, then install, then app knobs, then a "p340 — all apps" link. Never two levels deep (About → Settings). | chess, pod |
+| **Theme** | Dark by default; chooser Dark · Light · Auto; `localStorage['<app>Theme']`; painted in `<head>` before first paint; `?theme=` overrides one load. `theme-color` meta = the header colour. | museum `base.html` bootstrap (pod, chess, cabinet, weekends carry the same code) |
+| **New version** | Bottom-centre, just above the nav (`bottom: calc(var(--navh) + 12px + env(safe-area-inset-bottom))`, 24 px on desktop). Text **"New version ready"**, one button **"Refresh"**, no ✕. Waiting worker → toast → `SKIP_WAITING` → guarded reload; never `skipWaiting()` on install, never auto-reload. An app with no worker shows the same toast from xarchive's build-id poll. A themed line ("A new wing has opened") is allowed if the button still says Refresh. | jobs `#updatetoast` |
+| **Install nudge** | Only when `beforeinstallprompt` fires (iOS: the Share text), after ~4 s, as a bottom bar "Add ‹app› to your home screen" + one line of why + Install + ✕; ✕ snoozes 14 days, 60 after the second. Also a row in Settings. | museum `#installbar` |
+| **Keyboard** | Apps with desktop use carry `_keys.html` (`m` leader, `?` help, `d` palette); the palette lists the app's pages **and** "p340 — all apps". Own shortcuts go into that layer, not beside it. | xarchive `_keys.html` |
+| **Offline** | Worker: network-first HTML, cached copy, else an offline page that names the app and says "p340 is not reachable — is the phone on the tailnet?" with a Retry button. Never a bare "Offline." or the browser's dinosaur. | jobs `sw.js` (inline page), pod `offline.html` |
+| **404 / errors** | Browser navigations get an HTML page in the app's chrome (nav still there, a way back); JSON `{"detail":…}` only under `/api/`. Every empty state says whether it is *empty* or *broken* and what to do. | fidelive's 404; xarchive `/status` for "broken vs empty" |
+| **Icons** | Committed PNG 192 + 512 + 512 maskable, `"id": "/"`, favicon from the same art. | museum, igarchive, fidelive |
+| **Names** | One name everywhere: index tile, `short_name` (the home-screen label), header brand. Page titles **`‹page› · ‹app›`**, a count may lead: `(194) Read · pod`; the home page is just `‹app›`. | igarchive, xarchive |
+| **Between apps** | The index (`p340.grining.eu`) is the launcher; the browser's Back from an app's first screen must land on it in **one** press — so no `pushState`/`replaceState` on first load, redirects server-side (307), never client-side. No "home" chrome in the header; the Settings row and the palette entry are the way back. | pod (`/` → 307 → `/read`) |
+| **Login** | A token app sends a navigation to its own `/login` page (paste token, remember 400 days) and a `fetch()` a JSON 401. | jobs `auth.py` |
+
+The index itself (`~/apps/ops/p340-index.html`) orders its front panel by
+what each browser opens, so a new app needs no ranking — only a tile.
+
 ## 5. The things that always break
 
 1. **Soft navigation** — intercept same-host clicks, fetch, swap `#content`,
