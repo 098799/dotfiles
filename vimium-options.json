@@ -53,6 +53,22 @@
     {
       "passKeys": "",
       "pattern": "https?://keyboard-tester.com/*"
+    },
+    {
+      "passKeys": "",
+      "pattern": "https?://localhost:38000/*"
+    },
+    {
+      "passKeys": "",
+      "pattern": "https?://127.0.0.1:38000/*"
+    },
+    {
+      "passKeys": "",
+      "pattern": "https?://p14s*/*"
+    },
+    {
+      "passKeys": "",
+      "pattern": "https?://p340*/*"
     }
   ]
 }
