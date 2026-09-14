@@ -91,7 +91,11 @@ bindsym $mod+Shift+e floating toggle
 set $PATH $HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl:/var/lib/snapd/snap/bin:$HOME/bin
 
 # was $mod1+w
-bindsym $mod+d exec bash -c 'PATH=$HOME/bin:$HOME/.local/bin:$PATH rofi -show run -modi drun -lines 6 -font "Ubuntu 25" -terminal gnome-terminal'
+# drun (.desktop entries), not run (raw $PATH binaries). -modi is gone in rofi
+# 2.0, so the old "-show run -modi drun" silently dropped the modi flag and left
+# plain run mode: every /usr/bin binary, and no installed application at all.
+# Shift+Left / Shift+Right cycle drun -> run -> window inside the launcher.
+bindsym $mod+d exec bash -c 'PATH=$HOME/bin:$HOME/.local/bin:$PATH rofi -show drun -modes drun,run,window -lines 6 -font "Ubuntu 25" -terminal gnome-terminal'
 # was $mod1+d
 # bindsym $mod+z exec gnome-terminal
 bindsym $mod+z exec alacritty
