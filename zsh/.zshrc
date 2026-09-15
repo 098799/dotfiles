@@ -368,8 +368,10 @@ _claw_help() {
   done
   print -r -- ""
   print -r -- "With NO home named, the account is chosen by usage — the same selector"
-  print -r -- "cmon/cherd's \"C\" spawns use (\`claude-account explain\` shows why). \`claw main\`"
-  print -r -- "opts out and uses \$HOME as it is."
+  print -r -- "cmon/cherd's \"C\" spawns use (\`claude-account explain\` shows why). That"
+  print -r -- "selector never chooses MAIN: it is not spent on work. \`claw main\` is the"
+  print -r -- "only way onto it, and with no other account free claw refuses rather than"
+  print -r -- "falling back to \$HOME."
   print -r -- ""
   print -r -- "Every other word goes to claude, in any order — the home is picked out"
   print -r -- "wherever it sits, so these are the same:"
@@ -415,14 +417,27 @@ claw() {
 
   # No account named: ask the selector, exactly as a "C" spawn does, and let it
   # count this session as in-flight load so a second claw a minute later lands
-  # somewhere else. `claw main` opts out; so does an unreachable selector, which
-  # leaves $HOME alone — i.e. the behaviour claw had before it could choose.
+  # somewhere else.
+  #
+  # An unreachable or refusing selector is now a REFUSAL, not a fallback. It used
+  # to leave $HOME alone, which on this box quietly means the personal Max
+  # subscription — the account that is not to be spent on work at all. So there is
+  # exactly one way to land on it: type it (`claw main`). Everything else stops
+  # here with the reason on screen.
   if [[ -z "$cname" ]]; then
+    local why=""
     picked="$("$LEGARTIS_REPO"/tools/claude-account pick --home --commit 2>/dev/null)" || picked=""
     if [[ -n "$picked" && -d "$picked/.claude" ]]; then
       chome="$picked"
       cname="${picked:t}"          # /home/x/claude-prim -> claude-prim
       cname="${cname#claude-}"     #                     -> prim
+    else
+      # Re-run for the reason only — the first call is the one that charges the
+      # ledger, and stderr was dropped there so a tmux-less shell stays quiet.
+      why="$("$LEGARTIS_REPO"/tools/claude-account pick --home 2>&1 >/dev/null)"
+      print -u2 -r -- "claw: no account to spawn on${why:+ — $why}"
+      print -u2 -r -- "claw: the personal account is not spent on work. \`claw main\` to use it anyway, or name an account: $(_claw_homes | paste -sd' ' -)"
+      return 1
     fi
   fi
 
@@ -439,7 +454,9 @@ claw() {
   done
 
   local cmd="claude --dangerously-skip-permissions"
-  (( $# )) && cmd+=" ${(q)@}"
+  # Join first, then quote each word: inside "…" a bare ${(q)@} flattens all args
+  # into ONE escaped word, so claude saw "-c --model x" as a single option.
+  (( $# )) && cmd+=" ${(j: :)${(q)@}}"
 
   # -e keeps HOME set for every pane of the session, not just the first command.
   # Must be a real array: "${chome:+-e HOME=$chome}" collapses into one word,
