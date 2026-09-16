@@ -268,6 +268,17 @@ The wildcard certificate and DNS need no work. `sudo nginx -t` before reload.
   xarchive, pod's `/audio/` all do. On bae (`/opt/<app>`) nginx *can* serve
   files off disk directly, and museum does.
 - **Never `tailscale serve`**, never a second way in.
+- **A LAN door, if the app is for guests** (imagine, 2026-09-16, the only one):
+  keep the 127.0.0.1 bind and add a *second* server block,
+  `listen 80 default_server` with `allow 192.168.0.0/16; allow 100.64.0.0/10;
+  allow 127.0.0.1; deny all` — no address in the block, so a new DHCP lease
+  changes nothing, and nothing else on p340 listens on :80. It is plain http
+  (no certificate is trusted for a bare 192.168 address), which means that app
+  gets **no service worker and no installable PWA** — use xarchive's build-id
+  banner — and **nothing private may be served from it**. Anything that a login
+  would have protected becomes a ceiling instead: imagine caps daily spend,
+  images per device per hour and jobs in flight, and keeps a `data/PAUSED`
+  kill switch.
 - `ops/newapp-public.sh` is for **public** apps on bae — it publishes to the
   internet. Not for a tailnet app.
 
