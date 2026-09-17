@@ -94,8 +94,9 @@ set $PATH $HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib
 # drun (.desktop entries), not run (raw $PATH binaries). -modi is gone in rofi
 # 2.0, so the old "-show run -modi drun" silently dropped the modi flag and left
 # plain run mode: every /usr/bin binary, and no installed application at all.
-# Shift+Left / Shift+Right cycle drun -> run -> window inside the launcher.
-bindsym $mod+d exec bash -c 'PATH=$HOME/bin:$HOME/.local/bin:$PATH rofi -show drun -modes drun,run,window -lines 6 -font "Ubuntu 25" -terminal gnome-terminal'
+# combi = drun + run merged, so ~/bin scripts (ce, ...) show up next to apps.
+# Shift+Left / Shift+Right cycle combi -> drun -> run -> window inside the launcher.
+bindsym $mod+d exec --no-startup-id /home/tgrining/bin/rofi-launcher
 # was $mod1+d
 # bindsym $mod+z exec gnome-terminal
 bindsym $mod+z exec alacritty
@@ -103,7 +104,16 @@ bindsym $mod+z exec alacritty
 # was $mod1+s
 # bindsym $mod+s exec google-chrome-beta --new-window google.com
 # was $mod1+r
-bindsym $mod+x exec emacsclient -c
+# NEOMACS TEST (temporary): $mod+x opens a NEO Emacs CLIENT frame with the real
+# config, against the daemon started below — ~50ms, and closing every frame
+# leaves the daemon up, exactly like emacsclient against the GNU Emacs daemon.
+# Neomacs 0.0.18 lists --daemon/--bg-daemon/--fg-daemon in --help and rejects
+# all of them, so the daemon is an ordinary process holding one invisible frame,
+# with the two exit paths (WM close, C-x C-c) overridden in daemon.el.
+# `neomacs-try --restart` picks up ~/.emacs.conf edits; --stop ends it.
+# To go back, swap the two lines below.
+bindsym $mod+x exec --no-startup-id /home/tgrining/bin/neomacs-try
+# bindsym $mod+x exec emacsclient -c
 # was $mod1+q
 bindsym $mod+q exec thunar
 # Linear issue tracker TUI
@@ -207,9 +217,6 @@ workspace 10 output DP-2
 workspace work output DP-1
 workspace slack output DP-1
 workspace priv output DP-1
-workspace 6 output DP-1
-workspace 7 output DP-1
-workspace 8 output DP-1
 
 # switch to workspace
 bindsym $mod+r workspace cmon, focus output DP-2
@@ -362,10 +369,22 @@ exec --no-startup-id xss-lock -- $HOME/bin/lockscreen
 # everything lives in ~/.config/picom.conf.
 exec --no-startup-id picom
 
+# Clipboard manager. It is not a convenience: it keeps a well-behaved,
+# long-lived selection owner alive, so a paste target never has to talk to a
+# dead owner (source app closed -> Chromium waits out its selection timeout)
+# or to a half-implemented one like xclip. Starts only if installed.
+exec --no-startup-id sh -c 'command -v copyq >/dev/null && copyq --start-server'
+
 bindsym Mod1+F4 kill
 # bindsym $mod+$mod1+Shift+j --release exec --no-startup-id scrot -l style=dash,width=3,color="red" -s
 bindsym $mod+$mod1+Shift+k --release exec --no-startup-id scrot
-bindsym $mod+$mod1+Shift+j --release exec --no-startup-id sh -c 'scrot -s - | xclip -selection clipboard -t image/png'
+# Screenshot to clipboard. NOT via bare xclip: as selection owner xclip
+# advertises only "TARGETS image/png" and then answers *every* target request
+# with the whole PNG -- a TIMESTAMP request, which Chromium expects to answer
+# with a 4-byte INTEGER, came back as 3.2MB. Electron apps (Slack) poll
+# TIMESTAMP on the UI thread before each paste, so they freeze. Hand the image
+# to copyq when it is there; fall back to xclip otherwise.
+bindsym $mod+$mod1+Shift+j --release exec --no-startup-id sh -c 'scrot -s - | { command -v copyq >/dev/null && copyq copy image/png - || xclip -selection clipboard -t image/png; }'
 # Was $mod+Alt+Shift+u, which line 219 already uses for 'workspace 7, focus
 # output DP-2'. i3 lets the later binding win silently, so that workspace
 # jump had been dead. Moved here; $mod+Alt+Shift+s was free.
@@ -427,6 +446,9 @@ bindsym $mod+$mod1+Shift+g gaps inner all set $gaps_inner
 
 exec --no-startup-id nm-applet
 exec $HOME/Programs/emacs/src/emacs --daemon
+# NEOMACS TEST (temporary): the daemon $mod+x hands its frames to.  Opens no
+# window; costs one resident process, like the GNU Emacs daemon above it.
+exec --no-startup-id /home/tgrining/bin/neomacs-try --daemon
 exec autokey-gtk
 exec thunar --daemon
 exec --no-startup-id xsettingsd
@@ -508,3 +530,8 @@ include ~/.config/i3/active-chrome.conf
 # whatever caption the current chrome draws.
 for_window [class="W95sysmon"] floating enable
 for_window [instance="w95-sysmon-drop"] border none, sticky enable
+
+# FTL speedhack (Cheat Engine, headless) -- see ~/bin/ftl-speed
+bindsym $mod+F9  exec --no-startup-id /home/tgrining/bin/ftl-speed 3
+bindsym $mod+F10 exec --no-startup-id /home/tgrining/bin/ftl-speed 100
+bindsym $mod+F11 exec --no-startup-id /home/tgrining/bin/ftl-speed
