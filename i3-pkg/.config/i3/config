@@ -384,7 +384,7 @@ bindsym $mod+$mod1+Shift+k --release exec --no-startup-id scrot
 # with a 4-byte INTEGER, came back as 3.2MB. Electron apps (Slack) poll
 # TIMESTAMP on the UI thread before each paste, so they freeze. Hand the image
 # to copyq when it is there; fall back to xclip otherwise.
-bindsym $mod+$mod1+Shift+j --release exec --no-startup-id sh -c 'scrot -s - | { command -v copyq >/dev/null && copyq copy image/png - || xclip -selection clipboard -t image/png; }'
+bindsym $mod+$mod1+Shift+j --release exec --no-startup-id /home/tgrining/bin/screenshot-clip
 # Was $mod+Alt+Shift+u, which line 219 already uses for 'workspace 7, focus
 # output DP-2'. i3 lets the later binding win silently, so that workspace
 # jump had been dead. Moved here; $mod+Alt+Shift+s was free.
