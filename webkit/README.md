@@ -26,7 +26,7 @@ it here in the same change that proved it wrong, with the date.
 
 ## 1. Shape of an app
 
-The default, and what xarchive, pod, igarchive, jobs, pokedex and sandbox all
+The default, and what twitter, pod, igarchive, jobs, pokedex and sandbox all
 are:
 
 ```
@@ -34,7 +34,7 @@ app/config.py   env-driven settings, paths under data/
 app/db.py       SCHEMA string + idempotent migrations, stdlib sqlite3, WAL
 app/web.py      FastAPI + Jinja2, server-rendered
 app/worker.py   the long-running poller/renderer, if the app has one
-app/sources/    one module per upstream, behind a seam (xarchive, igarchive)
+app/sources/    one module per upstream, behind a seam (twitter, igarchive)
 app/templates/  base.html carries the CSS, the theme bootstrap, soft-nav, SW
 tools/          rebuilders and probes (probe-mirrors.sh, build.py, probe.py)
 tests/          pytest; tmp-path databases only
@@ -50,11 +50,11 @@ data/           the DB and media — gitignored
   at runtime. Tailnet apps must work with the internet down.
 - **Worker, not timer**, for anything that polls: a `Restart=always` service
   with its own schedule and its own backoff (igarchive: 12 h cadence, 20 min →
-  2 h retries on failure; xarchive: hourly, 15 min when a feed may have
+  2 h retries on failure; twitter: hourly, 15 min when a feed may have
   overflowed). A timer is right only for a daily batch (jobs-collect).
 - **`templates.env.auto_reload = False`.** Units run out of the working tree,
   and Jinja re-reads templates per render by default — so an edited template
-  goes live before the code it calls, and every page 500s (xarchive, twice).
+  goes live before the code it calls, and every page 500s (twitter, twice).
   Templates now change only on restart, i.e. on `ship`.
 - Other shapes exist and are fine when the reason is written down: health and
   fidelive are stdlib `http.server` on system Python; the kid toys are static
@@ -62,11 +62,11 @@ data/           the DB and media — gitignored
 
 ## 2. Correctness rules for anything that fetches
 
-From xarchive's and igarchive's READMEs, which are the best in the fleet:
+From twitter's and igarchive's READMEs, which are the best in the fleet:
 
 - **Empty versus broken.** A block page, a rate limit, an empty 200 and "posted
   nothing this week" all look like *no items*. Believe a response only after it
-  proves it is the thing you asked for (xarchive: parses as RSS, has a channel,
+  proves it is the thing you asked for (twitter: parses as RSS, has a channel,
   names `@user` in the title). Then zero items is an answer; record it.
 - **Do not count scaffolding as content.** igarchive harvested the profile
   avatar as a story, so a page with no stories still returned one item and the
@@ -92,7 +92,7 @@ From xarchive's and igarchive's READMEs, which are the best in the fleet:
 - **Never a token in a URL.** `<img>` and downloads get an HttpOnly cookie
   (genesis upgrades the header to a cookie). A query-string token is written to
   the nginx log — genesis leaked its token 1180 times that way.
-- **Token-less is a decision, not a default.** pod, xarchive, igarchive and
+- **Token-less is a decision, not a default.** pod, twitter, igarchive and
   sandbox hold public content and have none, on purpose, so `/feed.xml` works in
   any reader. Say so in the registry row.
 - **Every state-changing route checks the origin**, token or not. Allow a
@@ -100,7 +100,7 @@ From xarchive's and igarchive's READMEs, which are the best in the fleet:
   absent, i.e. not a browser — when there is no `Origin` or it is the app's
   own. **Refuse `same-site` too, not only `cross-site`**: every app lives
   under `*.grining.eu`, so to a browser sandbox's agent-written exhibits,
-  pod, xarchive and the public museum are all the *same site* as rcmon, and
+  pod, twitter and the public museum are all the *same site* as rcmon, and
   a `SameSite=Lax` cookie is attached to their requests. On 2026-09-10 that
   was shown live against rcmon (a page read the transcript stream and typed
   into an agent), and health and genesis were open the same way. Reference:
@@ -148,18 +148,18 @@ behave the same. **Copy from the app named** — it does the thing best today.
 
 | thing | the convention | copy from |
 |---|---|---|
-| **Header** | ≤ 56 px. Left: what this screen answers, with its freshness (`348 unread · newest 12m ago`, `Today`). Right: at most two icon buttons. The app's name alone is not a header — an installed PWA already shows its icon. | xarchive, health |
+| **Header** | ≤ 56 px. Left: what this screen answers, with its freshness (`348 unread · newest 12m ago`, `Today`). Right: at most two icon buttons. The app's name alone is not a header — an installed PWA already shows its icon. | twitter, health |
 | **Bottom nav** | Fixed, 3–5 destinations, icon **and** label, sentence case, ≥ 11 px, ≥ 56 px tall + `env(safe-area-inset-bottom)`, active tab in the accent, counts as a small badge. More than 5 → a "More" tab, never 6–7 squeezed tabs or icon-only tabs. | pod |
 | **Settings** | One place: the **last nav tab, labelled "Settings"** (gear). No nav? A gear in the header. Theme chooser first, then install, then app knobs, then a "p340 — all apps" link. Never two levels deep (About → Settings). | chess, pod |
 | **Theme** | Dark by default; chooser Dark · Light · Auto; `localStorage['<app>Theme']`; painted in `<head>` before first paint; `?theme=` overrides one load. `theme-color` meta = the header colour. | museum `base.html` bootstrap (pod, chess, cabinet, weekends carry the same code) |
-| **New version** | Bottom-centre, just above the nav (`bottom: calc(var(--navh) + 12px + env(safe-area-inset-bottom))`, 24 px on desktop). Text **"New version ready"**, one button **"Refresh"**, no ✕. Waiting worker → toast → `SKIP_WAITING` → guarded reload; never `skipWaiting()` on install, never auto-reload. An app with no worker shows the same toast from xarchive's build-id poll. A themed line ("A new wing has opened") is allowed if the button still says Refresh. | jobs `#updatetoast` |
+| **New version** | Bottom-centre, just above the nav (`bottom: calc(var(--navh) + 12px + env(safe-area-inset-bottom))`, 24 px on desktop). Text **"New version ready"**, one button **"Refresh"**, no ✕. Waiting worker → toast → `SKIP_WAITING` → guarded reload; never `skipWaiting()` on install, never auto-reload. An app with no worker shows the same toast from twitter's build-id poll. A themed line ("A new wing has opened") is allowed if the button still says Refresh. | jobs `#updatetoast` |
 | **Install nudge** | Only when `beforeinstallprompt` fires (iOS: the Share text), after ~4 s, as a bottom bar "Add ‹app› to your home screen" + one line of why + Install + ✕; ✕ snoozes 14 days, 60 after the second. Also a row in Settings. | museum `#installbar` |
 | **Desk (≥ 900px)** | A phone layout is not a desk layout with a wider `--shell`. One 52px bar: brand, the nav tabs in the same line, then on the right what this page can do — a **Filter ▾** button holding the page's chip strip as a popover, then ⌕ and ⋯. Filter chips and state lines never take a row of their own. A menu is an **anchored popover under its button**: no dim, no blur, no sheet from the bottom edge, 13.5px rows with a hover state; a dim is for a dialog with a form. A surface with several verbs (an open article) shows them as **labelled buttons** when there is room (pod: from 1300px) and folds into ⋯ only below that. Pages ship the phone markup once and let a script (`deskbar` in pod's `_app.html`) move the nav and fold the chips, so nothing is duplicated. | pod `_app.html` deskbar, `base.html` `#pop` |
-| **Keyboard** | Apps with desktop use carry `_keys.html` (`m` leader, `?` help, `d` palette); the palette lists the app's pages **and** "p340 — all apps". Own shortcuts go into that layer, not beside it. | xarchive `_keys.html` |
+| **Keyboard** | Apps with desktop use carry `_keys.html` (`m` leader, `?` help, `d` palette); the palette lists the app's pages **and** "p340 — all apps". Own shortcuts go into that layer, not beside it. | twitter `_keys.html` |
 | **Offline** | Worker: network-first HTML, cached copy, else an offline page that names the app and says "p340 is not reachable — is the phone on the tailnet?" with a Retry button. Never a bare "Offline." or the browser's dinosaur. | jobs `sw.js` (inline page), pod `offline.html` |
-| **404 / errors** | Browser navigations get an HTML page in the app's chrome (nav still there, a way back); JSON `{"detail":…}` only under `/api/`. Every empty state says whether it is *empty* or *broken* and what to do. | fidelive's 404; xarchive `/status` for "broken vs empty" |
+| **404 / errors** | Browser navigations get an HTML page in the app's chrome (nav still there, a way back); JSON `{"detail":…}` only under `/api/`. Every empty state says whether it is *empty* or *broken* and what to do. | fidelive's 404; twitter `/status` for "broken vs empty" |
 | **Icons** | Committed PNG 192 + 512 + 512 maskable, `"id": "/"`, favicon from the same art. | museum, igarchive, fidelive |
-| **Names** | One name everywhere: index tile, `short_name` (the home-screen label), header brand. Page titles **`‹page› · ‹app›`**, a count may lead: `(194) Read · pod`; the home page is just `‹app›`. | igarchive, xarchive |
+| **Names** | One name everywhere: index tile, `short_name` (the home-screen label), header brand. Page titles **`‹page› · ‹app›`**, a count may lead: `(194) Read · pod`; the home page is just `‹app›`. | igarchive, twitter |
 | **Between apps** | The index (`p340.grining.eu`) is the launcher; the browser's Back from an app's first screen must land on it in **one** press — so no `pushState`/`replaceState` on first load, redirects server-side (307), never client-side. No "home" chrome in the header; the Settings row and the palette entry are the way back. | pod (`/` → 307 → `/read`) |
 | **Login** | A token app sends a navigation to its own `/login` page (paste token, remember 400 days) and a `fetch()` a JSON 401. | jobs `auth.py` |
 
@@ -189,7 +189,7 @@ what each browser opens, so a new app needs no ranking — only a tile.
      toast. Guard the reload (`if (!reloading) { reloading = true; … }`) and do
      not reload on the *first* install — pod reloaded every cold visit.
    - A service worker is not compulsory. For an app that is useless offline,
-     xarchive's **build-id banner** is simpler: the page carries the build id,
+     twitter's **build-id banner** is simpler: the page carries the build id,
      polls `/version`, and shows "out of date — reload" when it changes.
    - **Icons: committed, byte-stable PNGs** — 192, 512 and a 512 maskable —
      plus `"id": "/"` in the manifest. SVG-only icons make Android re-mint the
@@ -201,7 +201,7 @@ what each browser opens, so a new app needs no ranking — only a tile.
 ## 6. Keyboard layer (`snippets/keys.html`)
 
 A Vimium-style layer inside the app — scrolling, link hints, history, a command
-palette over the app's own data. xarchive and pod carry the current copy as
+palette over the app's own data. twitter and pod carry the current copy as
 `_keys.html`. The rules that made it work:
 
 - **Tomek's own bindings** (`~/dotfiles/vimium-options.json`): `i o k l u p`
@@ -254,7 +254,7 @@ palette over the app's own data. xarchive and pod carry the current copy as
   `/api/palette?q=` answers `{groups:[{type, title, items:[{t, s, u, snip?,
   av?}], more?:{t, u}, nosave?}]}`; the old flat `{items:[{k,t,s,u}]}` is
   still read. **The canonical copy lives in `snippets/keys.html`, not in
-  either app**; pod's `_keys.html` and xarchive's `keys.js`/`keys.css` are
+  either app**; pod's `_keys.html` and twitter's `keys.js`/`keys.css` are
   copies of it, CONFIG block aside.
 - **The `?` sheet is searchable.** While it is open, typing filters the
   keys — any printable key lands in the field, `/` focuses it — a section
@@ -328,7 +328,7 @@ The wildcard certificate and DNS need no work. `sudo nginx -t` before reload.
 - **`$HOME` is 0700** and nginx runs as `http`, so nginx cannot `alias` or
   `try_files` anything under it. Serve media through the app (`/m/…` with
   `FileResponse`, range requests, a long private cache header) — igarchive,
-  xarchive, pod's `/audio/` all do. On bae (`/opt/<app>`) nginx *can* serve
+  twitter, pod's `/audio/` all do. On bae (`/opt/<app>`) nginx *can* serve
   files off disk directly, and museum does.
 - **Never `tailscale serve`**, never a second way in.
 - **A LAN door, if the app is for guests** (imagine, 2026-09-16, the only one):
@@ -337,7 +337,7 @@ The wildcard certificate and DNS need no work. `sudo nginx -t` before reload.
   allow 127.0.0.1; deny all` — no address in the block, so a new DHCP lease
   changes nothing, and nothing else on p340 listens on :80. It is plain http
   (no certificate is trusted for a bare 192.168 address), which means that app
-  gets **no service worker and no installable PWA** — use xarchive's build-id
+  gets **no service worker and no installable PWA** — use twitter's build-id
   banner — and **nothing private may be served from it**. Anything that a login
   would have protected becomes a ceiling instead: imagine caps daily spend,
   images per device per hour and jobs in flight, and keeps a `data/PAUSED`
@@ -450,7 +450,7 @@ not yet for its hardening. `sandbox.grining.eu` is the reference for a CSP.
 
 ## 13. Writing it down
 
-The READMEs that work (xarchive, igarchive, jobs, health's `STATE.md`) record
+The READMEs that work (twitter, igarchive, jobs, health's `STATE.md`) record
 **measured numbers, the alternative that was rejected and why, and the
 decisions not to re-litigate**. A future session reads those before it
 "improves" something back into a bug. Put the incident in the comment next to
