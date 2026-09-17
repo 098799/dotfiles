@@ -154,6 +154,7 @@ behave the same. **Copy from the app named** — it does the thing best today.
 | **Theme** | Dark by default; chooser Dark · Light · Auto; `localStorage['<app>Theme']`; painted in `<head>` before first paint; `?theme=` overrides one load. `theme-color` meta = the header colour. | museum `base.html` bootstrap (pod, chess, cabinet, weekends carry the same code) |
 | **New version** | Bottom-centre, just above the nav (`bottom: calc(var(--navh) + 12px + env(safe-area-inset-bottom))`, 24 px on desktop). Text **"New version ready"**, one button **"Refresh"**, no ✕. Waiting worker → toast → `SKIP_WAITING` → guarded reload; never `skipWaiting()` on install, never auto-reload. An app with no worker shows the same toast from xarchive's build-id poll. A themed line ("A new wing has opened") is allowed if the button still says Refresh. | jobs `#updatetoast` |
 | **Install nudge** | Only when `beforeinstallprompt` fires (iOS: the Share text), after ~4 s, as a bottom bar "Add ‹app› to your home screen" + one line of why + Install + ✕; ✕ snoozes 14 days, 60 after the second. Also a row in Settings. | museum `#installbar` |
+| **Desk (≥ 900px)** | A phone layout is not a desk layout with a wider `--shell`. One 52px bar: brand, the nav tabs in the same line, then on the right what this page can do — a **Filter ▾** button holding the page's chip strip as a popover, then ⌕ and ⋯. Filter chips and state lines never take a row of their own. A menu is an **anchored popover under its button**: no dim, no blur, no sheet from the bottom edge, 13.5px rows with a hover state; a dim is for a dialog with a form. A surface with several verbs (an open article) shows them as **labelled buttons** when there is room (pod: from 1300px) and folds into ⋯ only below that. Pages ship the phone markup once and let a script (`deskbar` in pod's `_app.html`) move the nav and fold the chips, so nothing is duplicated. | pod `_app.html` deskbar, `base.html` `#pop` |
 | **Keyboard** | Apps with desktop use carry `_keys.html` (`m` leader, `?` help, `d` palette); the palette lists the app's pages **and** "p340 — all apps". Own shortcuts go into that layer, not beside it. | xarchive `_keys.html` |
 | **Offline** | Worker: network-first HTML, cached copy, else an offline page that names the app and says "p340 is not reachable — is the phone on the tailnet?" with a Retry button. Never a bare "Offline." or the browser's dinosaur. | jobs `sw.js` (inline page), pod `offline.html` |
 | **404 / errors** | Browser navigations get an HTML page in the app's chrome (nav still there, a way back); JSON `{"detail":…}` only under `/api/`. Every empty state says whether it is *empty* or *broken* and what to do. | fidelive's 404; xarchive `/status` for "broken vs empty" |
@@ -204,10 +205,72 @@ palette over the app's own data. xarchive and pod carry the current copy as
 `_keys.html`. The rules that made it work:
 
 - **Tomek's own bindings** (`~/dotfiles/vimium-options.json`): `i o k l u p`
-  scroll, `s`/`S` back/forward, `d` palette, `f`/`e` hints, `gg`/`G`, `yy`, `?`.
+  scroll, `s`/`S` back/forward, `d`/`D` palette (`D`: open in a new tab),
+  `f`/`e` hints, `gg`/`G`, `yy`, `?`. Plus the Vimium defaults he did not
+  remap and reaches for anyway: `H`/`L` back/forward, `r` reload, `g i` first
+  text field, `g u`/`g U` up a level / the root, `y f` copy a link by hint.
+- **The home rows keep their direction.** `u i o p` scroll on every page,
+  inside an open overlay too, and no app borrows them. `k`/`l` are Vimium's
+  page down/up, so in a list of things they are **next/previous item** (down
+  and up); with one open, they swap to the next/previous one. `j`/`;` are
+  Vimium's previous/next tab, so they step through the page's own "tabs" —
+  the sources column, a filter strip. Never `j`/`k` for next/previous, never
+  `o` for "open": "open the thing under the cursor" is **`f`**, Vimium's
+  follow, falling through to link hints when there is no cursor. Shift-`k`
+  extends a selection. (pod's reader and its library cards are the reference;
+  2026-09-17.)
 - **`m` is the leader** — his Vimium config unmaps it, so app commands hang off
   `m` and never collide. Modes `full` / `leader` / `off` in localStorage, `m m`
   cycles; do not try to detect Vimium.
+- **Which-key, as standard.** Every chord (`m`, `g`, `y`) is a table of rows
+  `[key, what it does, fn]` in the layer (`CHORDS`), and ~180 ms after the
+  first key a panel (`#kwk`, bottom-left, above the hud) lists the rest of it.
+  A `gg` typed as one motion never sees it; a `g` left hanging does. A page
+  adds its own rows with `window.__keysChords(prefix)` → rows; the page's row
+  wins over the layer's on the same key and the panel shows the winner. The
+  pending chord forgets itself after 4 s. pod's `_keys.html` carries this; the
+  snippet here does not yet — copy from pod.
+- **Ctrl-K, in the Legartis shape.** `Ctrl`/`⌘ K` toggles the palette from
+  anywhere — inside a text field too, in every key mode; `d` is the same
+  palette, `D` the same with every choice in a new tab. `/` is always the
+  page's own search field and never a layer key. The look is the Legartis
+  global search (`~/legartis/services/frontend/projects/web/src/app/global-search`):
+  a panel in the upper third (12vh from the top, 640px wide, 72vh tall at
+  most), a plain 52px input row at 18px with a magnifier, a spinner while a
+  fetch is out and an `esc` chip, results under small uppercase section
+  titles, each row an icon tile (or avatar) + headline with the match marked
+  + one subline + an optional two-line snippet, hover and the arrows moving
+  the same active row (wrapping), a footer of kbd hints (↑↓ ⏎ ⇧⏎ esc). With
+  nothing typed: the pages ("Go to") and the last five **recent searches**
+  (localStorage `<store>.recent`); a search is recorded when a result row or
+  a "show all" is chosen, never a page and never an entity the app marks
+  `nosave` (a person, a source). From the first keystroke: **pages matched
+  locally** (prefix > word-prefix > contains > description, max 5), then the
+  app's groups after a **250 ms** debounce, each a few rows and a **"show all
+  ‹type› matching “q” →"** row when there is more. **Enter on nothing** goes
+  to the page's own search for what was typed (`CFG.searchUrl(q)`); a
+  "nothing matched" note says so. Backdrop a plain **50% dim, no blur**. On a
+  phone the card is the whole screen, no footer, 16px input. Endpoint
+  `/api/palette?q=` answers `{groups:[{type, title, items:[{t, s, u, snip?,
+  av?}], more?:{t, u}, nosave?}]}`; the old flat `{items:[{k,t,s,u}]}` is
+  still read. **The canonical copy lives in `snippets/keys.html`, not in
+  either app**; pod's `_keys.html` and xarchive's `keys.js`/`keys.css` are
+  copies of it, CONFIG block aside.
+- **The `?` sheet is searchable.** While it is open, typing filters the
+  keys — any printable key lands in the field, `/` focuses it — a section
+  with nothing left disappears, the field counts what is left ("4 of 90",
+  "no key matches"), Escape clears the filter and then closes. Standard for
+  every app with the layer; the snippet carries it.
+- **The header does not jiggle.** The sections sit at the same pixel on
+  every page, and the search loupe is on every page in the same place: on a
+  page with a field it opens the field, on a page without one it opens the
+  palette (the app sends the Ctrl-K chord to the layer rather than calling
+  into it). No `?` button in the header — `?` is a key.
+- **The layer calls into no app object.** App keys (pod's Space/[/]/n/x/-/=
+  transport) go through `window.__keysPageKey(key, event, count)`, which
+  runs before the layer's own switch and now receives the repeat count. The
+  three strings that name the app come from `CFG.name`. `m m` turns the
+  keys back on from `off`, as the hud says.
 - **The layer is uniform; pages give way** (`window.__keysBusy()`).
 - **Hints:** alphabet `sadfjklewcmpgh`, mixed length, built so no hint is a
   prefix of another. Navigate through `window.__go`, never `location.href`.

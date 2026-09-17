@@ -1,73 +1,138 @@
-{% comment %} ——— keyboard layer (webkit snippet) —————————————————————————————
-   A Vimium-style layer inside the app. Lifted from ~/museum
-   (museum/templates/_keys.html); see ~/dotfiles/webkit/README.md §5.
-
-   To adopt:
-     1. edit the CONFIG block below (storage key, leader targets, palette
-        endpoint, the "zoom" selector);
-     2. serve a JSON palette endpoint: {"items":[{k,t,s,u}, …]};
-     3. `{% include "_keys.html" %}` right before </body>;
-     4. expose your soft-nav function as `window.__go(url, push)`;
-     5. if a page has its own keys, have it consult `window.__keysBusy()`
-        and move its bindings off the layer's letters (digits + ↑↓/Enter).
-
-   Bindings are Tomek's own Vimium mappings — keep them; `m` is the leader
-   because his Vimium config unmaps it, which is what makes the two coexist. {% endcomment %}
+{# ——— keyboard layer ————————————————————————————————————————————————
+   The canonical copy. Apps copy this file whole as `_keys.html` and edit only
+   the CONFIG block (name, store, leader, commands, palette, searchUrl, glyphs,
+   zoom, trail, lightbox, popinScroll, strips) and the SHEET help table.
+   Everything else — the Vimium dialect, hints, the which-key panel, the Ctrl-K
+   palette in the Legartis shape, the searchable ? sheet — is shared, so a fix
+   lands here first and is copied out. The layer never calls into an app
+   object: app keys (pod's transport) go through window.__keysPageKey(key,
+   event, count). Reference apps: pod (this copy) and xarchive (keys.js /
+   keys.css split of the same code). See ~/dotfiles/webkit/README.md §6.
+   2026-09-17. #}
 <style>
 #khud{position:fixed;left:0;bottom:0;z-index:82;display:none;
   padding:5px 12px 5px 14px;border-radius:0 10px 0 0;background:var(--panel2);
   border-top:1px solid var(--line);border-right:1px solid var(--line);
-  font-family:var(--sans);font-size:12.5px;color:var(--gold);letter-spacing:.08em}
+  font-size:12.5px;color:var(--accent);letter-spacing:.08em}
 #khud.on{display:block}
+/* which-key: after the first key of a chord the rest of it is on screen */
+#kwk{position:fixed;left:0;bottom:0;z-index:83;display:none;width:min(96vw,640px);box-sizing:border-box;
+  padding:8px 14px 9px;border-radius:0 12px 0 0;background:var(--panel2);
+  border-top:1px solid var(--line);border-right:1px solid var(--line);
+  box-shadow:0 -6px 24px rgba(0,0,0,.35);font-size:12.5px;color:var(--ink)}
+#kwk.on{display:block}
+#kwk .wk-t{color:var(--accent);letter-spacing:.08em;margin-bottom:5px;font-size:12px}
+#kwk .wk-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 18px}
+#kwk .wk-r{display:flex;gap:8px;align-items:baseline;white-space:nowrap;overflow:hidden}
+#kwk kbd{flex:none;min-width:18px;text-align:center;padding:0 5px;border-radius:4px;
+  background:var(--panel);border:1px solid var(--line);font:600 11px/1.6 ui-monospace,monospace;
+  color:var(--accent)}
+#kwk .wk-d{color:var(--dim);overflow:hidden;text-overflow:ellipsis}
 .khint{position:absolute;z-index:84;padding:1px 4px 2px;border-radius:4px;
-  background:linear-gradient(#f4d99a,#d9ae5c);color:#2b2113;border:1px solid #8a6c3c;
-  font:600 11px/1.35 var(--sans);letter-spacing:.06em;text-transform:uppercase;
+  background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);
+  font:600 11px/1.35 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;
   box-shadow:0 2px 6px rgba(0,0,0,.55);pointer-events:none;white-space:nowrap}
 .khint.dim{opacity:.35}
-.khint b{color:#8a6c3c;font-weight:600}
-.kmatch{outline:2px solid var(--gold) !important;outline-offset:1px}
+.khint b{color:color-mix(in srgb,var(--accent-ink) 55%,transparent);font-weight:600}
+.kmatch{outline:2px solid var(--accent) !important;outline-offset:1px}
 #kpal,#khelp{position:fixed;inset:0;z-index:86;display:none;
-  background:rgba(6,4,2,.62);backdrop-filter:blur(2px)}
+  background:rgba(4,7,12,.5)}
 #kpal.on,#khelp.on{display:block}
-#kpal .kp-card{max-width:620px;margin:8vh auto 0;background:var(--panel);
-  border:1px solid var(--line);border-radius:14px;overflow:hidden;
-  box-shadow:0 24px 60px rgba(0,0,0,.6)}
-#kpal input{width:100%;box-sizing:border-box;padding:14px 16px;border:0;
-  border-bottom:1px solid var(--line);background:var(--panel2);color:var(--ink);
-  font-size:16px;font-family:var(--serif);outline:none}
-#kpal .kp-list{max-height:58vh;overflow-y:auto}
-#kpal .kp-row{display:flex;gap:10px;align-items:baseline;padding:9px 16px;cursor:pointer}
-#kpal .kp-row.sel{background:color-mix(in srgb,var(--gold) 12%,var(--panel))}
-#kpal .kp-k{flex:none;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--gold-deep);width:62px}
-#kpal .kp-t{flex:1;min-width:0;font-family:var(--serif);font-size:15.5px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#kpal .kp-s{flex:none;max-width:40%;font-size:12px;color:var(--faint);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#kpal .kp-foot{padding:8px 16px;border-top:1px solid var(--line);
-  font-size:11.5px;color:var(--faint);background:var(--panel2)}
+/* The palette: the Legartis shape, kept across the tailnet. Upper third of
+   the screen, where the eye already is and where a growing list has room to
+   grow downwards. The input is the panel itself, not a field sitting on it;
+   sections carry a small title; the footer says which keys do what. On a
+   phone the card is the whole screen. */
+#kpal .kp-card{max-width:640px;margin:12vh auto 0;background:var(--panel);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;
+  flex-direction:column;max-height:72vh;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+#kpal .kp-in{display:flex;align-items:center;gap:12px;padding:0 12px 0 16px;height:52px;
+  border-bottom:1px solid var(--line);flex:none}
+#kpal .kp-in svg{width:20px;height:20px;flex:none;color:var(--dim);fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round}
+#kpal input{flex:1;min-width:0;height:52px;padding:0;border:0;background:transparent;color:var(--ink);
+  font-size:18px;font-weight:500;outline:none;border-radius:0}
+#kpal input::placeholder{color:var(--dimmer)}
+#kpal .kp-key{flex:none;font:600 11px/1 system-ui,sans-serif;padding:5px 6px;border-radius:5px;
+  border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer}
+#kpal .kp-key:hover{color:var(--ink)}
+#kpal .kp-spin{display:none;width:14px;height:14px;flex:none;border-radius:50%;
+  border:2px solid var(--line);border-top-color:var(--accent);animation:kpspin .7s linear infinite}
+#kpal .kp-card.busy .kp-spin{display:block}
+@keyframes kpspin{to{transform:rotate(360deg)}}
+#kpal .kp-list{min-height:0;overflow-y:auto;padding:6px}
+#kpal .kp-sect{font:650 11px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--dimmer);padding:10px 10px 5px}
+#kpal .kp-sect:first-child{padding-top:4px}
+#kpal .kp-row{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;cursor:pointer;
+  border-radius:8px;scroll-margin:6px}
+#kpal .kp-row.sel{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
+#kpal .kp-tile{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+  background:var(--panel2);color:var(--accent);font:600 13px/1 system-ui,sans-serif;overflow:hidden;
+  margin-top:1px}
+#kpal .kp-tile.dim{color:var(--dimmer)}
+#kpal .kp-tile.av{background:none;border-radius:50%}
+#kpal .kp-tile img{width:26px;height:26px;object-fit:cover;display:block}
+#kpal .kp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;line-height:1.35}
+#kpal .kp-t{font-size:14.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kpal .kp-t.more{color:var(--accent)}
+#kpal .kp-s{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kpal .kp-snip{font-size:12.5px;color:var(--dim);display:-webkit-box;-webkit-box-orient:vertical;
+  -webkit-line-clamp:2;overflow:hidden;margin-top:2px}
+#kpal mark{background:none;color:var(--accent);font-weight:650}
+#kpal .kp-note{padding:18px 12px;text-align:center;font-size:13px;color:var(--dim)}
+#kpal .kp-foot{display:flex;align-items:center;gap:14px;padding:7px 10px 7px 16px;
+  border-top:1px solid var(--line);font-size:11.5px;color:var(--dim);background:var(--panel2);flex:none}
+#kpal .kp-foot kbd{display:inline-flex;align-items:center;justify-content:center;min-width:18px;
+  height:18px;padding:0 4px;border-radius:4px;border:1px solid var(--line);background:var(--panel);
+  color:var(--dim);font:600 10.5px/1 system-ui,sans-serif;margin-right:3px}
+#kpal .kp-foot .kp-close{margin-left:auto;background:none;border:0;color:var(--dim);
+  font:600 12px system-ui,sans-serif;cursor:pointer;padding:4px 8px;border-radius:6px}
+#kpal .kp-foot .kp-close:hover{background:var(--panel);color:var(--ink)}
+@media (max-width:759px){
+  #kpal .kp-card{margin:0;max-height:100dvh;height:100dvh;border-radius:0;border:0}
+  #kpal .kp-foot{display:none}
+  #kpal input{font-size:16px}
+}
 #khelp .kh-card{max-width:720px;margin:6vh auto 0;max-height:84vh;overflow-y:auto;
   background:var(--panel);border:1px solid var(--line);border-radius:14px;
   padding:20px 22px 18px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
-#khelp h2{font-size:20px;margin-bottom:2px}
+#khelp h2{font-size:20px;margin:0}
+#khelp .kh-head{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:2px}
+#khelp .kh-find{flex:1;min-width:12rem;display:flex;align-items:center;gap:8px;
+  border:1px solid var(--line);border-radius:9px;background:var(--panel2);padding:0 10px}
+#khelp .kh-find input{flex:1;min-width:0;border:0;background:none;padding:7px 0;
+  font:inherit;font-size:13.5px;color:var(--ink);outline:none}
+#khelp .kh-n{font-size:11.5px;color:var(--dim);white-space:nowrap}
+#khelp .kh-n.none{color:var(--accent)}
 #khelp .kh-grid{display:grid;grid-template-columns:1fr;gap:2px 26px;margin-top:6px}
 @media (min-width:700px){ #khelp .kh-grid{grid-template-columns:1fr 1fr} }
 #khelp .kh-row{display:flex;gap:10px;align-items:baseline;padding:3px 0;font-size:13.5px}
 #khelp kbd{flex:none;min-width:26px;text-align:center;padding:1px 6px;border-radius:5px;
-  border:1px solid var(--line);background:var(--panel2);color:var(--gold);
-  font:600 12px/1.5 var(--sans)}
+  border:1px solid var(--line);background:var(--panel2);color:var(--accent);
+  font:600 12px/1.5 system-ui,sans-serif}
 #khelp .kh-d{color:var(--dim);min-width:0}
 #khelp .kh-mode{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
   font-size:13px;color:var(--dim)}
-#khelp .kh-mode b{color:var(--gold)}
+#khelp .kh-mode b{color:var(--accent)}
 </style>
 <div id="khud" aria-hidden="true"></div>
+<div id="kwk" aria-live="polite"></div>
 <div id="kpal" role="dialog" aria-label="Jump to">
   <div class="kp-card">
-    <input type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-           placeholder="Jump to a gallery, painter, room or painting…" aria-label="Jump to">
-    <div class="kp-list"></div>
-    <div class="kp-foot">↑↓ choose · Enter open · Shift-Enter new tab · Esc close</div>
+    <div class="kp-in">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="Search episodes, sources and pages…" aria-label="Jump to"
+             role="combobox" aria-expanded="true">
+      <span class="kp-spin" aria-hidden="true"></span>
+      <button class="kp-key" data-pal-close type="button" title="Close">esc</button>
+    </div>
+    <div class="kp-list" role="listbox"></div>
+    <div class="kp-foot"><span><kbd>↑</kbd><kbd>↓</kbd> choose</span><span><kbd>⏎</kbd> open</span>
+      <span><kbd>⇧⏎</kbd> new tab</span><span><kbd>esc</kbd> close</span>
+      <button class="kp-close" data-pal-close type="button">Close</button></div>
+  </div>
   </div>
 </div>
 <div id="khelp" role="dialog" aria-label="Keyboard shortcuts"><div class="kh-card"></div></div>
@@ -78,24 +143,34 @@
 
   // ——— CONFIG: the only part that is app-specific ————————————————
   var CFG = {
-    store: 'app.keys',                 // localStorage key for the mode
-    palette: '/api/palette?q=',        // JSON: {"items":[{k,t,s,u}, …]}
-    zoom: '#content .zoomable',        // what `z` clicks, if anything
+    name: 'pod',                       // the app, in the hud and the help
+    store: 'podKeys',                  // localStorage key for the mode
+    palette: '/api/palette?q=',        // JSON: {groups:[{type,title,items:[{t,s,u,snip?,av?}],more?:{t,u},nosave?}]}
+    searchUrl: function(q){ return '/search?q=' + encodeURIComponent(q); },  // Enter on nothing
+    glyphs: {source: '\u25ce', episode: '\u266a'},   // the tile per group type
+    zoom: null,                        // nothing to zoom in pod
     // `m` + key → path
-    leader: {g: '/', a: '/artists', q: '/quiz', h: '/quiz/history',
-             y: '/account', s: '/search', r: '/room/random'},
-    // rows the palette offers before any query
+    leader: {r: '/read', l: '/library', q: '/queue', f: '/feeds', s: '/search',
+             y: '/settings', t: '/trends', b: '/read?s=starred'},
     commands: [
-      {k: 'go', t: 'Home', s: '', u: '/'},
+      {k: 'go', t: 'Read', s: 'the reader', u: '/read'},
+      {k: 'go', t: 'Starred', s: 'the reader', u: '/read?s=starred'},
+      {k: 'go', t: 'Trends', s: 'what you actually read', u: '/trends'},
+      {k: 'go', t: 'Library', s: '', u: '/library'},
+      {k: 'go', t: 'Up next', s: '', u: '/queue'},
+      {k: 'go', t: 'Sources', s: '', u: '/feeds'},
+      {k: 'go', t: 'Settings', s: '', u: '/settings'},
       {k: 'go', t: 'Keyboard shortcuts', s: 'this list of keys', u: '#help'}
     ],
-    // `]` / `[` walk the collection you clicked through; the selector is the
-    // kind of link that forms a trail (set to null to disable)
-    trail: 'a[href*="/painting/"]',
-    // optional overlays the layer must respect / scroll instead of the page
-    lightbox: '#lightbox',             // .open means a zoomed image is up
-    popinScroll: '#popin .pi-scroll',  // an article overlay's scroll box
-    strips: '#content .walk, #content .chips'   // what u/p steer sideways
+    // [ and ] are the transport here, so there is no click trail to walk
+    trail: null,
+    lightbox: null,
+    // The reading pane is a scroller of its own — the page behind it does not
+    // move — so while it is open every key that means "down a bit" or "down a
+    // page" has to be aimed at it. Without this the article sat still and the
+    // list underneath scrolled, which reads as a dead keyboard.
+    popinScroll: '#pane-body',
+    strips: '#content .chips, header .chips, .rd-side'   // what u/p steer sideways
   };
 
   // ——— mode: full (all keys) · leader (only m…, for when Vimium is driving)
@@ -108,8 +183,8 @@
   }
   function setMode(m){
     try { localStorage.setItem(CFG.store, m); } catch(e){}
-    hud(m === 'off' ? 'app keys off — set them again on /account'
-                    : 'app keys: ' + m, 1600);
+    hud(m === 'off' ? CFG.name + ' keys off — m m turns them back on'
+                    : CFG.name + ' keys: ' + m, 1600);
     if (window.__keysModeChanged) window.__keysModeChanged(m);
   }
   window.__keysMode = mode;
@@ -142,6 +217,16 @@
   // gives way — never the other way round.
   function digitsTaken(){
     return !!(window.__keysDigitsTaken && window.__keysDigitsTaken());
+  }
+  // The same bargain, one step further: a page may claim whole letters while
+  // it is mounted (`window.__keysPageKey(key, event, count)`). pod's reader
+  // needs k/l/s the way it needs them, and pod's transport keys live there
+  // too — the layer itself never calls into an app object. The
+  // layer must not scroll under them — so the page asks, the layer yields,
+  // and the page hands them back when it is navigated away from. The
+  // `m` leader is never on offer: it is Vimium's contract, not pod's.
+  function pageKey(k, e, n){
+    return !!(window.__keysPageKey && window.__keysPageKey(k, e, n || 1));
   }
   // pages with their own key handling (the quiz) must know when we hold the keys
   window.__keysBusy = function(){
@@ -223,7 +308,10 @@
   // ——— link hints ——————————————————————————————————————————————
   var HCHARS = 'sadfjklewcmpgh';   // Vimium's own alphabet, in its own order
   var hints = [], hintBuf = '', hintNewTab = false, hintLayer = null;
-  var HSEL = 'a[href], button, [role="button"], .zoomable, input:not([type="hidden"]), select, summary';
+  // `.art img` is in here because a picture in an article is a thing you can
+  // open, and `f` is how this app opens things without a mouse.
+  var HSEL = 'a[href], button, [role="button"], .zoomable, .art img, ' +
+             'input:not([type="hidden"]), select, summary';
   // Vimium's own scheme: as many one-key hints as the alphabet can spare,
   // the rest two keys — 33 links become 5 single presses and 28 doubles.
   function hintStrings(n){
@@ -277,7 +365,8 @@
       hintLayer.appendChild(m);
       hints.push({code: codes[i], el: t.el, mark: m});
     });
-    hud(newTab ? 'follow link in a new tab…' : 'follow link…');
+    hud(newTab === 'copy' ? 'copy a link…'
+        : newTab ? 'follow link in a new tab…' : 'follow link…');
   }
   function hintsOff(){
     if (hintLayer) hintLayer.remove();
@@ -307,6 +396,13 @@
     });
   }
   function activate(el){
+    if (hintNewTab === 'copy'){
+      var href = el.tagName === 'A' && el.href;
+      if (!href){ hud('that is not a link', 1200); return; }
+      if (navigator.clipboard) navigator.clipboard.writeText(href).catch(function(){});
+      hud('copied ' + href.replace(/^https?:\/\//, '').slice(0, 46), 1600);
+      return;
+    }
     if (hintNewTab && el.tagName === 'A' && el.href){ window.open(el.href, '_blank'); return; }
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'){
       el.focus(); return;
@@ -314,66 +410,190 @@
     el.click();
   }
 
-  // ——— the palette: everything in the museum, one query away ——————————
+  // ——— the palette: pages, sources and episodes, one query away ————————
+  // The shape is Legartis's ⌘K (global-search-overlay), kept across the
+  // tailnet: a panel in the upper third; with nothing typed, the pages and
+  // your recent searches; from the first keystroke the PAGES matched here,
+  // at once, and under them the app's own groups from CFG.palette, each a
+  // few rows and a "show all" when there is more; one flat list for the
+  // arrow keys, hover moving the same selection; Enter opens, Shift-Enter
+  // in a new tab, Enter on nothing searches the page for what you typed.
+  // Ctrl-K / ⌘K opens it from anywhere; so does `d`, and `D` with every
+  // choice in a new tab.
   var pal = document.getElementById('kpal');
   var palIn = pal.querySelector('input'), palList = pal.querySelector('.kp-list');
-  var palItems = [], palSel = 0, palSeq = 0, palT = null;
-  var STATIC = CFG.commands;
+  var palCard = pal.querySelector('.kp-card');
+  var palOpts = [], palSel = 0, palSeq = 0, palT = null, palQ = '';
+  var palNewTab = false;             // `D`: everything chosen opens in a new tab
+  var RECENT = CFG.store + '.recent', RECENT_N = 5, DEBOUNCE = 250;
+  var PAGE_N = 5;                       // pages offered for one query
+
+  function recents(){
+    try { return JSON.parse(localStorage.getItem(RECENT) || '[]'); } catch(e){ return []; }
+  }
+  function remember(q){
+    if (!q) return;
+    var r = recents().filter(function(x){ return x !== q; });
+    r.unshift(q);
+    try { localStorage.setItem(RECENT, JSON.stringify(r.slice(0, RECENT_N))); } catch(e){}
+  }
+  function esc(t){
+    return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; });
+  }
+  // The query marked in a line of text: escaped first, so an article that
+  // contains markup never becomes markup here.
+  function mark(text, q){
+    var t = esc(text);
+    if (!q) return t;
+    var i = t.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return t;
+    return t.slice(0, i) + '<mark>' + t.slice(i, i + q.length) + '</mark>' + t.slice(i + q.length);
+  }
+  // Pages, ranked: a title the query starts, then a word it starts, then a
+  // title that merely contains it, then the description. Without the tiers
+  // "se" would rank Settings against Search by nothing at all.
+  function pages(q){
+    var t = q.toLowerCase();
+    if (!t) return CFG.commands.slice();
+    return CFG.commands.map(function(c){
+      var l = c.t.toLowerCase(), s = (c.s || '').toLowerCase(), score = 0;
+      if (l.indexOf(t) === 0) score = 4;
+      else if (l.indexOf(' ' + t) >= 0) score = 3;
+      else if (l.indexOf(t) >= 0) score = 2;
+      else if (s.indexOf(t) >= 0) score = 1;
+      return {c: c, score: score};
+    }).filter(function(x){ return x.score > 0; })
+      .sort(function(a, b){ return b.score - a.score; })
+      .slice(0, PAGE_N).map(function(x){ return x.c; });
+  }
+  // What an app's endpoint may answer: the tailnet shape {groups:[{type,
+  // title, items, more, nosave}]}, or the older flat {items:[{k,t,s,u}]},
+  // grouped here by its `k`.
+  function groupsOf(d){
+    if (d && d.groups) return d.groups;
+    var by = {}, order = [];
+    (d && d.items || []).forEach(function(it){
+      var k = it.k === 'go' ? 'Pages' : (it.k || 'Results');
+      if (!by[k]){ by[k] = {type: k, title: k.charAt(0).toUpperCase() + k.slice(1), items: []}; order.push(k); }
+      by[k].items.push(it);
+    });
+    return order.map(function(k){ return by[k]; });
+  }
   function palOpen(){
     pal.classList.add('on');
-    palIn.value = ''; palSel = 0;
-    render(STATIC.slice());
+    palIn.value = ''; palQ = ''; palSel = 0;
+    paint('', [], true);
     palIn.focus();
-    query('');
   }
-  function palClose(){ pal.classList.remove('on'); palIn.blur(); }
+  function palClose(){
+    pal.classList.remove('on'); palCard.classList.remove('busy'); palIn.blur();
+    clearTimeout(palT); palSeq++;
+  }
   function palIsOpen(){ return pal.classList.contains('on'); }
-  function render(items){
-    palItems = items;
-    palList.innerHTML = '';
-    items.forEach(function(it, i){
-      var row = document.createElement('div');
-      row.className = 'kp-row' + (i === palSel ? ' sel' : '');
-      row.innerHTML = '<span class="kp-k"></span><span class="kp-t"></span><span class="kp-s"></span>';
-      row.children[0].textContent = it.k === 'go' ? 'go' : it.k;
-      row.children[1].textContent = it.t;
-      row.children[2].textContent = it.s || '';
-      row.addEventListener('mousedown', function(e){ e.preventDefault(); choose(i, e.shiftKey); });
-      palList.appendChild(row);
-    });
+
+  // One rendered section: a title and rows. Every row is pushed onto the
+  // flat option list in visual order, so the arrows walk across sections.
+  function section(title, rows){
+    if (!rows.length) return;
+    var h = document.createElement('div');
+    h.className = 'kp-sect'; h.textContent = title;
+    palList.appendChild(h);
+    rows.forEach(function(r){ palList.appendChild(r); });
   }
-  function select(i){
-    if (!palItems.length) return;
-    palSel = Math.max(0, Math.min(palItems.length - 1, i));
-    [].forEach.call(palList.children, function(r, j){ r.classList.toggle('sel', j === palSel); });
-    var sel = palList.children[palSel];
-    if (sel) sel.scrollIntoView({block: 'nearest'});
+  function row(opt, html, cls){
+    var el = document.createElement('div');
+    el.className = 'kp-row' + (cls ? ' ' + cls : '');
+    el.setAttribute('role', 'option');
+    el.innerHTML = html;
+    var i = palOpts.length;
+    opt.el = el; palOpts.push(opt);
+    el.addEventListener('mouseenter', function(){ select(i, true); });
+    el.addEventListener('mousedown', function(e){ e.preventDefault(); choose(i, e.shiftKey); });
+    return el;
+  }
+  function tile(inner, cls){ return '<span class="kp-tile' + (cls ? ' ' + cls : '') + '">' + inner + '</span>'; }
+  var GLYPH = CFG.glyphs || {};
+  GLYPH.go = GLYPH.go || '\u2192'; GLYPH.recent = '\u21ba'; GLYPH.more = '\u2026';
+
+  function paint(q, groups, idle){
+    palOpts = []; palList.innerHTML = '';
+    // Pages: matched here, on the keystroke, before anything is fetched.
+    section(q ? 'Pages' : 'Go to', pages(q).map(function(c){
+      return row({u: c.u, kind: 'page'},
+        tile(GLYPH.go) + '<span class="kp-main"><span class="kp-t">' + mark(c.t, q) +
+        '</span>' + (c.s ? '<span class="kp-s">' + esc(c.s) + '</span>' : '') + '</span>');
+    }));
+    if (!q){
+      section('Recent searches', recents().map(function(r){
+        return row({kind: 'recent', q: r},
+          tile(GLYPH.recent, 'dim') + '<span class="kp-main"><span class="kp-t">' + esc(r) + '</span></span>');
+      }));
+      return;
+    }
+    groups.forEach(function(g){
+      var rows = (g.items || []).map(function(it){
+        var av = it.av ? '<img src="' + esc(it.av) + '" alt="">' : (GLYPH[g.type] || GLYPH[it.k] || '\u00b7');
+        return row({u: it.u, kind: 'row', q: q, nosave: !!g.nosave},
+          tile(av, it.av ? 'av' : '') + '<span class="kp-main"><span class="kp-t">' + mark(it.t, q) +
+          '</span>' + (it.s ? '<span class="kp-s">' + esc(it.s) + '</span>' : '') +
+          (it.snip ? '<span class="kp-snip">' + mark(it.snip, q) + '</span>' : '') + '</span>');
+      });
+      if (g.more) rows.push(row({u: g.more.u, kind: 'more', q: q},
+        tile(GLYPH.more, 'dim') + '<span class="kp-main"><span class="kp-t more">' + esc(g.more.t) +
+        ' \u201c' + esc(q) + '\u201d \u2192</span></span>', 'more'));
+      section(g.title || g.type, rows);
+    });
+    if (!idle && !palOpts.length){
+      var n = document.createElement('div');
+      n.className = 'kp-note';
+      n.textContent = 'Nothing is called that' + (CFG.searchUrl ? ' \u2014 Enter searches the page anyway.' : '.');
+      palList.appendChild(n);
+    }
+    select(0, false);
+  }
+  function select(i, quiet){
+    if (!palOpts.length) return;
+    palSel = (i + palOpts.length) % palOpts.length;
+    palOpts.forEach(function(o, j){ o.el.classList.toggle('sel', j === palSel); });
+    if (!quiet) palOpts[palSel].el.scrollIntoView({block: 'nearest'});
   }
   function choose(i, newTab){
-    var it = palItems[i];
-    if (!it) return;
+    var o = palOpts[i];
+    var q = palQ;
+    newTab = newTab || palNewTab;
+    if (!o){
+      // Enter on nothing: the page's own search, for what was typed.
+      if (q && CFG.searchUrl){ remember(q); palClose(); go(CFG.searchUrl(q), newTab); }
+      return;
+    }
+    if (o.kind === 'recent'){ palIn.value = o.q; palIn.dispatchEvent(new Event('input')); return; }
+    // A page was never a search, and neither is an entity the app marks
+    // `nosave` (a person, a source): only a result you had to look for is.
+    if ((o.kind === 'row' && !o.nosave) || o.kind === 'more') remember(q);
     palClose();
-    if (it.u === '#help'){ helpOpen(); return; }
-    go(it.u, newTab);
+    if (o.u === '#help'){ helpOpen(); return; }
+    go(o.u, newTab);
   }
   function query(q){
     var mine = ++palSeq;
-    var local = STATIC.filter(function(s){
-      return !q || (s.t + ' ' + s.s).toLowerCase().indexOf(q.toLowerCase()) >= 0;
-    });
+    palQ = q;
+    if (!q){ paint('', [], true); palCard.classList.remove('busy'); return; }
+    paint(q, [], true);                     // the pages, now; the rest follows
+    palCard.classList.add('busy');
     fetch(CFG.palette + encodeURIComponent(q))
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (mine !== palSeq) return;           // a newer keystroke already won
-        palSel = 0;
-        render(local.concat(d.items || []));
+        if (mine !== palSeq) return;        // a newer keystroke already won
+        palCard.classList.remove('busy');
+        paint(q, groupsOf(d), false);
       })
-      .catch(function(){ if (mine === palSeq){ palSel = 0; render(local); } });
+      .catch(function(){ if (mine === palSeq){ palCard.classList.remove('busy'); paint(q, [], false); } });
   }
   palIn.addEventListener('input', function(){
     clearTimeout(palT);
     var q = palIn.value.trim();
-    palT = setTimeout(function(){ query(q); }, 110);
+    palT = setTimeout(function(){ query(q); }, DEBOUNCE);
   });
   palIn.addEventListener('keydown', function(e){
     if (e.key === 'Escape'){ e.preventDefault(); palClose(); return; }
@@ -382,7 +602,20 @@
     if (e.key === 'Enter'){ e.preventDefault(); choose(palSel, e.shiftKey); return; }
     e.stopPropagation();   // ordinary typing never reaches the key layer
   });
-  pal.addEventListener('mousedown', function(e){ if (e.target === pal) palClose(); });
+  pal.addEventListener('mousedown', function(e){
+    if (e.target === pal) palClose();
+  });
+  pal.addEventListener('click', function(e){ if (e.target.closest('[data-pal-close]')) palClose(); });
+  // Ctrl-K / ⌘K opens it from anywhere — inside a text field too, and in
+  // every key mode, because it is not a Vimium key and every app on the
+  // tailnet answers it the same way.
+  window.addEventListener('keydown', function(e){
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')){
+      e.preventDefault(); e.stopPropagation();
+      if (palIsOpen()) palClose(); else { palNewTab = false; palOpen(); }
+    }
+  }, true);
+  window.__palette = function(){ palNewTab = false; palOpen(); };
 
   // ——— help sheet ————————————————————————————————————————————————
   var help = document.getElementById('khelp'), helpCard = help.querySelector('.kh-card');
@@ -391,22 +624,61 @@
     ['Scroll', [['i', 'down'], ['o', 'up'], ['k', 'page down'], ['l', 'page up'],
                 ['u', 'strip left'], ['p', 'strip right'], ['gg', 'top'], ['G', 'bottom']]],
     ['Navigate', [['s', 'back'], ['S', 'forward'], ['f', 'follow a link'],
-                  ['e', 'link in a new tab'], [']', 'next painting'], ['[', 'previous painting']]],
-    ['Museum', [['d', 'jump to anything'], ['/', 'search'], ['m g', 'galleries'],
-                ['m a', 'artists'], ['m q', 'quiz'], ['m h', 'quiz history'],
-                ['m y', 'your account'], ['m r', 'a random room']]],
-    ['This page', [['z', 'zoom the painting'], ['y y', 'copy the address'],
-                   ['?', 'these keys'], ['Esc', 'close one layer'],
-                   ['m m', 'cycle the key modes']]],
-    ['Quiz', [['1 4', 'answer (1 to 4)'], ['↑ ↓', 'walk the options'],
-              ['Enter', 'commit, then next question']]]
+                  ['e', 'link in a new tab'], ['ctrl k', 'search everything'],
+                  ['d', 'the same palette'],
+                  ['D', 'jump, in a new tab'], ['g u', 'up one level'],
+                  ['g U', 'the front page'], ['g i', 'the first text field'],
+                  ['r', 'reload'], ['/', 'search']]],
+    ['Listen', [['space', 'play / pause'], ['[', 'back 15 seconds'],
+                [']', 'forward 30 seconds'], ['n', 'next episode'],
+                ['-', 'slower'], ['=', 'faster'], ['x', 'stop and close the player']]],
+    ['Inside an open article', [['i', 'down'], ['o', 'up'],
+             ['g g', 'the top'], ['G', 'the end'], ['↑ ↓', 'down and up'],
+             ['PgUp PgDn', 'by the screen'], ['k', 'the next article'],
+             ['l', 'the one before'], ['Enter Esc', 'back to the list']]],
+    ['Reader (on /read)', [['k', 'next item'], ['l', 'previous'],
+             ['j', 'previous place in the column'], [';', 'the next one'],
+             ['f', 'open the one under the cursor'], ['Enter', 'open / close'],
+             ['s', 'star'], ['U', 'unread again'],
+             ['c', 'write a note'], ['t', 'read it aloud'],
+             ['v', 'the original page'], ['r', 'refresh'],
+             ['A', 'mark all read'], ['1 2', 'list / expanded'],
+             ['N', 'next place in the column'], ['P', 'the one before'],
+             ['g c', 'next folder'], ['g C', 'previous folder'],
+             ['/', 'search everything']]],
+    ['Reader — go to', [['g a', 'all items'], ['g s', 'starred'],
+             ['g n', 'your notes'], ['g d', 'read aloud'], ['g c', 'next folder'],
+             ['g C', 'previous folder'], ['g t', 'trends'], ['g u', 'subscriptions'],
+             ['g h', 'the audio library'], ['g g', 'top of the list']]],
+    ['pod', [['m r', 'reader'], ['m b', 'starred'], ['m t', 'trends'],
+             ['m l', 'audio library'], ['m q', 'up next'], ['m f', 'sources'],
+             ['m s', 'search'], ['m y', 'settings']]],
+    ['Picking several (audio library)', [['k', 'next card'], ['l', 'previous'],
+             ['x', 'pick this one'], ['X', 'pick it and step down'],
+             ['⇧ k', 'extend the run'], ['ctrl a', 'pick everything here'],
+             ['Del', 'delete what is picked'], ['Esc', 'pick nothing']]],
+    ['Gestures', [['hold', 'an episode — its whole menu'],
+                  ['right-click', 'the same menu, with a mouse'],
+                  ['⇧ click', 'a run of cards; ctrl-click, one more'],
+                  ['swipe', 'a reader row: star it, or be done with it']]],
+    ['This page', [['y y', 'copy the address'], ['y f', 'copy a link'],
+                   ['?', 'these keys'],
+                   ['Esc', 'close one layer'], ['m m', 'cycle the key modes']]]
   ];
+  // The sheet is searchable: any printable key while it is open lands in
+  // the filter, `/` focuses it, a section with nothing left disappears, and
+  // Escape clears the filter before it closes the sheet.
+  var helpIn = null;
   function helpOpen(){
-    var h = '<h2>Keyboard</h2><div class="faint" style="font-size:12.5px">' +
-      'Your Vimium bindings, inside the museum. A number repeats: <b>3i</b>.</div>' +
+    var h = '<div class="kh-head"><h2>Keyboard</h2>' +
+      '<label class="kh-find"><input type="text" placeholder="Type to filter the keys…" ' +
+      'autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Filter the keys">' +
+      '<span class="kh-n"></span></label></div>' +
+      '<div class="muted" style="font-size:12.5px">' +
+      'Your Vimium bindings, inside ' + CFG.name + '. A number repeats: <b>3i</b>.</div>' +
       '<div class="kh-grid">';
     SHEET.forEach(function(sec){
-      h += '<div><div class="eyebrow" style="margin:12px 0 4px">' + sec[0] + '</div>';
+      h += '<div class="kh-sec"><div class="eyebrow" style="margin:12px 0 4px">' + sec[0] + '</div>';
       sec[1].forEach(function(r){
         h += '<div class="kh-row"><kbd>' + r[0].replace(/ /g, '</kbd><kbd>') +
              '</kbd><span class="kh-d">' + r[1] + '</span></div>';
@@ -416,24 +688,128 @@
     h += '</div><div class="kh-mode">Mode: <b>' + mode() + '</b> — ' +
       '<b>full</b> uses every key, <b>leader</b> only the <kbd>m</kbd> commands ' +
       '(leave the rest to Vimium), <b>off</b> nothing. Press <kbd>m</kbd><kbd>m</kbd> ' +
-      'to cycle, or set it on your account page.</div>';
+      'to cycle.</div>';
     helpCard.innerHTML = h;
+    helpIn = helpCard.querySelector('.kh-find input');
+    helpIn.addEventListener('input', helpFilter);
     help.classList.add('on');
+    helpCard.scrollTop = 0;
   }
-  function helpClose(){ help.classList.remove('on'); }
+  function helpFilter(){
+    var q = (helpIn.value || '').trim().toLowerCase(), n = 0, all = 0;
+    [].forEach.call(helpCard.querySelectorAll('.kh-sec'), function(sec){
+      var kept = 0;
+      [].forEach.call(sec.querySelectorAll('.kh-row'), function(r){
+        var hit = !q || r.textContent.toLowerCase().indexOf(q) >= 0;
+        r.hidden = !hit; all++; if (hit){ kept++; n++; }
+      });
+      sec.hidden = !kept;
+    });
+    var c = helpCard.querySelector('.kh-n');
+    c.textContent = q ? (n ? n + ' of ' + all : 'no key matches') : '';
+    c.classList.toggle('none', q && !n);
+  }
+  function helpClose(){ help.classList.remove('on'); helpIn = null; }
   function helpIsOpen(){ return help.classList.contains('on'); }
   help.addEventListener('mousedown', function(e){ if (e.target === help) helpClose(); });
   window.__keysHelp = helpOpen;
 
   // ——— leader (m …) and the dispatcher ————————————————————————————
   var LEADER = CFG.leader;
+  // ——— chords, and the which-key panel that finishes them ————————————
+  // Every two-key command is a row here: [key, what it does, fn]. A page may
+  // put rows of its own in front of these through window.__keysChords(prefix)
+  // — the reader's `g a` "all items" beats the layer's, and its row is what
+  // the panel shows — and the layer never needs to know what the page meant.
+  function leaderRows(){
+    var out = [];
+    Object.keys(LEADER).forEach(function(k){
+      var url = LEADER[k], name = url.replace(/^\//, '').replace(/[?=&].*$/, '') || 'home';
+      (CFG.commands || []).some(function(c){ if (c.u === url){ name = c.t; return true; } });
+      out.push([k, name.toLowerCase(), function(){ go(url); }]);
+    });
+    out.push(['m', 'cycle the key modes', function(){
+      setMode(MODES[(MODES.indexOf(mode()) + 1) % MODES.length]);
+    }]);
+    out.push(['?', 'these keys', helpOpen]);
+    return out;
+  }
+  var CHORDS = {
+    m: leaderRows,
+    g: [['g', 'the top', function(){ toEnd(false); }],
+        ['i', 'the first text field', focusInput],
+        ['u', 'up one level', function(){ upUrl(false); }],
+        ['U', 'the front page', function(){ upUrl(true); }]],
+    y: [['y', 'copy the address', copyUrl],
+        ['f', 'copy a link', function(){ hintsOn('copy'); }]]
+  };
+  function chordRows(p){
+    var page = (window.__keysChords && window.__keysChords(p)) || [];
+    var own = CHORDS[p] || [];
+    if (typeof own === 'function') own = own();
+    var seen = {}, out = [];
+    page.concat(own).forEach(function(r){
+      if (!seen[r[0]]){ seen[r[0]] = 1; out.push(r); }
+    });
+    return out;
+  }
+  function chordRun(p, k){
+    var row = null;
+    chordRows(p).some(function(r){ if (r[0] === k){ row = r; return true; } });
+    if (!row){ hud(p + k + ' is not a ' + (p === 'm' ? CFG.name + ' ' : p + '-') + 'command', 1400); return false; }
+    row[2]();
+    return true;
+  }
+  // The panel comes up a beat after the first key, so a `gg` typed as one
+  // motion never sees it, and a `g` left hanging does. Which-key, in short.
+  var wk = document.getElementById('kwk'), wkT = null;
+  function whichOn(p){
+    clearTimeout(wkT);
+    wkT = setTimeout(function(){
+      var rows = chordRows(p);
+      if (!rows.length) return;
+      var h = '<div class="wk-t">' + (count ? count : '') + p + ' …</div><div class="wk-g">';
+      rows.forEach(function(r){
+        h += '<div class="wk-r"><kbd>' + r[0].replace('<', '&lt;') + '</kbd>' +
+             '<span class="wk-d">' + r[1] + '</span></div>';
+      });
+      wk.innerHTML = h + '</div>';
+      wk.classList.add('on');
+      hud(null);
+    }, WK_DELAY);
+  }
+  function whichOff(){ clearTimeout(wkT); wk.classList.remove('on'); }
+  var WK_DELAY = 180;
+  window.__keysWhich = whichOn;          // a page with a chord of its own
+  window.__keysWhichOff = whichOff;
+
   var pending = '', count = '', pendT = null;
-  function clearPending(){ pending = ''; count = ''; clearTimeout(pendT); hud(null); }
+  function clearPending(){ pending = ''; count = ''; clearTimeout(pendT); hud(null); whichOff(); }
   function arm(p){
     pending = p;
     hud(count + p + '…');
+    whichOn(p);
     clearTimeout(pendT);
-    pendT = setTimeout(clearPending, 2500);   // a half-typed command forgets itself
+    pendT = setTimeout(clearPending, 4000);   // a half-typed command forgets itself
+  }
+  // Vimium's `gi`: the first usable text field on the page
+  function focusInput(){
+    var f = [].slice.call(document.querySelectorAll(
+      'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]'))
+      .filter(function(el){
+        if (el.disabled || el.closest('#kpal, #khelp')) return false;
+        var r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })[0];
+    if (!f){ hud('no text field here', 1200); return; }
+    f.focus();
+    if (f.select) try { f.select(); } catch(e){}
+  }
+  // Vimium's `gu` / `gU`: one directory up the address, or straight to the root
+  function upUrl(root){
+    var path = location.pathname.replace(/\/+$/, '');
+    if (root || path.lastIndexOf('/') <= 0){ go('/'); return; }
+    go(path.slice(0, path.lastIndexOf('/')) || '/');
   }
   function copyUrl(){
     var url = location.href;
@@ -442,52 +818,87 @@
   }
   function zoom(){
     var img = CFG.zoom && document.querySelector(CFG.zoom);
-    if (img) img.click(); else hud('no painting to zoom here', 1400);
+    if (img) img.click(); else hud('nothing to zoom here', 1400);
   }
 
   window.addEventListener('keydown', function(e){
-    // our own overlays get the keys first, whatever the mode
+    // our own overlays get the keys first, whatever the mode, topmost first —
+    // a picture opened from inside the reading pane must go before the pane.
+    if (window.__lightboxOpen && window.__lightboxOpen()){
+      if (e.key === 'Escape' || e.key === 'q'){
+        e.preventDefault(); e.stopPropagation(); window.__lightboxClose();
+      }
+      return;
+    }
+    // The overflow sheet is the topmost of the rest: with a menu open, Escape
+    // must close the menu and not the article underneath it.
+    if (window.__layers && window.__layers() && document.getElementById('sheet')
+        && document.getElementById('sheet').classList.contains('on')){
+      if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); window.__closeLayer(); }
+      return;
+    }
+    if (window.__menuOpen && window.__menuOpen()){
+      if (e.key === 'Escape'){
+        e.preventDefault(); e.stopPropagation();
+        window.__menuClose();
+      }
+      return;
+    }
     if (palIsOpen()) return;                       // the palette input handles itself
     if (hints.length){
       if (hintKey(e)){ e.preventDefault(); e.stopPropagation(); }
       return;
     }
     if (helpIsOpen()){
-      if (e.key === 'Escape' || e.key === '?' || e.key === 'q'){
-        e.preventDefault(); e.stopPropagation(); helpClose();
+      var inField = helpIn && document.activeElement === helpIn;
+      if (e.key === 'Escape'){
+        e.preventDefault(); e.stopPropagation();
+        // A filter is cleared before the sheet is closed: one layer at a time.
+        if (helpIn && helpIn.value){ helpIn.value = ''; helpFilter(); helpIn.focus(); }
+        else helpClose();
+        return;
+      }
+      // `/` into an empty filter is the "start searching" gesture, not text.
+      if (inField && e.key === '/' && !helpIn.value){ e.preventDefault(); return; }
+      if (!inField && (e.key === '?' || e.key === 'q')){
+        e.preventDefault(); e.stopPropagation(); helpClose(); return;
+      }
+      // `/`, or any printable key, goes to the filter: the sheet is a list
+      // of keys, and looking one up should not need a mouse.
+      if (!inField && helpIn && !e.metaKey && !e.ctrlKey && !e.altKey){
+        if (e.key === '/'){ e.preventDefault(); e.stopPropagation(); helpIn.focus(); return; }
+        if (e.key.length === 1){ helpIn.focus(); return; }   // the key lands in the field
       }
       return;
     }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (typing(document.activeElement)) return;
-    if (e.key === 'Escape'){ if (pending || count) clearPending(); return; }
+    if (e.key === 'Escape'){
+      // A half-typed command forgets itself first; after that Escape belongs
+      // to whatever the page has open — the reader's article pane closes on
+      // it, and closing an overlay is what Escape means everywhere else.
+      if (pending || count){ clearPending(); return; }
+      if (pageKey('Escape', e)){ e.preventDefault(); e.stopPropagation(); }
+      return;
+    }
 
     var m = mode();
-    if (m === 'off' ) return;
     var k = e.key;
+    // Off means off — except for `m m`, which is the way back on. The hud
+    // says so, and a mode you cannot leave from the keyboard is a trap.
+    if (m === 'off'){
+      if (pending === 'm'){ pending = ''; if (k === 'm'){ e.preventDefault(); setMode('full'); } return; }
+      if (k === 'm'){ pending = 'm'; clearTimeout(pendT); pendT = setTimeout(function(){ pending = ''; }, 2500); }
+      return;
+    }
 
     // pending leader / two-key sequences
-    if (pending === 'm'){
+    if (pending){
       e.preventDefault(); e.stopPropagation();
+      var p = pending;
+      if (k === 'Shift' || k === 'Control' || k === 'Alt' || k === 'Meta') return;
       clearPending();
-      if (k === 'm'){
-        var next = MODES[(MODES.indexOf(m) + 1) % MODES.length];
-        setMode(next);
-      } else if (k === '?'){ helpOpen(); }
-      else if (LEADER[k]) go(LEADER[k]);
-      else hud('m' + k + ' is not a museum command', 1400);
-      return;
-    }
-    if (pending === 'g'){
-      e.preventDefault(); e.stopPropagation();
-      clearPending();
-      if (k === 'g') toEnd(false);
-      return;
-    }
-    if (pending === 'y'){
-      e.preventDefault(); e.stopPropagation();
-      clearPending();
-      if (k === 'y') copyUrl();
+      chordRun(p, k);
       return;
     }
 
@@ -504,9 +915,33 @@
       return;
     }
     var n = Math.min(parseInt(count || '1', 10), 50);
+    // a focused button wants its own Space; the layer stays out of it
+    if (k === ' ' && document.activeElement && document.activeElement !== document.body
+        && document.activeElement.tagName === 'BUTTON') return;
+
+    // The page gets first refusal on its own letters, with the count: `3k`
+    // is three items down in a reader, not the third page of the layer.
+    if (pageKey(k, e, n)){ e.preventDefault(); e.stopPropagation(); clearPending(); return; }
 
     // an open article reads like a page: scroll it, but leave links to the popin
     if ((lbOpen() || popOpen()) && 'fe]['.indexOf(k) >= 0) return;
+
+    // Inside an open article the arrows and the page keys are what everybody
+    // reaches for first, whatever dialect they know, and they are aimed at
+    // the pane rather than at the list behind it.
+    if (popOpen()){
+      var paged = true;
+      switch (k){
+        case 'ArrowDown': scrollBy(0, STEP * n); break;
+        case 'ArrowUp': scrollBy(0, -STEP * n); break;
+        case 'PageDown': scrollBy(0, pageStep() * n); break;
+        case 'PageUp': scrollBy(0, -pageStep() * n); break;
+        case 'Home': toEnd(false); break;
+        case 'End': toEnd(true); break;
+        default: paged = false;
+      }
+      if (paged){ e.preventDefault(); e.stopPropagation(); clearPending(); return; }
+    }
 
     var handled = true;
     switch (k){
@@ -519,14 +954,16 @@
       case 'G': toEnd(true); break;
       case 'g': arm('g'); return;
       case 'y': arm('y'); return;
-      case 's': history.back(); break;
-      case 'S': history.forward(); break;
+      case 's': case 'H': history.back(); break;
+      case 'S': case 'L': history.forward(); break;
+      case 'r': location.reload(); break;
       case 'f': hintsOn(false); break;
       case 'e': case 'F': hintsOn(true); break;
-      case 'd': palOpen(); break;
-      case ']': step(n); break;
-      case '[': step(-n); break;
+      case 'd': palNewTab = false; palOpen(); break;
+      case 'D': palNewTab = true; palOpen(); break;
       case 'z': zoom(); break;
+      case ']': if (CFG.trail) step(n); else handled = false; break;
+      case '[': if (CFG.trail) step(-n); else handled = false; break;
       default: handled = false;
     }
     if (handled){ e.preventDefault(); e.stopPropagation(); clearPending(); }
