@@ -1,0 +1,6 @@
+# ~/dotfiles is a Syncthing folder, so *.sync-conflict-* files appear in here
+# on their own. Without this, stow happily symlinks them into ~/.config/i3 and
+# i3 picks up whatever a stale conflict copy says. Also hide the one-off backup
+# install.sh leaves behind.
+.*sync-conflict-.*
+.*\.pre-stow

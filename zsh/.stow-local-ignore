@@ -1,0 +1,3 @@
+# ~/dotfiles is a Syncthing folder, so *.sync-conflict-* files appear in here
+# on their own. Without this, stow symlinks them straight into ~ .
+.*sync-conflict-.*
