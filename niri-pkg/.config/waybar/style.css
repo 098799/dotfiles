@@ -15,6 +15,8 @@
 /* the colours the i3blocks scripts print on their third line */
 @define-color block_red   #dc322f;
 @define-color block_green #859900;
+@define-color block_yellow #b58900;
+@define-color block_orange #cb4b16;
 
 * {
     font-family: "Terminess Nerd Font", "Ubuntu Mono", monospace;
@@ -48,15 +50,21 @@ tooltip label { color: @title_fg; }
  * i3's behaviour back -- the bar then marks exactly the desktops with content.
  * The focused workspace is exempt, so switching to an empty one still shows you
  * where you are.
- * GTK CSS has no display:none, so shrink the box instead. padding/min-width
- * alone are not enough: the label keeps the width of its text, so the hidden
- * buttons still left a ~100px hole. font-size: 0 takes the text width away. */
+ * GTK CSS has no display:none, so shrink the box instead. Shrinking only the
+ * button is not enough: the label inside keeps the width of its text, so the
+ * hidden buttons still left a ~100px hole. The label rule takes that away. */
 #workspaces button.empty:not(.focused) {
     padding: 0;
     margin: 0;
     min-width: 0;
     font-size: 0;
     opacity: 0;
+}
+#workspaces button.empty:not(.focused) label {
+    font-size: 0;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
 }
 
 /* scroll-strip position indicator (see custom/cols in config.jsonc) */
@@ -68,7 +76,7 @@ tooltip label { color: @title_fg; }
 /* One block = i3blocks' separator_block_width=15 (7+7 padding and a 1px rule),
  * so the right side takes the same width it took on i3. With 8+8 padding plus
  * 6px module spacing it came out ~170px wider and pushed the clock off-screen. */
-#custom-claude, #custom-cpu, #custom-temp, #custom-memory, #custom-disk,
+#custom-claude, #cpu, #temperature, #memory, #custom-disk,
 #custom-updates, #custom-network, #custom-vpn, #custom-bluetooth,
 #custom-bt-headphones, #custom-bt-keyboard, #pulseaudio, #custom-cpu-boost,
 #custom-cpu-cap, #custom-power-profile, #custom-battery, #custom-screenshot,
@@ -80,9 +88,9 @@ tooltip label { color: @title_fg; }
 #pulseaudio.mic                     { color: @block_green; }
 #pulseaudio.mic.source-muted        { color: @block_red; }
 #clock { color: @title_fg; }
-#workspaces button.empty:not(.focused) label {
-    font-size: 0;
-    min-width: 0;
-    padding: 0;
-    margin: 0;
-}
+/* temp.sh / memory.sh colour thresholds (config.jsonc). The temperature module
+ * has no states, only warning/critical, so temp keeps 70 and 85 and drops
+ * temp.sh's 60 °C yellow — this CPU sits at 59-73 °C, so it was on all day. */
+#memory.m60 { color: @block_yellow; }
+#temperature.warning, #memory.m75 { color: @block_orange; }
+#temperature.critical, #memory.m90 { color: @block_red; }

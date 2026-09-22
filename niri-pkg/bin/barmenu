@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""A `rofi -dmenu` stand-in for menus opened from waybar on niri.
+
+The i3blocks scripts open their menus with `rofi -dmenu`, placed at
+`xdotool getmouselocation`. On niri neither half works:
+
+  * xdotool reads the XWayland pointer, which only moves over X11 windows, so
+    the menu opened somewhere unrelated to the block you clicked;
+  * Wayland rofi is a layer surface of its own size, so a click outside it
+    lands in the window underneath and the menu stays open.
+
+This draws the menu on a transparent overlay that covers the whole output. The
+overlay gets the pointer position the moment it maps (no motion needed), so
+the menu opens under the block you clicked, and any click outside the menu
+lands on the overlay and closes it.
+
+Same contract as rofi -dmenu: items on stdin, the chosen one on stdout, exit 1
+with no output when cancelled. -p is the prompt, -selected-row the preselected
+(current) item; every other rofi option is accepted and ignored.
+
+Keys: Up/Down (or k/j) to move, Enter to pick, 1-9 to pick directly, Escape
+to cancel. Hover and keyboard share one highlight.
+
+Only ~/bin/i3blocks-waybar calls this, through a `rofi` shim on PATH, so the
+scripts are unchanged and i3 still gets the real rofi. Without Wayland or the
+GTK layer-shell bindings it hands over to the real rofi.
+"""
+import os
+import sys
+
+REAL_ROFI = "/usr/bin/rofi"
+# waybar's height (config.jsonc); the menu opens just under it.
+BAR_HEIGHT = int(os.environ.get("BARMENU_BAR_HEIGHT", "27"))
+EDGE = 4
+# If the overlay has not seen the pointer by then, open at the top-right.
+POINTER_WAIT_MS = 200
+
+CSS = b"""
+* { font-family: "Terminess Nerd Font", monospace; font-size: 14pt; }
+window { background: transparent; }
+.menu { background: #282828; border: 1px solid #504945; padding: 4px 0; min-width: 160px; }
+.prompt { color: #7c6f64; padding: 0 14px 4px; }
+button {
+    background: transparent; background-image: none; border: none;
+    border-radius: 0; box-shadow: none; outline-width: 0;
+    padding: 4px 14px; color: #ebdbb2; min-height: 0;
+}
+button:focus, button:hover { background: #3c3836; color: #fbf1c7; }
+button.current label { color: #98971a; }
+"""
+
+
+def rofi_fallback() -> None:
+    os.execv(REAL_ROFI, ["rofi", *sys.argv[1:]])
+
+
+def parse_args(argv: list[str]) -> tuple[str, int]:
+    prompt, selected = "", -1
+    i = 0
+    while i < len(argv):
+        if argv[i] == "-p" and i + 1 < len(argv):
+            prompt = argv[i + 1]
+            i += 1
+        elif argv[i] == "-selected-row" and i + 1 < len(argv):
+            try:
+                selected = int(argv[i + 1])
+            except ValueError:
+                pass
+            i += 1
+        i += 1
+    return prompt, selected
+
+
+def main() -> int:
+    if not os.environ.get("WAYLAND_DISPLAY"):
+        rofi_fallback()
+    try:
+        import gi
+
+        gi.require_version("Gtk", "3.0")
+        gi.require_version("Gdk", "3.0")
+        gi.require_version("GtkLayerShell", "0.1")
+        from gi.repository import Gdk, GLib, Gtk, GtkLayerShell
+    except (ImportError, ValueError) as err:
+        print(f"barmenu: no GTK layer-shell ({err}), using rofi", file=sys.stderr)
+        rofi_fallback()
+
+    prompt, selected = parse_args(sys.argv[1:])
+    items = [line.rstrip("\n") for line in sys.stdin if line.strip()]
+    if not items:
+        return 1
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(CSS)
+    Gtk.StyleContext.add_provider_for_screen(
+        Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    )
+
+    win = Gtk.Window()
+    GtkLayerShell.init_for_window(win)
+    GtkLayerShell.set_namespace(win, "barmenu")
+    GtkLayerShell.set_layer(win, GtkLayerShell.Layer.OVERLAY)
+    for edge in (
+        GtkLayerShell.Edge.TOP,
+        GtkLayerShell.Edge.BOTTOM,
+        GtkLayerShell.Edge.LEFT,
+        GtkLayerShell.Edge.RIGHT,
+    ):
+        GtkLayerShell.set_anchor(win, edge, True)
+    # -1: cover the bar too, instead of starting below its exclusive zone.
+    GtkLayerShell.set_exclusive_zone(win, -1)
+    GtkLayerShell.set_keyboard_mode(win, GtkLayerShell.KeyboardMode.EXCLUSIVE)
+    visual = win.get_screen().get_rgba_visual()
+    if visual is not None:
+        win.set_visual(visual)
+    win.set_app_paintable(True)
+
+    def clear(_widget, cr) -> bool:
+        cr.set_source_rgba(0, 0, 0, 0)
+        cr.set_operator(1)  # cairo.OPERATOR_SOURCE
+        cr.paint()
+        return False
+
+    win.connect("draw", clear)
+
+    result: list[str] = []
+
+    def finish(choice: str | None) -> None:
+        if choice is not None:
+            result.append(choice)
+        Gtk.main_quit()
+
+    fixed = Gtk.Fixed()
+    win.add(fixed)
+    menu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    menu.get_style_context().add_class("menu")
+    if prompt:
+        label = Gtk.Label(label=prompt, xalign=0)
+        label.get_style_context().add_class("prompt")
+        menu.pack_start(label, False, False, 0)
+    buttons = []
+    for index, item in enumerate(items):
+        button = Gtk.Button()
+        button.add(Gtk.Label(label=item, xalign=0))
+        if index == selected:
+            button.get_style_context().add_class("current")
+        button.connect("clicked", lambda _b, choice=item: finish(choice))
+        button.connect("enter-notify-event", lambda b, _e: b.grab_focus() and False)
+        menu.pack_start(button, False, False, 0)
+        buttons.append(button)
+    fixed.put(menu, 0, 0)
+    menu.show_all()
+    menu.set_opacity(0)  # until it has a place
+
+    placed = [False]
+
+    def place(px: float, py: float) -> None:
+        if placed[0]:
+            return
+        placed[0] = True
+        width, height = win.get_allocated_width(), win.get_allocated_height()
+        mw = menu.get_preferred_width()[1]
+        mh = menu.get_preferred_height()[1]
+        x = int(min(max(px - mw / 2, EDGE), width - mw - EDGE))
+        if py <= BAR_HEIGHT + EDGE:
+            y = BAR_HEIGHT + 2
+        else:
+            y = int(min(max(py, EDGE), height - mh - EDGE))
+        fixed.move(menu, x, y)
+        menu.set_opacity(1)
+        buttons[max(selected, 0) if selected < len(buttons) else 0].grab_focus()
+
+    win.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.POINTER_MOTION_MASK)
+    win.connect("enter-notify-event", lambda _w, e: place(e.x, e.y) or False)
+    win.connect("motion-notify-event", lambda _w, e: place(e.x, e.y) or False)
+    GLib.timeout_add(
+        POINTER_WAIT_MS,
+        lambda: place(win.get_allocated_width(), 0) or False,
+    )
+
+    def on_press(_widget, event) -> bool:
+        alloc = menu.get_allocation()
+        inside = (
+            alloc.x <= event.x < alloc.x + alloc.width
+            and alloc.y <= event.y < alloc.y + alloc.height
+        )
+        if not inside:
+            finish(None)
+            return True
+        return False
+
+    win.connect("button-press-event", on_press)
+
+    def on_key(_widget, event) -> bool:
+        key = Gdk.keyval_name(event.keyval) or ""
+        focused = next((i for i, b in enumerate(buttons) if b.has_focus()), 0)
+        if key == "Escape":
+            finish(None)
+        elif key in ("Down", "j", "Tab"):
+            buttons[(focused + 1) % len(buttons)].grab_focus()
+        elif key in ("Up", "k", "ISO_Left_Tab"):
+            buttons[(focused - 1) % len(buttons)].grab_focus()
+        elif key in ("Return", "KP_Enter", "space"):
+            finish(items[focused])
+        elif len(key) == 1 and key.isdigit() and 1 <= int(key) <= len(items):
+            finish(items[int(key) - 1])
+        else:
+            return False
+        return True
+
+    win.connect("key-press-event", on_key)
+    win.connect("destroy", lambda _w: Gtk.main_quit())
+    win.show_all()
+    Gtk.main()
+
+    if not result:
+        return 1
+    print(result[0], flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

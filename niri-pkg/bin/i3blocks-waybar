@@ -26,11 +26,10 @@ A click is not a read, and it runs differently:
     killed the script under the open menu, and whatever you picked went nowhere.
   * No captured output. Scripts start `alacritty ... &`; a captured stdout kept
     the adapter alive until that terminal closed.
-  * A fixed menu position. The scripts place rofi at `xdotool getmouselocation`.
-    On niri that is the XWayland pointer, which only moves over X11 windows, so
-    over waybar it is stale and the menu opened where the pointer last left an
-    X11 window.
-    A shim answers with the top-right corner, just under the bar, instead.
+  * Menus from ~/bin/barmenu. A `rofi` shim on PATH sends `rofi -dmenu` there:
+    it opens under the block you clicked and closes on a click outside, which
+    Wayland rofi at an `xdotool getmouselocation` position did neither of (see
+    barmenu). Any other rofi call goes to the real rofi.
   * --signal N sends SIGRTMIN+N to waybar when the script returns, and again a
     few seconds later for the things scripts start in the background
     (bluetoothctl connect, wg-quick up), so the block shows the new state.
@@ -43,26 +42,20 @@ import sys
 import time
 
 READ_TIMEOUT = 10
-# Widest rofi menu the scripts open is 320px; keep it clear of the screen edge.
-MENU_WIDTH = 340
-BAR_HEIGHT = 27
 RESIGNAL_AFTER = 4
 
-SHIM = """#!/bin/sh
-if [ "$1" = getmouselocation ]; then
-    echo "X=$I3BW_MENU_X"
-    echo "Y=$I3BW_MENU_Y"
-    echo "SCREEN=0"
-    echo "WINDOW=0"
-    exit 0
-fi
-exec /usr/bin/xdotool "$@"
+BARMENU = os.path.join(os.path.dirname(os.path.realpath(__file__)), "barmenu")
+SHIM = f"""#!/bin/sh
+for arg; do
+    [ "$arg" = -dmenu ] && exec {BARMENU} "$@"
+done
+exec /usr/bin/rofi "$@"
 """
 
 
 def shim_dir() -> str:
     path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "i3blocks-waybar")
-    shim = os.path.join(path, "xdotool")
+    shim = os.path.join(path, "rofi")
     try:
         with open(shim) as f:
             if f.read() == SHIM:
@@ -76,16 +69,6 @@ def shim_dir() -> str:
     return path
 
 
-def output_width() -> int:
-    try:
-        out = subprocess.run(
-            ["niri", "msg", "-j", "focused-output"], capture_output=True, text=True, timeout=2
-        ).stdout
-        return int(json.loads(out)["logical"]["width"])
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
-        return 1920
-
-
 def signal_waybar(number: int) -> None:
     subprocess.run(["pkill", f"-RTMIN+{number}", "-x", "waybar"], check=False)
 
@@ -94,8 +77,6 @@ def click(script: str, button: str, signal_number: int | None) -> int:
     env = dict(os.environ, BLOCK_BUTTON=button)
     if env.get("WAYLAND_DISPLAY"):
         env["PATH"] = shim_dir() + os.pathsep + env.get("PATH", "")
-        env["I3BW_MENU_X"] = str(max(0, output_width() - MENU_WIDTH))
-        env["I3BW_MENU_Y"] = str(BAR_HEIGHT + 2)
     try:
         subprocess.run([script], env=env, stdout=subprocess.DEVNULL, check=False)
     except OSError:

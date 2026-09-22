@@ -3,15 +3,19 @@
 // Every block runs the SAME ~/scripts/*.sh as ~/.config/i3blocks/config, through
 // ~/bin/i3blocks-waybar, so both bars show the same icons, text and colours and
 // keep the same click menus. Order, intervals and signal numbers follow that
-// file. Only four modules are native, each for a reason:
+// file. Seven modules are native, each for a reason:
+//   cpu, temperature, memory    tick every 1-2s at no cost, so a load change
+//                               shows at once (see the native section);
 //   pulseaudio, pulseaudio#mic  follow PulseAudio events, so no key bind has to
 //                               signal the bar (the i3 binds had to);
 //   tray, clock                 no script can do these.
+// Menus the scripts open (`rofi -dmenu`) come up in ~/bin/barmenu instead: under
+// the block you clicked, and a click outside closes them.
 //
 // Nerd Font icons here are raw private-use characters (U+F0000 and up). Some
 // editors and tools drop them silently and leave a plain space — that is how
 // every native icon went missing once. After an edit, check they survived:
-//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 6
+//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 9
 {
     "layer": "top",
     "position": "top",
@@ -24,7 +28,7 @@
     "modules-left": ["niri/workspaces", "custom/cols"],
     "modules-center": [],
     "modules-right": [
-        "custom/claude", "custom/cpu", "custom/temp", "custom/memory", "custom/disk",
+        "custom/claude", "cpu", "temperature", "memory", "custom/disk",
         "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
         "custom/bt-headphones", "custom/bt-keyboard",
         "pulseaudio", "pulseaudio#mic",
@@ -53,22 +57,6 @@
         "exec": "~/bin/i3blocks-waybar --hint 'right: switch account' ~/scripts/claude-usage.sh",
         "return-type": "json", "interval": 60, "signal": 15,
         "on-click-right": "~/bin/i3blocks-waybar --signal 15 ~/scripts/claude-usage.sh 3"
-    },
-    "custom/cpu": {
-        "exec": "~/bin/i3blocks-waybar --hint 'left: htop · right: htop by CPU' ~/scripts/cpu.sh",
-        "return-type": "json", "interval": 5,
-        "on-click": "~/bin/i3blocks-waybar ~/scripts/cpu.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar ~/scripts/cpu.sh 3"
-    },
-    "custom/temp": {
-        "exec": "~/bin/i3blocks-waybar ~/scripts/temp.sh",
-        "return-type": "json", "interval": 5
-    },
-    "custom/memory": {
-        "exec": "~/bin/i3blocks-waybar --hint 'left: htop by memory · right: free -h' ~/scripts/memory.sh",
-        "return-type": "json", "interval": 10,
-        "on-click": "~/bin/i3blocks-waybar ~/scripts/memory.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar ~/scripts/memory.sh 3"
     },
     "custom/disk": {
         "exec": "~/bin/i3blocks-waybar --hint 'left: biggest dirs (sudo du) · right: df -h' ~/scripts/disk.sh",
@@ -146,6 +134,31 @@
     },
 
     // ---- native -------------------------------------------------------------
+    // cpu / temp / memory: cpu.sh, temp.sh, memory.sh as native modules. They read
+    // /proc and /sys inside waybar, so they can tick every 1-2s for free; the
+    // scripts cost a bash + python spawn per tick and ran every 5-10s, so a load
+    // change took that long to show. Same text; the states are the scripts'
+    // colour thresholds (style.css paints them).
+    "cpu": {
+        "format": "󰍛 {usage}%", "interval": 1,
+        "on-click": "alacritty -e htop",
+        "on-click-right": "alacritty -e htop -s PERCENT_CPU"
+    },
+    // temp.sh asks for coretemp, which this AMD box does not have, and falls back
+    // to the hottest thermal zone: zone 0 (acpitz) is the only one. This module
+    // takes no "states", only these two thresholds (see style.css).
+    "temperature": {
+        "thermal-zone": 0,
+        "format": "󰔏 {temperatureC}°C", "interval": 2,
+        "warning-threshold": 70, "critical-threshold": 85
+    },
+    "memory": {
+        "format": "󰘚 {used:0.1f}G/{total:0.1f}G", "interval": 2,
+        "states": { "m60": 60, "m75": 75, "m90": 90 },
+        "tooltip-format": "{percentage}% used\nleft: htop by memory · right: free -h",
+        "on-click": "alacritty -e htop -s PERCENT_MEM",
+        "on-click-right": "alacritty -e bash -c \"free -h; read -p 'Press enter to close...'\""
+    },
     // volume.sh / mic.sh look: red when muted, mic icon only.
     "pulseaudio": {
         "format": "{icon} {volume}%",
