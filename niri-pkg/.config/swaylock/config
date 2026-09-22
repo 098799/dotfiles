@@ -1,0 +1,20 @@
+# gruvbox-dark, matches colors.d/gruvbox-dark.conf
+scaling=fill
+indicator-radius=100
+indicator-thickness=8
+color=282828
+ring-color=3c3836
+key-hl-color=98971a
+bs-hl-color=d3869b
+inside-color=282828cc
+text-color=ebdbb2
+ring-ver-color=458588
+inside-ver-color=282828cc
+ring-wrong-color=cc241d
+inside-wrong-color=282828cc
+ring-clear-color=d65d0e
+line-color=00000000
+separator-color=00000000
+font=Ubuntu Mono
+ignore-empty-password
+show-failed-attempts

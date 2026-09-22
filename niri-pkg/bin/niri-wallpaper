@@ -1,0 +1,8 @@
+#!/bin/sh
+# The Wayland half of `theme`'s wallpaper: `theme` writes ~/.fehbg with the
+# current image; feh cannot paint a Wayland root, so replay it through swaybg.
+# Restarts the previous swaybg, so it is safe to call after every theme change.
+wp=$(grep -oE '/[^ ]+\.(png|jpg|jpeg|webp)' "$HOME/.fehbg" 2>/dev/null | tail -1)
+[ -n "$wp" ] || exit 0
+pkill -x swaybg 2>/dev/null
+exec swaybg -m fill -i "$wp"

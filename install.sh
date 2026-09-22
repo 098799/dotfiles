@@ -4,6 +4,8 @@
 # NEW MACHINE SETUP:
 # 1. Install dependencies:
 #      sudo pacman -S stow git zsh alacritty i3 rofi
+#    niri session (optional):
+#      sudo pacman -S niri xwayland-satellite waybar swaybg swaylock swayidle wl-clipboard grim slurp brightnessctl xdg-desktop-portal-gnome
 #
 # 2. Clone dotfiles:
 #      git clone <your-repo-url> ~/dotfiles
@@ -39,6 +41,12 @@ mkdir -p ~/.config/i3
 # Core packages (always install)
 echo "Stowing core packages..."
 stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
+
+# niri: the scrolling-tiling Wayland session next to i3 (lightdm lists both).
+# ~/.config/niri, ~/.config/waybar, ~/.config/swaylock and the niri-* helpers in
+# ~/bin. Packages: niri xwayland-satellite waybar swaybg swaylock swayidle
+# wl-clipboard grim slurp brightnessctl xdg-desktop-portal-gnome
+stow -v -t ~ niri-pkg
 
 # Seed the i3 active palette symlink if it's missing — i3's `include` silently
 # no-ops on a missing file, which would drop the bar{} block and client.*

@@ -1,0 +1,9 @@
+#!/bin/sh
+# swaylock with the current wallpaper as the saver, like ~/bin/lockscreen does
+# with xsecurelock. PAM goes through /etc/pam.d/swaylock -> login, which carries
+# pam_fprintd, so the fingerprint reader arms on its own.
+wp=$(grep -oE '/[^ ]+\.(png|jpg|jpeg|webp)' "$HOME/.fehbg" 2>/dev/null | tail -1)
+if [ -n "$wp" ]; then
+    exec swaylock -f -i "$wp"
+fi
+exec swaylock -f

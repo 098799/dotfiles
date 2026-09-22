@@ -1,0 +1,45 @@
+/* gruvbox-dark, the bar{} colors block of colors.d/gruvbox-dark.conf */
+@define-color bg_main   #282828;
+@define-color bg_alt    #3c3836;
+@define-color fg_main   #a89984;
+@define-color fg_dim    #7c6f64;
+@define-color title_fg  #ebdbb2;
+@define-color accent    #98971a;
+@define-color accent_fg #fbf1c7;
+@define-color info      #458588;
+@define-color info_fg   #fbf1c7;
+@define-color urgent    #d3869b;
+@define-color urgent_fg #282828;
+@define-color warn      #d65d0e;
+@define-color sep       #504945;
+
+* {
+    font-family: "Terminess Nerd Font", "Ubuntu Mono", monospace;
+    font-size: 14px;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+}
+window#waybar { background: @bg_main; color: @fg_main; }
+
+#workspaces button {
+    padding: 0 8px;
+    color: @fg_dim;
+    background: @bg_main;
+}
+#workspaces button.active   { color: @accent_fg; background: @accent; }
+#workspaces button.visible  { color: @info_fg;   background: @info; }
+#workspaces button.urgent   { color: @urgent_fg; background: @urgent; }
+#workspaces button:hover    { background: @bg_alt; color: @title_fg; }
+
+#window { padding: 0 10px; color: @title_fg; }
+
+#custom-claude, #cpu, #temperature, #memory, #disk, #custom-updates, #network,
+#custom-vpn, #bluetooth, #pulseaudio, #battery, #tray, #clock {
+    padding: 0 8px;
+    border-left: 1px solid @sep;
+}
+#temperature.critical, #battery.critical:not(.charging) { color: @urgent; }
+#battery.warning:not(.charging) { color: @warn; }
+#pulseaudio.muted, #pulseaudio.source-muted, #network.disconnected { color: @fg_dim; }
+#clock { color: @title_fg; }

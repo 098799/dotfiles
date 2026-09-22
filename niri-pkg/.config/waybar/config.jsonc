@@ -1,0 +1,62 @@
+// The i3bar/i3blocks twin for niri. Native waybar modules where they exist,
+// the i3blocks scripts for the three that have no native module.
+{
+    "layer": "top",
+    "position": "top",
+    "height": 26,
+    "spacing": 6,
+    "modules-left": ["niri/workspaces", "niri/window"],
+    "modules-center": [],
+    "modules-right": [
+        "custom/claude", "cpu", "temperature", "memory", "disk", "custom/updates",
+        "network", "custom/vpn", "bluetooth", "pulseaudio", "pulseaudio#mic",
+        "battery", "tray", "clock"
+    ],
+    "niri/workspaces": {
+        "format": "{value}",
+        "current-only": false
+    },
+    "niri/window": { "format": "{title}", "max-length": 80, "separate-outputs": true },
+    "custom/claude":  { "exec": "~/scripts/claude-usage.sh", "interval": 60, "return-type": "" },
+    "custom/updates": { "exec": "~/scripts/updates.sh", "interval": 1800 },
+    "custom/vpn":     { "exec": "~/scripts/vpn.sh", "interval": 10 },
+    "cpu":     { "format": " {usage}%", "interval": 2 },
+    "temperature": { "format": " {temperatureC}°", "critical-threshold": 85 },
+    "memory":  { "format": " {percentage}%", "interval": 5 },
+    "disk":    { "format": " {percentage_used}%", "path": "/", "interval": 60 },
+    "network": {
+        "format-wifi": " {essid}",
+        "format-ethernet": " {ipaddr}",
+        "format-disconnected": " off",
+        "tooltip-format": "{ifname} {ipaddr}/{cidr} ↑{bandwidthUpBytes} ↓{bandwidthDownBytes}",
+        "on-click": "nm-connection-editor"
+    },
+    "bluetooth": {
+        "format": " {status}",
+        "format-connected": " {device_alias}",
+        "format-connected-battery": " {device_alias} {device_battery_percentage}%",
+        "on-click": "blueman-manager"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": " mute",
+        "format-icons": { "default": ["", "", ""] },
+        "on-click": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+        "on-click-right": "pavucontrol",
+        "scroll-step": 5
+    },
+    "pulseaudio#mic": {
+        "format": "{format_source}",
+        "format-source": " {volume}%",
+        "format-source-muted": " off",
+        "on-click": "pactl set-source-mute @DEFAULT_SOURCE@ toggle"
+    },
+    "battery": {
+        "format": "{icon} {capacity}%",
+        "format-charging": " {capacity}%",
+        "format-icons": ["", "", "", "", ""],
+        "states": { "warning": 20, "critical": 10 }
+    },
+    "tray": { "spacing": 8 },
+    "clock": { "format": "{:%a %d %b  %H:%M}", "tooltip-format": "<tt>{calendar}</tt>" }
+}

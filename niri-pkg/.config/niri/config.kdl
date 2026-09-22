@@ -1,0 +1,330 @@
+// niri — the scrolling-tiling twin of ~/.config/i3/config.
+//
+// Every binding below is the i3 one, moved over where niri has the same verb.
+// The ones that do not exist here (gap toggles, xrandr screen_switch, autoclick,
+// the X11 recorders, w95 chrome) stay i3-only and are listed at the bottom.
+//
+// The mental model, i3 → niri:
+//   i3 "split v"           = a COLUMN: stack windows on top of each other
+//   i3 "split h"           = the workspace itself, an endless strip of columns
+//   i3 "layout tabbed"     = tabbed display of one column
+//   i3 "fullscreen"        = fullscreen-window; maximize-column is the softer one
+//   i3 "workspace N"       = a named workspace — niri keeps them per output
+// niri reloads this file on every save; there is no reload/restart keybind.
+
+input {
+    keyboard {
+        xkb {
+            // set_keyboard (F14 in i3) runs setxkbmap; put the layout here instead.
+            // layout "pl"
+        }
+        numlock
+        repeat-delay 300
+        repeat-rate 40
+    }
+    touchpad {
+        tap
+        natural-scroll
+    }
+    // i3: focus_follows_mouse no
+    focus-follows-mouse max-scroll-amount="0%"
+    warp-mouse-to-focus
+}
+
+// Outputs are found with `niri msg outputs`; Wayland names differ from xrandr's.
+// output "DP-1" {
+//     mode "2560x1440@144"
+// }
+
+layout {
+    // i3: gaps inner 10 / outer 0.
+    gaps 10
+    center-focused-column "never"
+    always-center-single-column
+
+    // Mod+E / Mod+Shift+W cycle through these (i3 had "layout toggle split" and
+    // the resize mode). One-third, half, two-thirds, full.
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+        proportion 1.0
+    }
+    default-column-width { proportion 0.5; }
+
+    // i3: default_border pixel 4, client.focused = gruvbox accent, unfocused = bg_alt,
+    // urgent = $urgent. The ring is off: one 4px border is the focus indicator.
+    focus-ring { off; }
+    border {
+        width 4
+        active-color "#98971a"
+        inactive-color "#3c3836"
+        urgent-color "#d3869b"
+    }
+
+    // picom: shadow-radius 24, shadow-opacity 0.55
+    shadow {
+        on
+        softness 24
+        spread 4
+        offset x=0 y=6
+        color "#0008"
+    }
+
+    struts { }
+}
+
+// picom: corner-radius 10
+window-rule {
+    geometry-corner-radius 10
+    clip-to-geometry true
+}
+// i3: for_window [window_role=pop-up|bubble|task_dialog|Preferences], window_type=dialog|menu
+// niri has no window_role; dialogs are floated by their parent relationship already.
+window-rule {
+    match app-id=r#"^W95sysmon$"#
+    open-floating true
+}
+window-rule {
+    match app-id=r#"^copyq$"#
+    open-floating true
+}
+window-rule {
+    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+window-rule {
+    match app-id=r#"^(google-chrome|chromium)"# title="^(Open|Save) File$"
+    open-floating true
+}
+
+// i3 workspace names, in the order they were declared. Named workspaces are
+// pinned to the top of every output; the `open-on-output` lines are commented
+// until the Wayland connector names are known (`niri msg outputs`).
+workspace "cmon"
+workspace "0"
+workspace "1"
+workspace "2"
+workspace "3"
+workspace "4"
+workspace "5"
+workspace "6"
+workspace "7"
+workspace "8"
+workspace "9"
+workspace "10"
+workspace "work"  // { open-on-output "DP-1"; }
+workspace "slack" // { open-on-output "DP-1"; }
+workspace "priv"  // { open-on-output "DP-1"; }
+
+prefer-no-csd
+screenshot-path "~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png"
+
+hotkey-overlay {
+    skip-at-startup
+}
+
+animations {
+    slowdown 0.8
+}
+
+environment {
+    // GTK/Qt/Electron pick Wayland; the neomacs/emacs frames go via Xwayland.
+    QT_QPA_PLATFORM "wayland;xcb"
+    MOZ_ENABLE_WAYLAND "1"
+    NIXOS_OZONE_WL "1"
+    ELECTRON_OZONE_PLATFORM_HINT "auto"
+    // Same PATH i3 had (the `set $PATH` line), so ~/bin scripts spawn from binds.
+    PATH "/home/tgrining/bin:/home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin"
+}
+
+// ---- autostart (i3 `exec` block) ------------------------------------------
+spawn-at-startup "waybar"
+spawn-at-startup "niri-wallpaper"           // feh --bg-scale → swaybg, reads ~/.fehbg
+spawn-at-startup "dunst"
+spawn-at-startup "niri-idle"                // xss-lock → swayidle
+spawn-sh-at-startup "command -v copyq >/dev/null && copyq --start-server"
+spawn-at-startup "nm-applet"
+spawn-sh-at-startup "$HOME/Programs/emacs/src/emacs --daemon"
+spawn-at-startup "neomacs-try" "--daemon"
+spawn-at-startup "thunar" "--daemon"
+spawn-at-startup "syncthing"
+spawn-at-startup "gammastep"                // uses wlr-gamma-control on niri
+spawn-sh-at-startup "bluetoothctl power on"
+spawn-at-startup "w95-sysmon" "--hidden"
+// i3-only, no Wayland twin: picom (niri composites), xsettingsd, volumeicon
+// (waybar's pulseaudio module), autokey-gtk, espanso (the X11 build; the
+// wayland build is a separate package), theme-restore (writes X-only files).
+
+binds {
+    Mod+Shift+C { show-hotkey-overlay; }   // i3: reload — niri reloads on save; this shows the map
+
+    // ---- windows --------------------------------------------------------
+    Mod+Shift+Q repeat=false { close-window; }
+    Alt+Shift+Q repeat=false { close-window; }
+    Alt+F4      repeat=false { close-window; }
+
+    // focus: i3 j/k/l/; = left/down/up/right
+    Mod+J         { focus-column-left; }
+    Mod+K         { focus-window-down; }
+    Mod+L         { focus-window-up; }
+    Mod+Semicolon { focus-column-right; }
+    Mod+Left      { focus-column-left; }
+    Mod+Down      { focus-window-down; }
+    Mod+Up        { focus-window-up; }
+    Mod+Right     { focus-column-right; }
+
+    // move
+    Mod+Shift+J         { move-column-left; }
+    Mod+Shift+K         { move-window-down; }
+    Mod+Shift+L         { move-window-up; }
+    Mod+Shift+Semicolon { move-column-right; }
+    Mod+Shift+Left      { move-column-left; }
+    Mod+Shift+Down      { move-window-down; }
+    Mod+Shift+Up        { move-window-up; }
+    Mod+Shift+Right     { move-column-right; }
+
+    // the scrolling extras: ends of the strip, and monitors
+    Mod+Home            { focus-column-first; }
+    Mod+End             { focus-column-last; }
+    Mod+Shift+Home      { move-column-to-first; }
+    Mod+Shift+End       { move-column-to-last; }
+    Mod+Ctrl+Left       { focus-monitor-left; }
+    Mod+Ctrl+Right      { focus-monitor-right; }
+    Mod+Ctrl+Shift+Left  { move-column-to-monitor-left; }
+    Mod+Ctrl+Shift+Right { move-column-to-monitor-right; }
+
+    // i3 split v / split h → stack into a column / pull out of it
+    Mod+C { consume-window-into-column; }    // i3: split v
+    Mod+V { expel-window-from-column; }      // i3: split h
+    Mod+BracketLeft  { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+
+    // i3 layouts
+    Mod+A       { fullscreen-window; }             // i3: fullscreen toggle
+    Mod+W       { toggle-column-tabbed-display; }  // i3: layout tabbed
+    Mod+Shift+F { toggle-column-tabbed-display; }  // i3: layout stacked (same thing here)
+    Mod+F       { maximize-column; }               // i3: split v; layout tabbed — nearest: fill the screen
+    Mod+E       { switch-preset-column-width; }    // i3: layout toggle split
+    Mod+Shift+E     { toggle-window-floating; }    // i3: floating toggle
+    Mod+Shift+Space { toggle-window-floating; }
+    Mod+Ctrl+Space { switch-focus-between-floating-and-tiling; }
+    Mod+Shift+A     { center-column; }
+
+    // i3 resize mode (Mod+Shift+W). No modes in niri, so the same keys with Ctrl:
+    //   j / ;  width -/+      l / k  height -/+      Shift = fine 2%
+    Mod+Shift+W           { switch-preset-column-width; }
+    Mod+Ctrl+J            { set-column-width "-10%"; }
+    Mod+Ctrl+Semicolon    { set-column-width "+10%"; }
+    Mod+Ctrl+L            { set-window-height "-10%"; }
+    Mod+Ctrl+K            { set-window-height "+10%"; }
+    Mod+Ctrl+Shift+J          { set-column-width "-2%"; }
+    Mod+Ctrl+Shift+Semicolon  { set-column-width "+2%"; }
+    Mod+Ctrl+Shift+L          { set-window-height "-2%"; }
+    Mod+Ctrl+Shift+K          { set-window-height "+2%"; }
+    Mod+Ctrl+Minus  { set-column-width "-10%"; }
+    Mod+Ctrl+Equal  { set-column-width "+10%"; }
+    Mod+Ctrl+R      { reset-window-height; }
+    Mod+Ctrl+E      { expand-column-to-available-width; }
+
+    // ---- launchers (same keys as i3) --------------------------------------
+    Mod+D hotkey-overlay-title="rofi" { spawn "rofi" "-show" "combi" "-combi-modes" "run,drun" "-combi-display-format" "{text}" "-sort" "-sorting-method" "fzf" "-modes" "combi,drun,run,window" "-lines" "6" "-font" "Ubuntu 25" "-terminal" "alacritty"; }
+    Mod+Z hotkey-overlay-title="alacritty" { spawn "alacritty"; }
+    Mod+X hotkey-overlay-title="neomacs"   { spawn "neomacs-try"; }
+    Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
+    Mod+S hotkey-overlay-title="System Monitor" { spawn "w95-sysmon"; }
+    Mod+Shift+S hotkey-overlay-title="cmon" { spawn "alacritty" "-e" "/home/tgrining/bin/cmon"; }
+
+    // ---- workspaces (i3 keys, i3 names) ------------------------------------
+    Mod+R     { focus-workspace "cmon"; }
+    Mod+T     { focus-workspace "0"; }
+    Mod+Y     { focus-workspace "1"; }
+    Mod+U     { focus-workspace "2"; }
+    Mod+I     { focus-workspace "3"; }
+    Mod+O     { focus-workspace "4"; }
+    Mod+P     { focus-workspace "5"; }
+    Mod+Alt+Shift+Y { focus-workspace "6"; }
+    Mod+Alt+Shift+U { focus-workspace "7"; }
+    Mod+Alt+Shift+I { focus-workspace "8"; }
+    Mod+Alt+Shift+O { focus-workspace "9"; }
+    Mod+Alt+Shift+P { focus-workspace "10"; }
+    Mod+G     { focus-workspace "work"; }
+    Mod+H     { focus-workspace "slack"; }
+    Mod+Slash { focus-workspace "priv"; }
+    Mod+M     { focus-workspace "6"; }
+    Mod+Comma { focus-workspace "7"; }
+    Mod+Period { focus-workspace "8"; }
+
+    Mod+Shift+R     { move-column-to-workspace "cmon"; }
+    Mod+Shift+T     { move-column-to-workspace "0"; }
+    Mod+Shift+Y     { move-column-to-workspace "1"; }
+    Mod+Shift+U     { move-column-to-workspace "2"; }
+    Mod+Shift+I     { move-column-to-workspace "3"; }
+    Mod+Shift+O     { move-column-to-workspace "4"; }
+    Mod+Shift+P     { move-column-to-workspace "5"; }
+    Mod+Shift+G     { move-column-to-workspace "work"; }
+    Mod+Shift+H     { move-column-to-workspace "slack"; }
+    Mod+Shift+Slash { move-column-to-workspace "priv"; }
+    Mod+Shift+M     { move-column-to-workspace "6"; }
+    Mod+Shift+Comma { move-column-to-workspace "7"; }
+    Mod+Shift+Period { move-column-to-workspace "8"; }
+
+    // i3: workspace back_and_forth
+    Mod+B { focus-workspace-previous; }
+    Mod+N { focus-workspace-previous; }
+    // niri has no "move to previous workspace"; the nearest is up/down.
+    Mod+Shift+B { move-column-to-workspace-down; }
+
+    Mod+Page_Down      { focus-workspace-down; }
+    Mod+Page_Up        { focus-workspace-up; }
+    Mod+Shift+Page_Down { move-column-to-workspace-down; }
+    Mod+Shift+Page_Up   { move-column-to-workspace-up; }
+    Mod+WheelScrollDown      cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp        cooldown-ms=150 { focus-workspace-up; }
+    Mod+WheelScrollRight     { focus-column-right; }
+    Mod+WheelScrollLeft      { focus-column-left; }
+    Mod+Shift+WheelScrollDown { focus-column-right; }
+    Mod+Shift+WheelScrollUp   { focus-column-left; }
+    Mod+Tab repeat=false { toggle-overview; }
+
+    // ---- session ------------------------------------------------------------
+    Mod+Shift+X { quit; }                                  // asks first, like i3-nagbar
+    Ctrl+Alt+L  { spawn "niri-lock"; }                     // xsecurelock → swaylock
+    Mod+Shift+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+
+    // ---- screenshots (scrot → grim/slurp/niri) ------------------------------
+    Mod+Alt+Shift+K { screenshot-screen; }                 // scrot
+    Mod+Alt+Shift+J { spawn "niri-screenshot-clip"; }      // screenshot-clip: region → clipboard
+    Mod+Alt+Shift+S { screenshot; }                        // scrot -s: niri's own picker
+    Print           { screenshot; }
+    Alt+Print       { screenshot-window; }
+
+    // ---- notifications (dunst, same keys) -----------------------------------
+    Mod+Grave       { spawn "dunstctl" "close"; }
+    Mod+Shift+Grave { spawn "dunstctl" "close-all"; }
+    Ctrl+Mod+H      { spawn "dunstctl" "history-pop"; }
+    Ctrl+Alt+C      { spawn "dunstctl" "context"; }
+
+    // ---- audio / brightness ---------------------------------------------------
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+5%"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-5%"; }
+    XF86AudioMute        allow-when-locked=true { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
+    Mod+Shift+BracketLeft  { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
+    Mod+Shift+BracketRight { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+10%"; }
+    Mod+Escape { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
+    Mod+Space  { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
+
+    // ---- FTL speedhack, as in i3 ---------------------------------------------
+    Mod+F9  { spawn "/home/tgrining/bin/ftl-speed" "3"; }
+    Mod+F10 { spawn "/home/tgrining/bin/ftl-speed" "100"; }
+    Mod+F11 { spawn "/home/tgrining/bin/ftl-speed"; }
+}
+
+// Not carried over (X11 only): Mod+Alt+G gap toggles (niri gaps are static),
+// Mod+BackSpace screen_switch (xrandr; use `niri msg output`), Mod+Alt+Shift+C
+// autoclick (xdotool), Mod+Alt+Shift+L/; record-desktop/-window (x11grab; use
+// wf-recorder), F14 set_keyboard (setxkbmap; use input.keyboard.xkb above),
+// Mod+Shift+V restart (not needed).

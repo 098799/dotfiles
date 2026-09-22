@@ -1,0 +1,4 @@
+#!/bin/sh
+# Region screenshot straight to the clipboard (i3's screenshot-clip).
+# wl-copy is a well-behaved selection owner, unlike xclip, so no copyq detour.
+grim -g "$(slurp)" - | wl-copy --type image/png
