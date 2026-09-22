@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Open a program BELOW the focused window, in the same column.
+
+  niri-spawn-below [command ...]     (default: alacritty)
+
+niri always opens a new window as a new column to the right of the focused
+one; there is no layout option to open it into the current column. So this
+spawns the command, waits for its window, and moves it one column left —
+into the column it came from, under the window that had focus.
+
+The column keeps the width it had before. Without that, niri-auto-width sees
+two terminal columns for a moment and halves them both.
+"""
+import json
+import subprocess
+import sys
+import threading
+import time
+
+
+def niri(*args: str) -> str:
+    return subprocess.run(
+        ["niri", "msg", *args], capture_output=True, text=True, check=False
+    ).stdout
+
+
+def main() -> int:
+    command = sys.argv[1:] or ["alacritty"]
+
+    try:
+        before = json.loads(niri("-j", "focused-window"))
+    except json.JSONDecodeError:
+        before = None
+    if not before or before["is_floating"]:
+        # Nothing tiled to go under: just open it the normal way.
+        niri("action", "spawn", "--", *command)
+        return 0
+
+    output = json.loads(niri("-j", "focused-output"))["logical"]
+    gaps = 10  # layout { gaps 10 } in config.kdl
+    # Invert niri's proportion formula, width = (output - gaps) * p - gaps,
+    # so the restored width comes out the same pixel for pixel.
+    proportion = (before["layout"]["tile_size"][0] + gaps) / (output["width"] - gaps)
+
+    stream = subprocess.Popen(
+        ["niri", "msg", "-j", "event-stream"], stdout=subprocess.PIPE, text=True, bufsize=1
+    )
+    assert stream.stdout is not None
+    # Stop waiting after 10 s if the program never opens a window.
+    threading.Timer(10, stream.kill).start()
+
+    known: set[int] | None = None
+    new_id = None
+    for line in stream.stdout:
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if "WindowsChanged" in ev and known is None:
+            # The stream's first snapshot. Spawn only now, so the new window
+            # cannot open before we know which windows are old.
+            known = {w["id"] for w in ev["WindowsChanged"]["windows"]}
+            niri("action", "spawn", "--", *command)
+        elif "WindowOpenedOrChanged" in ev and known is not None:
+            w = ev["WindowOpenedOrChanged"]["window"]
+            if w["id"] not in known and not w["is_floating"]:
+                new_id = w["id"]
+                break
+    stream.kill()
+    if new_id is None:
+        return 1
+
+    niri("action", "consume-or-expel-window-left", "--id", str(new_id))
+    # niri-auto-width reacts to the same open event; let it finish, then
+    # put the width back.
+    time.sleep(0.3)
+    niri("action", "set-window-width", "--id", str(new_id), f"{proportion * 100:.3f}%")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

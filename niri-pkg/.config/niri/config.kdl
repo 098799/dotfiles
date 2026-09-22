@@ -383,6 +383,9 @@ binds {
     // ---- launchers (same keys as i3) --------------------------------------
     Mod+D hotkey-overlay-title="rofi" { spawn "rofi" "-show" "combi" "-combi-modes" "run,drun" "-combi-display-format" "{text}" "-sort" "-sorting-method" "fzf" "-modes" "combi,drun,run,window" "-lines" "6" "-font" "Ubuntu 25" "-terminal" "alacritty"; }
     Mod+Z hotkey-overlay-title="alacritty" { spawn "alacritty"; }
+    // niri opens every new window as a new column on the right; this one opens
+    // the terminal under the focused window instead, in the same column.
+    Mod+Shift+Z hotkey-overlay-title="alacritty below" { spawn "niri-spawn-below" "alacritty"; }
     Mod+X hotkey-overlay-title="neomacs"   { spawn "neomacs-try"; }
     Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
     Mod+S hotkey-overlay-title="System Monitor" { spawn "w95-sysmon"; }
