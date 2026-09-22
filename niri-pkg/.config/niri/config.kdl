@@ -46,7 +46,7 @@ layout {
     center-focused-column "never"
     always-center-single-column
 
-    // Mod+E / Mod+Shift+W cycle through these, forward / back (i3 had "layout toggle split" and
+    // Mod+E / Mod+Shift+E cycle through these, forward / back (i3 had "layout toggle split" and
     // the resize mode). One-third, half, two-thirds, full.
     preset-column-widths {
         proportion 0.33333
@@ -341,16 +341,16 @@ binds {
     Mod+W       { toggle-column-tabbed-display; }  // i3: layout tabbed
     Mod+Shift+F { toggle-column-tabbed-display; }  // i3: layout stacked (same thing here)
     Mod+F       { maximize-column; }               // i3: split v; layout tabbed — nearest: fill the screen
-    Mod+E       { switch-preset-column-width; }    // i3: layout toggle split
-    Mod+Shift+E     { toggle-window-floating; }    // i3: floating toggle
-    Mod+Shift+Space { toggle-window-floating; }
+    Mod+E       { switch-preset-column-width; }       // i3: layout toggle split
+    Mod+Shift+E { switch-preset-column-width-back; }  // same presets, backwards
+    Mod+Shift+Space { toggle-window-floating; }    // i3: floating toggle (i3 also had Mod+Shift+E)
     Mod+Ctrl+Space { switch-focus-between-floating-and-tiling; }
     Mod+Shift+A     { center-column; }
 
     // i3 resize mode (Mod+Shift+W). No modes in niri, so the same keys with Ctrl:
     //   j / ;  width -/+      l / k  height -/+      Shift = fine 2%
-    // Mod+E walks the presets forward, Mod+Shift+W walks them back:
-    // 2/3 -> 1/2 is one press instead of three. Mod+Ctrl+W jumps straight to 1/2.
+    // Mod+Shift+W walks the presets back, like Mod+Shift+E.
+    // Mod+Ctrl+W jumps straight to 1/2.
     Mod+Shift+W           { switch-preset-column-width-back; }
     Mod+Ctrl+W            { set-column-width "50%"; }
     Mod+Ctrl+J            { set-column-width "-10%"; }
