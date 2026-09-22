@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""Size terminal columns by how many share the workspace.
+
+  one terminal alone   -> 2/3 of the screen (one Mod+E from the 1/2 default)
+  two terminals        -> 1/2 each, so both are the same width
+  three or more        -> left alone; they do not fit side by side anyway
+
+niri has no layout option for this: `default-column-width` is one fixed value,
+and nothing resizes the columns that are already there when a new one opens.
+So this script listens to niri's event stream and resizes after the fact.
+
+It acts only when a window opens, closes, or moves to another workspace, and
+only when every tiled window on that workspace is a terminal. A width you set
+by hand stays until the next such event on that workspace.
+"""
+import json
+import subprocess
+import sys
+
+TERMINALS = {"Alacritty"}
+SOLO_WIDTH = "66.667%"
+PAIR_WIDTH = "50%"
+
+# id -> workspace_id, so a close or a move knows which workspace it left.
+where: dict[int, int | None] = {}
+
+
+def niri(*args: str) -> str:
+    return subprocess.run(
+        ["niri", "msg", *args], capture_output=True, text=True, check=False
+    ).stdout
+
+
+def resize(workspace_id: int | None) -> None:
+    if workspace_id is None:
+        return
+    # Read fresh: the event only describes one window, and the columns of the
+    # others shift when a new one is inserted.
+    try:
+        windows = json.loads(niri("-j", "windows"))
+    except json.JSONDecodeError:
+        return
+    tiled = [
+        w for w in windows if w["workspace_id"] == workspace_id and not w["is_floating"]
+    ]
+    if not tiled or any(w["app_id"] not in TERMINALS for w in tiled):
+        return
+
+    # One window per column is enough: a tiled window's width is its column's.
+    columns: dict[int, int] = {}
+    for w in tiled:
+        columns.setdefault(w["layout"]["pos_in_scrolling_layout"][0], w["id"])
+
+    if len(columns) == 1:
+        width = SOLO_WIDTH
+    elif len(columns) == 2:
+        width = PAIR_WIDTH
+    else:
+        return
+    for window_id in columns.values():
+        niri("action", "set-window-width", "--id", str(window_id), width)
+
+
+def main() -> int:
+    proc = subprocess.Popen(
+        ["niri", "msg", "-j", "event-stream"],
+        stdout=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    seeded = False
+    for line in proc.stdout:
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        for kind, data in ev.items():
+            if kind == "WindowsChanged":
+                # The first event of the stream: the windows that already
+                # exist. Record them, resize nothing.
+                where.clear()
+                where.update({w["id"]: w["workspace_id"] for w in data["windows"]})
+                seeded = True
+            elif kind == "WindowOpenedOrChanged" and seeded:
+                w = data["window"]
+                known = w["id"] in where
+                before = where.get(w["id"])
+                where[w["id"]] = w["workspace_id"]
+                if not known:
+                    resize(w["workspace_id"])
+                elif before != w["workspace_id"]:
+                    resize(before)
+                    resize(w["workspace_id"])
+            elif kind == "WindowClosed":
+                resize(where.pop(data["id"], None))
+    return proc.wait()
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(0)

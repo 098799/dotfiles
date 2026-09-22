@@ -46,7 +46,7 @@ layout {
     center-focused-column "never"
     always-center-single-column
 
-    // Mod+E / Mod+Shift+W cycle through these (i3 had "layout toggle split" and
+    // Mod+E / Mod+Shift+W cycle through these, forward / back (i3 had "layout toggle split" and
     // the resize mode). One-third, half, two-thirds, full.
     preset-column-widths {
         proportion 0.33333
@@ -255,6 +255,7 @@ spawn-at-startup "theme-restore"            // i3's `exec theme-restore`: re-app
 spawn-at-startup "niri-wallpaper"           // feh --bg-scale → swaybg, reads ~/.fehbg
 spawn-at-startup "dunst"
 spawn-at-startup "niri-idle"                // xss-lock → swayidle
+spawn-at-startup "niri-auto-width"          // lone terminal 2/3, two terminals 1/2 each
 spawn-sh-at-startup "command -v copyq >/dev/null && copyq --start-server"
 spawn-at-startup "nm-applet"
 spawn-sh-at-startup "$HOME/Programs/emacs/src/emacs --daemon"
@@ -348,7 +349,10 @@ binds {
 
     // i3 resize mode (Mod+Shift+W). No modes in niri, so the same keys with Ctrl:
     //   j / ;  width -/+      l / k  height -/+      Shift = fine 2%
-    Mod+Shift+W           { switch-preset-column-width; }
+    // Mod+E walks the presets forward, Mod+Shift+W walks them back:
+    // 2/3 -> 1/2 is one press instead of three. Mod+Ctrl+W jumps straight to 1/2.
+    Mod+Shift+W           { switch-preset-column-width-back; }
+    Mod+Ctrl+W            { set-column-width "50%"; }
     Mod+Ctrl+J            { set-column-width "-10%"; }
     Mod+Ctrl+Semicolon    { set-column-width "+10%"; }
     Mod+Ctrl+L            { set-window-height "-10%"; }
