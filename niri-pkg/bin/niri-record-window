@@ -1,0 +1,3 @@
+#!/bin/sh
+# Wayland twin of ~/bin/record-window. See niri-record.
+exec niri-record window "$@"

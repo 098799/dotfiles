@@ -1,0 +1,180 @@
+#!/bin/bash
+# Pick and apply a wallpaper matching the CURRENT screen aspect ratio.
+#
+# Wallpapers live in ~/Pictures/wallpapers as <palette>-<mode>-N.<ext>. The set
+# is mixed: -1..5 are 2560x1440 (16:9), -6..9 are 3440x1440 (21:9). Picking at
+# random across the whole set meant `feh --bg-scale` squashed a 21:9 Escher onto
+# the 16:10 laptop panel (and stretched a 16:9 one across the ultrawide). So
+# score every candidate by how close its aspect is to the live primary output,
+# keep the closest group, and rotate at random inside that group only.
+#
+# usage: wallpaper-pick [-n] [-a WxH] [mode palette]
+#   -n / --dry-run   print the pick, change nothing
+#   -a / --aspect    pretend the screen is WxH (for checking the other layouts
+#                    without unplugging anything)
+# mode/palette default to ~/.config/theme/state.
+#
+# Called by `theme` and by the ~/.screenlayout/*.sh scripts -- a layout change
+# alters the aspect without touching the theme, and that is exactly the case
+# that used to leave a squashed wallpaper behind.
+set -euo pipefail
+
+wallpaper_dir=$HOME/Pictures/wallpapers
+state=$HOME/.config/theme/state
+
+dry_run= force_geom=
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n | --dry-run) dry_run=1; shift ;;
+        -a | --aspect) force_geom=$2; shift 2 ;;
+        *) break ;;
+    esac
+done
+
+if [[ $# -eq 2 ]]; then
+    mode=$1 palette=$2
+elif [[ -f $state ]]; then
+    read -r mode palette <"$state"
+else
+    mode=dark palette=gruvbox
+fi
+
+# Win95 has no wallpaper -- it is a flat teal root with icons on top, and feh
+# would paint straight over both.
+[[ $palette == win95 ]] && exit 0
+
+# feh is only used to paint the X root; on Wayland swaybg does that instead.
+[[ -n ${WAYLAND_DISPLAY:-} ]] || command -v feh >/dev/null || exit 0
+
+# --- screen aspect ---------------------------------------------------------
+# The primary output is what the wallpaper is judged against; with several
+# monitors feh --bg-scale fits each one separately and we cannot satisfy all.
+screen_aspect=""
+if [[ -n $force_geom ]]; then
+    [[ $force_geom =~ ^([0-9]+)x([0-9]+)$ ]] || { echo "bad --aspect: $force_geom" >&2; exit 2; }
+    screen_aspect=$(( BASH_REMATCH[1] * 1000 / BASH_REMATCH[2] ))
+elif command -v niri >/dev/null && niri msg --json focused-output >/dev/null 2>&1; then
+    # Ask niri first. xrandr under niri queries XWAYLAND's root, which is a
+    # synthetic 1920x1080-ish screen unrelated to the real monitor — so the
+    # 21:9/16:9 pick below was made against the wrong aspect on every Wayland
+    # run, and quietly: xrandr answers, it just answers about the wrong screen.
+    # `|| true`: this file runs under `set -e`, so a python that exits non-zero
+    # on a shape it did not expect would abort the whole wallpaper pick.
+    geom=$(niri msg --json focused-output 2>/dev/null |
+        python3 -c 'import json,sys; o=json.load(sys.stdin)["logical"]; print("%dx%d" % (o["width"], o["height"]))' \
+        2>/dev/null || true)
+    if [[ $geom =~ ^([0-9]+)x([0-9]+) ]]; then
+        screen_aspect=$(( BASH_REMATCH[1] * 1000 / BASH_REMATCH[2] ))
+    fi
+elif command -v xrandr >/dev/null && xrandr --query >/dev/null 2>&1; then
+    geom=$(xrandr --query | awk '/ connected primary /{print $4; exit}')
+    [[ -z $geom ]] && geom=$(xrandr --query | awk '/ connected [0-9]/{print $3; exit}')
+    if [[ $geom =~ ^([0-9]+)x([0-9]+) ]]; then
+        screen_aspect=$(( BASH_REMATCH[1] * 1000 / BASH_REMATCH[2] ))
+    fi
+fi
+if [[ -z $screen_aspect ]] && command -v xdpyinfo >/dev/null; then
+    dims=$(xdpyinfo 2>/dev/null | awk '/dimensions:/{print $2; exit}')
+    [[ $dims =~ ^([0-9]+)x([0-9]+) ]] &&
+        screen_aspect=$(( BASH_REMATCH[1] * 1000 / BASH_REMATCH[2] ))
+fi
+
+# --- image dimensions ------------------------------------------------------
+# PNG carries width/height as big-endian u32 at offset 16 in the IHDR chunk, so
+# read it straight out of the header: `identify` on every candidate at every
+# login is a needless ImageMagick dependency on the hot path. JPEG has no such
+# fixed offset -- fall back to identify there.
+img_aspect() {
+    local f=$1 b w h
+    if [[ $f == *.png ]]; then
+        b=$(od -An -tu1 -j16 -N8 -- "$f" 2>/dev/null) || return 1
+        set -- $b
+        [[ $# -eq 8 ]] || return 1
+        w=$(( $1 * 16777216 + $2 * 65536 + $3 * 256 + $4 ))
+        h=$(( $5 * 16777216 + $6 * 65536 + $7 * 256 + $8 ))
+    elif command -v identify >/dev/null; then
+        read -r w h < <(identify -format '%w %h' "$f[0]" 2>/dev/null) || return 1
+    else
+        return 1
+    fi
+    (( h > 0 )) || return 1
+    echo $(( w * 1000 / h ))
+}
+
+# --- candidates ------------------------------------------------------------
+variants=()
+for ext in png jpg jpeg; do
+    for cand in "$wallpaper_dir/$palette-$mode"-*."$ext"; do
+        [[ -f $cand ]] && variants+=("$cand")
+    done
+done
+
+wallpaper=""
+if (( ${#variants[@]} )); then
+    if [[ -n $screen_aspect ]]; then
+        # Keep the closest-aspect group. The 60/1000 tolerance is deliberately
+        # wider than a rounding wobble and narrower than the gap between the
+        # ratios in play (16:9 = 1777, 16:10 = 1600, 21:9 = 2388): images of the
+        # same nominal ratio stay in one group, images of different ones never
+        # merge. Without a tolerance a one-pixel difference would pin the pick
+        # to a single file and kill the rotation.
+        best=-1 && matched=()
+        for cand in "${variants[@]}"; do
+            a=$(img_aspect "$cand") || continue
+            d=$(( a - screen_aspect )); (( d < 0 )) && d=$(( -d ))
+            if (( best < 0 || d < best )); then best=$d; fi
+        done
+        if (( best >= 0 )); then
+            for cand in "${variants[@]}"; do
+                a=$(img_aspect "$cand") || continue
+                d=$(( a - screen_aspect )); (( d < 0 )) && d=$(( -d ))
+                (( d <= best + 60 )) && matched+=("$cand")
+            done
+        fi
+        # An unreadable header everywhere leaves matched empty -- rotate over
+        # the whole set rather than painting nothing.
+        (( ${#matched[@]} )) || matched=("${variants[@]}")
+    else
+        matched=("${variants[@]}")
+    fi
+    wallpaper="${matched[RANDOM % ${#matched[@]}]}"
+fi
+
+# legacy single file $palette-$mode.<ext>, then a per-mode one, then the default
+if [[ -z $wallpaper ]]; then
+    for ext in png jpg jpeg; do
+        cand="$wallpaper_dir/$palette-$mode.$ext"
+        [[ -f $cand ]] && { wallpaper=$cand; break; }
+    done
+fi
+if [[ -z $wallpaper ]]; then
+    for ext in png jpg jpeg; do
+        cand="$wallpaper_dir/$mode.$ext"
+        [[ -f $cand ]] && { wallpaper=$cand; break; }
+    done
+fi
+if [[ -z $wallpaper && -f $HOME/Pictures/legartis-escher.png ]]; then
+    wallpaper=$HOME/Pictures/legartis-escher.png
+fi
+[[ -n $wallpaper ]] || exit 0
+
+if [[ -n $dry_run ]]; then
+    echo "$wallpaper"
+    exit 0
+fi
+
+# The choice is baked into ~/.fehbg so an i3 reload replays the same pick.
+# ~/.fehbg is written either way: it is the record of WHICH image was picked,
+# and niri-lock and niri-wallpaper both read the path back out of it.
+printf '#!/bin/sh\nfeh --no-fehbg --bg-scale %q\n' "$wallpaper" >"$HOME/.fehbg"
+chmod +x "$HOME/.fehbg"
+
+# Painting it is display-server specific. feh draws on the X root window, which
+# under niri is Xwayland's — invisible, and nothing reports the miss, so a theme
+# switch looked like it had simply failed to change the wallpaper. On Wayland
+# hand the same image to swaybg through niri-wallpaper instead.
+if [[ -n ${WAYLAND_DISPLAY:-} ]]; then
+    "$HOME/bin/niri-wallpaper" >/dev/null 2>&1 &
+else
+    feh --no-fehbg --bg-scale "$wallpaper"
+fi

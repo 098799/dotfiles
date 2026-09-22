@@ -15,8 +15,12 @@
 input {
     keyboard {
         xkb {
-            // set_keyboard (F14 in i3) runs setxkbmap; put the layout here instead.
-            // layout "pl"
+            // i3 bound F14 to ~/bin/set_keyboard, which flips setxkbmap between
+            // pl and a second layout. setxkbmap talks to an X server, so it is
+            // inert under niri: the layouts are declared HERE, and F14 below
+            // walks them with switch-layout. us stays first, so nothing about
+            // today's typing changes until the key is pressed.
+            layout "us,pl"
         }
         numlock
         repeat-delay 300
@@ -55,6 +59,30 @@ layout {
     // i3: default_border pixel 4, client.focused = gruvbox accent, unfocused = bg_alt,
     // urgent = $urgent. The ring is off: one 4px border is the focus indicator.
     focus-ring { off; }
+
+    // i3's tabbed layout drew a row of TITLE BARS you could read and click.
+    // niri has no titlebars at all, so its tabs are a colour strip instead —
+    // and `render-titles` is not a valid option here, so no config brings the
+    // names back. The default strip is a thin sliver out in the wallpaper gap,
+    // which is near-invisible. Make it read like an i3 tab row instead:
+    //   position top    - along the top of the column, where i3 put tabs
+    //   place-within-column - inside the column, not floating in the gap
+    //   length 1.0      - spans the full column width, one segment per window
+    //   width 8         - thick enough to actually see
+    //   hide-when-single-tab - no strip on a one-window column
+    // Colours match the border block below; niri colours are static here, the
+    // dark-gruv/light-gruv/*-sele scripts do not touch this file.
+    tab-indicator {
+        hide-when-single-tab
+        place-within-column
+        position "top"
+        width 8
+        gap 4
+        length total-proportion=1.0
+        active-color "#98971a"
+        inactive-color "#3c3836"
+        urgent-color "#d3869b"
+    }
     border {
         width 4
         active-color "#98971a"
@@ -81,9 +109,20 @@ window-rule {
 }
 // i3: for_window [window_role=pop-up|bubble|task_dialog|Preferences], window_type=dialog|menu
 // niri has no window_role; dialogs are floated by their parent relationship already.
+// i3 matched this on the X11 class, `for_window [class="W95sysmon"]`. The
+// Wayland app-id is NOT the WM_CLASS: it is "w95-sysmon", lower case and
+// hyphenated, so the ported regex matched nothing and the System Monitor
+// opened TILED — a full-width column shoving the workspace sideways, with no
+// error to say why. Checked against `niri msg --json windows`.
 window-rule {
-    match app-id=r#"^W95sysmon$"#
+    match app-id=r#"^w95-sysmon$"#
     open-floating true
+    // i3: `for_window [instance="w95-sysmon-drop"] border none`. There is no
+    // instance name on Wayland — both shapes share one app-id — so the border
+    // comes off for both. The other half of that rule, `sticky enable`, has no
+    // niri twin at all: niri has no sticky windows, so the drop-down panel
+    // lives on one workspace instead of following you across them.
+    border { off; }
 }
 window-rule {
     match app-id=r#"^copyq$"#
@@ -128,6 +167,29 @@ animations {
     slowdown 0.8
 }
 
+// ---- Overview -------------------------------------------------------------
+// niri's Exposé. Two ways in, both already live:
+//   Mod+Tab        toggle-overview (bound below)
+//   top-left hot corner, GNOME-style, ON BY DEFAULT
+// i3 had no equivalent, so nothing was ported here — this is niri's own answer
+// to "what do I have open", and it is why the bar does not need to answer it.
+//
+// NOTE: waybar is `position: top` with niri/workspaces first, so its leftmost
+// module sits in the same corner that arms the hot corner. If clicking a
+// workspace pill keeps flinging you into the Overview, that is the collision.
+// Fix by disabling the corner (Mod+Tab still works):
+//
+//   gestures {
+//       hot-corners {
+//           off
+//       }
+//   }
+//
+// Appearance knobs, if the default zoom reads too tight:
+//   overview { zoom 0.5; backdrop-color "#1d2021"; }
+// Left unset on purpose: backdrop-color is a fixed hex, and the dark-gruv /
+// light-gruv / dark-sele / light-sele switches would not follow it.
+
 environment {
     // GTK/Qt/Electron pick Wayland; the neomacs/emacs frames go via Xwayland.
     QT_QPA_PLATFORM "wayland;xcb"
@@ -136,10 +198,60 @@ environment {
     ELECTRON_OZONE_PLATFORM_HINT "auto"
     // Same PATH i3 had (the `set $PATH` line), so ~/bin scripts spawn from binds.
     PATH "/home/tgrining/bin:/home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin"
+
+    // --- scrub the stale shell env that systemd --user carries into the session ---
+    // `dbus-update-activation-environment --all` in ~/.zshrc pushed a whole
+    // interactive pane's env into systemd --user. Under i3 that was invisible.
+    // niri runs as `niri --session` under systemd --user, so niri inherits it and
+    // hands it to every app it spawns. ZDOTDIR is the one that breaks the shell:
+    // it was imported EMPTY, and an empty ZDOTDIR makes zsh read /.zshrc instead
+    // of ~/.zshrc — so a terminal opens with no aliases and no `claw`.
+    ZDOTDIR null
+    // Same source: per-pane state that must not leak into a fresh terminal.
+    TMUX null
+    TMUX_PANE null
+    TERM_PROGRAM null
+    TERM_PROGRAM_VERSION null
+    VIRTUAL_ENV null
+    VIRTUAL_ENV_PROMPT null
+    VIRTUAL_ENV_DISABLE_PROMPT null
+    // i3 is gone; a live I3SOCK makes i3-aware tools talk to a dead compositor.
+    I3SOCK null
+    // niri sets TERM per app; a session-wide TERM=alacritty lies to everything else.
+    TERM null
+    // Set to a LITERAL `~/legartis` by `set -a && source ~/bin/.env`. ~ does not
+    // expand inside a var, so every consumer got a path that cannot resolve, and
+    // .zshrc's `: ${LEGARTIS_REPO:=$HOME/legartis}` only fires when UNSET — so the
+    // broken value won. Unset it here and let .zshrc compute it.
+    LEGARTIS_REPO null
+    // Rest of the same import: session-scoped state that is wrong once stale.
+    KUBECONFIG null
+    KUBIE_ACTIVE null
+    KUBIE_DEPTH null
+    KUBIE_KUBECONFIG null
+    KUBIE_SESSION null
+    KUBIE_SHELL null
+    KUBIE_STATE null
+    CLAUDECODE null
+    CLAUDE_CODE_CHILD_SESSION null
+    CLAUDE_CODE_ENTRYPOINT null
+    CLAUDE_CODE_MESSAGING_SOCKET null
+    CLAUDE_CODE_MESSAGING_TOKEN null
+    CLAUDE_CODE_SESSION_ID null
+    CLAUDE_CODE_SESSION_ATTENDED null
+    CLAUDE_PID null
+    ALACRITTY_LOG null
+    ALACRITTY_SOCKET null
+    ALACRITTY_WINDOW_ID null
+    WINDOWID null
+    PSQL_DB null
+    PYTHONPATH null
+    OLDPWD null
 }
 
 // ---- autostart (i3 `exec` block) ------------------------------------------
 spawn-at-startup "waybar"
+spawn-at-startup "theme-restore"            // i3's `exec theme-restore`: re-apply the saved theme
 spawn-at-startup "niri-wallpaper"           // feh --bg-scale → swaybg, reads ~/.fehbg
 spawn-at-startup "dunst"
 spawn-at-startup "niri-idle"                // xss-lock → swayidle
@@ -152,6 +264,17 @@ spawn-at-startup "syncthing"
 spawn-at-startup "gammastep"                // uses wlr-gamma-control on niri
 spawn-sh-at-startup "bluetoothctl power on"
 spawn-at-startup "w95-sysmon" "--hidden"
+// xsettingsd still matters: it is what tells the Xwayland apps (Emacs, the
+// espanso X11 build, anything not yet ported) their DPI, theme and fonts.
+spawn-at-startup "xsettingsd"
+// Screen sharing (Slack, Meet, OBS, and `niri-record-window`'s picker) goes
+// through xdg-desktop-portal, which reads XDG_CURRENT_DESKTOP ONCE at start to
+// choose a backend. systemd --user outlives a logout, so the portal left over
+// from the i3 session stays up with XDG_CURRENT_DESKTOP=i3 and never gains a
+// ScreenCast interface at all — screen sharing then fails with no error that
+// names the cause. try-restart touches it only when such a leftover exists; a
+// portal that is not running dbus-activates later with the right environment.
+spawn-sh-at-startup "systemctl --user try-restart xdg-desktop-portal.service"
 // i3-only, no Wayland twin: picom (niri composites), xsettingsd, volumeicon
 // (waybar's pulseaudio module), autokey-gtk, espanso (the X11 build; the
 // wayland build is a separate package), theme-restore (writes X-only files).
@@ -165,14 +288,23 @@ binds {
     Alt+F4      repeat=false { close-window; }
 
     // focus: i3 j/k/l/; = left/down/up/right
-    Mod+J         { focus-column-left; }
+    //
+    // Left/right are the COMBINED actions, not plain focus-column-*. A tabbed
+    // column lays its tabs out horizontally, so "previous tab" reads as left,
+    // not up — and plain focus-column-left would skip the whole column instead
+    // of stepping through its tabs. focus-window-up-or-column-left steps to the
+    // previous tab first, and only jumps to the column on the left once it runs
+    // out. That is how i3 tabs behaved: left/right walked the tabs, then moved on.
+    Mod+J         { focus-window-up-or-column-left; }
+    Mod+Semicolon { focus-window-down-or-column-right; }
+    Mod+Left      { focus-window-up-or-column-left; }
+    Mod+Right     { focus-window-down-or-column-right; }
+    // k/l stay PURE vertical, so there is still a way to move inside a stacked
+    // column without the left/right fallback kicking in at the ends.
     Mod+K         { focus-window-down; }
     Mod+L         { focus-window-up; }
-    Mod+Semicolon { focus-column-right; }
-    Mod+Left      { focus-column-left; }
     Mod+Down      { focus-window-down; }
     Mod+Up        { focus-window-up; }
-    Mod+Right     { focus-column-right; }
 
     // move
     Mod+Shift+J         { move-column-left; }
@@ -197,8 +329,11 @@ binds {
     // i3 split v / split h → stack into a column / pull out of it
     Mod+C { consume-window-into-column; }    // i3: split v
     Mod+V { expel-window-from-column; }      // i3: split h
-    Mod+BracketLeft  { consume-or-expel-window-left; }
-    Mod+BracketRight { consume-or-expel-window-right; }
+    // niri's own default puts these on Mod+[ / Mod+]. i3 had volume -10%/+10%
+    // there, and that muscle memory wins, so consume-or-expel moves to +Shift
+    // and the volume binds go back to the bare brackets (see the audio section).
+    Mod+Shift+BracketLeft  { consume-or-expel-window-left; }
+    Mod+Shift+BracketRight { consume-or-expel-window-right; }
 
     // i3 layouts
     Mod+A       { fullscreen-window; }             // i3: fullscreen toggle
@@ -226,6 +361,20 @@ binds {
     Mod+Ctrl+Equal  { set-column-width "+10%"; }
     Mod+Ctrl+R      { reset-window-height; }
     Mod+Ctrl+E      { expand-column-to-available-width; }
+    // The rest of i3's resize mode. `plus`/`minus` grew all four edges at once,
+    // which only made sense because i3's width/height moved the right and
+    // bottom edges alone; niri sizes around the centre already, so they are
+    // the same +/- 10% as Mod+Ctrl+Minus/Equal, on the keypad this time.
+    Mod+Ctrl+KP_Add      { set-column-width "+10%"; }
+    Mod+Ctrl+KP_Subtract { set-column-width "-10%"; }
+    // resize mode `c`, and the 1/2/3 presets (50% / 75% / 90%, centred).
+    Mod+Ctrl+C { center-window; }
+    // Three actions, and a niri bind takes exactly one — hence the script.
+    Mod+Ctrl+1 { spawn "niri-preset-size" "50"; }
+    Mod+Ctrl+2 { spawn "niri-preset-size" "75"; }
+    Mod+Ctrl+3 { spawn "niri-preset-size" "90"; }
+    // No twin for resize mode's h/n/u/m (grow ONE edge): niri sizes a window by
+    // width and height about its centre and exposes no per-edge verb at all.
 
     // ---- launchers (same keys as i3) --------------------------------------
     Mod+D hotkey-overlay-title="rofi" { spawn "rofi" "-show" "combi" "-combi-modes" "run,drun" "-combi-display-format" "{text}" "-sort" "-sorting-method" "fzf" "-modes" "combi,drun,run,window" "-lines" "6" "-font" "Ubuntu 25" "-terminal" "alacritty"; }
@@ -299,6 +448,32 @@ binds {
     Print           { screenshot; }
     Alt+Print       { screenshot-window; }
 
+    // ---- screen recording (ffmpeg x11grab -> gpu-screen-recorder) ------------
+    // Same keys, same toggle: press once to start, again to stop. The plain
+    // combo records system sound + microphone mixed to one track; +Ctrl is the
+    // silent twin, exactly as in i3. See ~/bin/niri-record.
+    Mod+Alt+Shift+L         repeat=false { spawn "niri-record-desktop"; }
+    Mod+Alt+Shift+Semicolon repeat=false { spawn "niri-record-window"; }
+    Mod+Ctrl+Alt+Shift+L         repeat=false { spawn-sh "AUDIO=none niri-record-desktop"; }
+    Mod+Ctrl+Alt+Shift+Semicolon repeat=false { spawn-sh "AUDIO=none niri-record-window"; }
+    // ~/bin/record-region was never bound under i3. slurp makes it the cheapest
+    // of the three on Wayland, so it gets a key here.
+    Mod+Alt+Shift+R         repeat=false { spawn "niri-record-region"; }
+
+    // ---- autoclick (xdotool -> ydotool) -------------------------------------
+    Mod+Alt+Shift+C repeat=false { spawn "niri-autoclick"; }
+
+    // ---- gaps (i3: gaps inner all set 0 / $gaps_inner) -----------------------
+    // niri has no runtime gap action, so niri-gaps rewrites the `gaps` line in
+    // this file and lets the config watcher animate it. Side effect over i3:
+    // the choice now survives a restart.
+    Mod+Alt+G       { spawn "niri-gaps" "0"; }
+    Mod+Alt+Shift+G { spawn "niri-gaps" "restore"; }
+
+    // i3: F14 -> ~/bin/set_keyboard (setxkbmap). The layouts are in the xkb
+    // block at the top of this file; this walks them.
+    F14 { switch-layout "next"; }
+
     // ---- notifications (dunst, same keys) -----------------------------------
     Mod+Grave       { spawn "dunstctl" "close"; }
     Mod+Shift+Grave { spawn "dunstctl" "close-all"; }
@@ -310,8 +485,10 @@ binds {
     XF86AudioLowerVolume allow-when-locked=true { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-5%"; }
     XF86AudioMute        allow-when-locked=true { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
     XF86AudioMicMute     allow-when-locked=true { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
-    Mod+Shift+BracketLeft  { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
-    Mod+Shift+BracketRight { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+10%"; }
+    // i3: $mod+bracketleft / $mod+bracketright. Reclaimed from niri's default
+    // consume-or-expel-window, which now sits on Mod+Shift+[ / Mod+Shift+].
+    Mod+BracketLeft  { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
+    Mod+BracketRight { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+10%"; }
     Mod+Escape { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
     Mod+Space  { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
     XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
@@ -321,10 +498,34 @@ binds {
     Mod+F9  { spawn "/home/tgrining/bin/ftl-speed" "3"; }
     Mod+F10 { spawn "/home/tgrining/bin/ftl-speed" "100"; }
     Mod+F11 { spawn "/home/tgrining/bin/ftl-speed"; }
+
+    // i3 had this on ~/scripts/screen_switch. That menu is half xrandr layouts
+    // and half theme/font switches; the niri port keeps the switches as they
+    // were and re-expresses the layouts with `niri msg output`.
+    Mod+BackSpace hotkey-overlay-title="screen / theme / font" { spawn "/home/tgrining/bin/niri-screen-switch"; }
 }
 
-// Not carried over (X11 only): Mod+Alt+G gap toggles (niri gaps are static),
-// Mod+BackSpace screen_switch (xrandr; use `niri msg output`), Mod+Alt+Shift+C
-// autoclick (xdotool), Mod+Alt+Shift+L/; record-desktop/-window (x11grab; use
-// wf-recorder), F14 set_keyboard (setxkbmap; use input.keyboard.xkb above),
-// Mod+Shift+V restart (not needed).
+// Ported since the first pass: Mod+BackSpace screen_switch -> niri-screen-switch;
+// Mod+Alt+Shift+L / Semicolon record-desktop/-window -> niri-record (plus the
+// +Ctrl silent pair and a new Mod+Alt+Shift+R for record-region);
+// Mod+Alt+Shift+C autoclick -> niri-autoclick (ydotool); Mod+Alt+G / +Shift+G
+// gap toggles -> niri-gaps; F14 set_keyboard -> switch-layout.
+//
+// Still X11-only, and deliberately so:
+//   Mod+Shift+V "restart i3"  — niri reloads this file on save; there is
+//       nothing to restart, and `quit` is already on Mod+Shift+X.
+//   picom                     — niri composites, and the blur/shadow/corner
+//       settings from picom.conf are in the layout block above.
+//   volumeicon, i3blocks      — waybar's pulseaudio / pulseaudio#mic modules.
+//       This is why no bind here signals i3blocks: waybar follows PulseAudio
+//       itself, so the old `pkill -RTMIN+10 i3blocks` tail is simply gone.
+//   xbacklight                — X-only; the brightness keys use brightnessctl.
+//   w95-autobar, w95 chrome   — i3-95 is a patched i3. Windows 95 mode is an
+//       i3 session, not a niri one.
+
+// KNOWN GAP: espanso. The installed build is espanso-x11-bin, which reads the
+// keyboard through X11, so it only ever sees Xwayland windows — text expansion
+// is dead in Alacritty, waybar-spawned apps and every Wayland-native window,
+// with no error anywhere. autokey-gtk has the same problem and the same cause.
+// The fix is the wayland build (AUR: espanso-wayland), which is a separate
+// package, not a flag. Left as it is rather than half-started from here.

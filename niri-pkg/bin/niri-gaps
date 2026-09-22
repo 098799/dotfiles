@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# niri-gaps — the Wayland twin of i3's `gaps inner all set N`
+# (Mod+Alt+G / Mod+Alt+Shift+G).
+#
+#   niri-gaps 0 | niri-gaps 10 | niri-gaps toggle | niri-gaps restore
+#
+# niri has NO runtime gap action — `niri msg action` offers nothing for the
+# layout block, so the i3 binding has no direct twin. What niri does have is a
+# config watcher: it re-reads config.kdl on every save and animates the layout
+# to the new value. So the toggle is a one-line rewrite of the config, which
+# is why the gap survives a restart (i3's `gaps set` did not) and why the
+# resting value lives in the file rather than in this script.
+#
+# Only the `gaps` line inside the top-level `layout {` block is touched. The
+# `gap 4` in tab-indicator is a different key and a different block; matching
+# on the word alone would eat it.
+
+set -euo pipefail
+
+CONFIG="${NIRI_CONFIG:-$HOME/.config/niri/config.kdl}"
+STATE="${XDG_RUNTIME_DIR:-/tmp}/niri-gaps.last"
+DEFAULT_GAP=10
+
+[[ -f "$CONFIG" ]] || { echo "niri-gaps: no $CONFIG" >&2; exit 1; }
+
+current() {
+    awk '
+        /^layout[[:space:]]*\{/ { inlayout=1; next }
+        inlayout && /^\}/       { inlayout=0 }
+        inlayout && $1=="gaps"  { print $2; exit }
+    ' "$CONFIG"
+}
+
+set_gap() {
+    local want="$1" tmp
+    tmp=$(mktemp "${CONFIG}.XXXXXX")
+    awk -v want="$want" '
+        /^layout[[:space:]]*\{/ { inlayout=1 }
+        inlayout && /^\}/       { inlayout=0 }
+        inlayout && $1=="gaps" && !done {
+            # keep the original indentation and any trailing comment
+            match($0, /^[[:space:]]*/)
+            indent = substr($0, 1, RLENGTH)
+            rest = ""
+            if (match($0, /\/\/.*$/)) rest = " " substr($0, RSTART)
+            print indent "gaps " want rest
+            done = 1
+            next
+        }
+        { print }
+    ' "$CONFIG" > "$tmp"
+    # Rewrite in place rather than rename: niri watches the path, and a rename
+    # can drop the inotify watch on some filesystems.
+    cat "$tmp" > "$CONFIG"
+    rm -f "$tmp"
+}
+
+now=$(current)
+[[ -n "$now" ]] || { echo "niri-gaps: no 'gaps' line in the layout block of $CONFIG" >&2; exit 1; }
+
+case "${1:-toggle}" in
+    toggle)
+        if [[ "$now" == "0" ]]; then
+            set_gap "$(cat "$STATE" 2>/dev/null || echo $DEFAULT_GAP)"
+        else
+            echo "$now" > "$STATE"
+            set_gap 0
+        fi
+        ;;
+    restore)
+        set_gap "$(cat "$STATE" 2>/dev/null || echo $DEFAULT_GAP)"
+        ;;
+    0)  [[ "$now" != "0" ]] && echo "$now" > "$STATE"
+        set_gap 0
+        ;;
+    [0-9]*)
+        set_gap "$1"
+        ;;
+    *)  echo "usage: niri-gaps [0|<n>|toggle|restore]" >&2; exit 2 ;;
+esac

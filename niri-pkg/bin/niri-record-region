@@ -1,0 +1,3 @@
+#!/bin/sh
+# Wayland twin of ~/bin/record-region. See niri-record.
+exec niri-record region "$@"

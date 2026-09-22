@@ -69,7 +69,15 @@ sys.path.insert(0, SHARE)
 def channel():
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
     sock.setblocking(False)
-    return sock, "\0w95-sysmon" + os.environ.get("DISPLAY", ":0")
+    # Keyed on the SESSION, so two logins never fight over one panel. DISPLAY
+    # is the X11 spelling of that and was the only one under i3; under niri it
+    # still exists (Xwayland sets it) but it is no longer the thing that
+    # identifies the session — a niri session with Xwayland not yet up has no
+    # DISPLAY at all, and the ":0" fallback would then let a second instance
+    # bind a DIFFERENT key on the same seat and put up a second panel. Prefer
+    # WAYLAND_DISPLAY where there is one.
+    session = os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY", ":0")
+    return sock, "\0w95-sysmon" + session
 
 
 def claim(sock, address):

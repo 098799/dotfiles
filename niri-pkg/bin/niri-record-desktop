@@ -1,0 +1,3 @@
+#!/bin/sh
+# Wayland twin of ~/bin/record-desktop. See niri-record.
+exec niri-record desktop "$@"

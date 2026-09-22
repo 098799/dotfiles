@@ -1,0 +1,14 @@
+#!/bin/sh
+# niri-preset-size — i3's resize-mode presets 1 / 2 / 3
+# ("resize set N ppt N ppt; move position center").
+#
+#   niri-preset-size 50 | 75 | 90
+#
+# It is a script and not a keybind because a niri bind takes exactly ONE action
+# — `{ set-window-width "50%"; set-window-height "50%"; center-window; }` is a
+# config error, not a sequence — while the i3 binding was three commands.
+set -eu
+pct="${1:?usage: niri-preset-size <percent>}"
+niri msg action set-window-width "${pct}%"
+niri msg action set-window-height "${pct}%"
+niri msg action center-window

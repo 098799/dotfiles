@@ -1,0 +1,155 @@
+#!/bin/bash
+# niri-record — the Wayland twin of ~/bin/record-desktop / record-window /
+# record-region, which were ffmpeg -f x11grab and capture nothing under niri.
+#
+#   niri-record desktop|window|region [--audio both|system|mic|none] [out.mp4]
+#
+# Same contract as the i3 scripts: run once to start, run again to stop, one
+# key does both. Audio defaults to `both` (system sound + microphone mixed to
+# one track) and can be overridden per run with --audio or AUDIO=mic.
+#
+# Engine: gpu-screen-recorder, not ffmpeg.
+#   - ffmpeg's x11grab has no Wayland equivalent; wf-recorder is the usual
+#     stand-in but it captures a whole OUTPUT only, mixes no audio (one -a
+#     device), and encodes on the CPU.
+#   - gsr encodes on the 890M through VAAPI (the x11grab scripts burned a core
+#     on libx264 ultrafast), merges two PulseAudio devices into one track with
+#     `-a "a|b"`, and takes a window through the xdg-desktop-portal ScreenCast
+#     picker — which is the only way to record one window on Wayland, because
+#     niri's IPC does not report window geometry (`tile_pos_in_workspace_view`
+#     is null for every window in 26.04).
+#   - `-fallback-cpu-encoding yes` covers a broken VAAPI without a second tool.
+#
+# NOTE ON `window`: the portal picker is a dialog, not the crosshair xdotool
+# drew. It also offers a whole screen, so it doubles as "record that other
+# monitor". Cancelling the dialog cancels the recording, as before.
+
+set -u
+
+MODE="${1:-}"
+case "$MODE" in
+    desktop|window|region) shift ;;
+    *) echo "usage: niri-record desktop|window|region [--audio both|system|mic|none] [out.mp4]" >&2; exit 2 ;;
+esac
+
+RUNDIR="${XDG_RUNTIME_DIR:-/tmp}"
+STATEFILE="$RUNDIR/niri-record-$MODE.state"
+OUTFILE_STORE="$RUNDIR/niri-record-$MODE.out"
+ERRLOG="$RUNDIR/niri-record-$MODE.log"
+
+note() { command -v notify-send >/dev/null 2>&1 && notify-send "$@" || true; }
+alive() { [[ -n "${1:-}" ]] && kill -0 "$1" 2>/dev/null; }
+
+# --- Toggle off ----------------------------------------------------------
+# The state is claimed BEFORE the picker opens, so a second press always has
+# something to act on: a live recorder, or a selection still being made.
+if [[ -f "$STATEFILE" ]]; then
+    { read -r KIND; read -r WATCH_PID; read -r OWNER_PID; } < "$STATEFILE"
+    if alive "$WATCH_PID"; then
+        if [[ "$KIND" == "REC" ]]; then
+            kill -INT "$WATCH_PID"
+            for _ in {1..80}; do alive "$WATCH_PID" || break; sleep 0.1; done
+            alive "$WATCH_PID" && kill -TERM "$WATCH_PID"
+            note -u normal "Recording stopped ($MODE)" "Saved to $(cat "$OUTFILE_STORE" 2>/dev/null)"
+        else
+            pkill -P "$OWNER_PID" 2>/dev/null
+            kill -TERM "$OWNER_PID" 2>/dev/null
+            note -u normal "Recording cancelled ($MODE)" "Selection aborted"
+        fi
+        rm -f "$STATEFILE"
+        exit 0
+    fi
+    rm -f "$STATEFILE"   # stale (previous run died) — fall through and start
+fi
+
+release() {
+    # Only drop the state if it is still ours, never a newer run's.
+    [[ -f "$STATEFILE" && "$(sed -n 3p "$STATEFILE" 2>/dev/null)" == "$$" ]] && rm -f "$STATEFILE"
+}
+trap release EXIT
+printf 'SELECT\n%s\n%s\n' "$$" "$$" > "$STATEFILE"
+
+command -v gpu-screen-recorder >/dev/null 2>&1 || {
+    rm -f "$STATEFILE"
+    note -u critical "Recording failed" "gpu-screen-recorder not installed"
+    exit 1
+}
+
+# --- Audio ---------------------------------------------------------------
+# gsr resolves `default_output` / `default_input` itself, and "a|b" merges the
+# two into ONE track — the amix filter_complex the ffmpeg scripts needed.
+AUDIO="${AUDIO:-both}"
+if [[ "${1:-}" == "--audio" || "${1:-}" == "-a" ]]; then
+    AUDIO="${2:-both}"; shift 2
+fi
+case "$AUDIO" in
+    none)   AUDIO_ARGS=() ;;
+    system) AUDIO_ARGS=(-a default_output) ;;
+    mic)    AUDIO_ARGS=(-a default_input) ;;
+    both|*) AUDIO="both"; AUDIO_ARGS=(-a "default_output|default_input") ;;
+esac
+# aac, not gsr's opus default: the i3 recordings were aac, and every player and
+# every Slack/Drive preview takes aac in an mp4 without arguing.
+[[ ${#AUDIO_ARGS[@]} -gt 0 ]] && AUDIO_ARGS+=(-ac aac -ab 192)
+
+# --- What to capture -----------------------------------------------------
+case "$MODE" in
+desktop)
+    # The focused output, so this does the right thing on the dock as well.
+    OUT_NAME=$(niri msg --json focused-output 2>/dev/null \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["name"])' 2>/dev/null)
+    [[ -n "$OUT_NAME" ]] || OUT_NAME=screen
+    CAPTURE=(-w "$OUT_NAME")
+    DEFAULT_OUT="$HOME/desktop_$(date +%Y%m%d_%H%M%S).mp4"
+    WHAT="$OUT_NAME"
+    ;;
+window)
+    # The portal picker. gsr raises it itself; -restore-portal-session no so
+    # every run asks again, the way the xdotool crosshair did.
+    CAPTURE=(-w portal -restore-portal-session no)
+    DEFAULT_OUT="$HOME/recording_$(date +%Y%m%d_%H%M%S).mp4"
+    WHAT="portal selection"
+    note -u low "Pick a window" "Choose the window to record in the share dialog"
+    ;;
+region)
+    command -v slurp >/dev/null 2>&1 || {
+        rm -f "$STATEFILE"; note -u critical "Recording failed" "slurp not installed"; exit 1; }
+    REGION=$(slurp -f '%wx%h+%x+%y' 2>/dev/null) || {
+        rm -f "$STATEFILE"; note -u normal "Recording cancelled" "Selection aborted"; exit 1; }
+    [[ -n "$REGION" ]] || { rm -f "$STATEFILE"; note -u critical "Recording failed" "Empty selection"; exit 1; }
+    # libx264/VAAPI both want even dimensions; slurp hands out odd ones freely.
+    REGION=$(printf '%s' "$REGION" | awk -F'[x+]' '{printf "%dx%d+%d+%d", $1-($1%2), $2-($2%2), $3, $4}')
+    CAPTURE=(-w region -region "$REGION")
+    DEFAULT_OUT="$HOME/region_$(date +%Y%m%d_%H%M%S).mp4"
+    WHAT="$REGION"
+    ;;
+esac
+
+OUTPUT="${1:-$DEFAULT_OUT}"
+echo "$OUTPUT" > "$OUTFILE_STORE"
+
+gpu-screen-recorder \
+    "${CAPTURE[@]}" \
+    -f 30 \
+    -k h264 \
+    -q very_high \
+    -cursor yes \
+    -fallback-cpu-encoding yes \
+    "${AUDIO_ARGS[@]}" \
+    -o "$OUTPUT" \
+    </dev/null >"$ERRLOG" 2>&1 &
+
+RECPID=$!
+printf 'REC\n%s\n%s\n' "$RECPID" "$$" > "$STATEFILE"
+
+# gsr dies within a second on a missing portal or a refused picker — say so
+# instead of leaving a dead pid the next keypress silently steps over.
+sleep 1.5
+if ! alive "$RECPID"; then
+    rm -f "$STATEFILE"
+    note -u critical "Recording failed ($MODE)" "$(tail -n 3 "$ERRLOG" 2>/dev/null)"
+    exit 1
+fi
+
+trap - EXIT
+note -u low "Recording started ($MODE)" "$WHAT • audio:$AUDIO → $OUTPUT"

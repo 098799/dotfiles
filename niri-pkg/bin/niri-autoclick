@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# niri-autoclick — the Wayland twin of ~/bin/autoclick, which drives xdotool
+# and therefore clicks nothing under niri (Xwayland has no view of the Wayland
+# pointer, and niri accepts no synthetic X events).
+#
+# Same contract: run once to START clicking wherever the mouse is, run again to
+# STOP, one key does both.
+#
+#   niri-autoclick          # toggle (left button)
+#   niri-autoclick -b 3     # right button (1=left 2=middle 3=right, as in X11)
+#   niri-autoclick stop
+#   niri-autoclick status
+#
+# Engine: ydotool, which writes to /dev/uinput as a virtual input device, so
+# the click arrives as a REAL kernel event and niri cannot tell it apart from
+# the mouse. wtype is the usual ydotool alternative but types only — it has no
+# pointer verb at all. ydotool needs its daemon (`ydotoold`, started by niri);
+# this script starts it on demand if it is not up, so the first press after a
+# fresh login still clicks.
+#
+# /dev/uinput is root:input 0660, and logind puts an ACL for the seat owner on
+# it, so no `usermod -aG input` is needed on this box (check with
+# `getfacl /dev/uinput` if a click ever silently does nothing).
+
+set -euo pipefail
+
+pidfile="${XDG_RUNTIME_DIR:-/tmp}/niri-autoclick.pid"
+button=1
+
+case "${1:-}" in
+  -b) button="${2:-1}"; shift 2 || true;;
+  stop)   action=stop;;
+  status) action=status;;
+esac
+
+# X11 button numbers -> ydotool button codes. 0x40 is press, 0x80 is release,
+# so 0xC0 is a whole click of button 0 (left); 1 is right, 2 is middle. Note
+# the order differs from X11, where 2 is middle and 3 is right.
+case "$button" in
+  1) code=0xC0 ;;
+  2) code=0xC2 ;;
+  3) code=0xC1 ;;
+  *) echo "niri-autoclick: button must be 1, 2 or 3" >&2; exit 2 ;;
+esac
+
+notify() {
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -t 1200 -h string:x-canonical-private-synchronous:autoclick \
+      "autoclick" "$1" || true
+}
+
+running() { [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null; }
+
+stop() {
+  if [[ -f "$pidfile" ]]; then
+    local pid; pid="$(cat "$pidfile")"
+    # The loop runs in its own process group (setsid), so kill the group and
+    # take the ydotool child down with it.
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+  fi
+  rm -f "$pidfile"
+}
+
+case "${action:-toggle}" in
+  status) running && echo "running (pid $(cat "$pidfile"))" || echo "stopped"; exit 0;;
+  stop)   stop; notify "⏹ stopped"; exit 0;;
+esac
+
+if running; then stop; notify "⏹ stopped"; exit 0; fi
+
+command -v ydotool >/dev/null || { notify "ydotool not installed"; exit 1; }
+
+# ydotool talks to ydotoold over a socket; without the daemon every click is a
+# silent no-op. niri starts it at login, but start it here too so a key press
+# after a crashed daemon still works.
+sock="${YDOTOOL_SOCKET:-${XDG_RUNTIME_DIR:-/tmp}/.ydotool_socket}"
+if [[ ! -S "$sock" ]]; then
+    systemctl --user start ydotool.service 2>/dev/null || (setsid ydotoold >/dev/null 2>&1 &)
+    for _ in {1..20}; do [[ -S "$sock" ]] && break; sleep 0.1; done
+fi
+
+# 1 click/sec, one instantaneous press+release per tick — the same cadence the
+# X11 script settled on, because apps register a real-shaped click far more
+# reliably than a burst.
+setsid bash -c '
+  trap "exit 0" TERM INT
+  while :; do
+    ydotool click '"$code"' >/dev/null 2>&1
+    sleep 1
+  done
+' &
+echo $! > "$pidfile"
+notify "▶ clicking (button $button)"
