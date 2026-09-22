@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Run an i3blocks script and emit waybar JSON.
+
+The niri bar runs the SAME ~/scripts/*.sh that i3blocks runs, so both bars show
+the same icons, text and colours, and keep the same click menus. This adapter
+translates the protocol.
+
+i3blocks: up to 3 lines on stdout -- full_text, short_text, colour (#rrggbb).
+Clicks arrive as $BLOCK_BUTTON (1 left, 2 middle, 3 right, 4/5 scroll).
+
+waybar: one JSON object with "text"/"tooltip". waybar renders labels as pango
+markup, so the colour becomes a <span>.
+
+    i3blocks-waybar ~/scripts/uptime.sh                  # read it
+    i3blocks-waybar ~/scripts/cpu-cap.sh 1               # left-click it
+    i3blocks-waybar --signal 14 ~/scripts/cpu-cap.sh 1   # ...then redraw the block
+    i3blocks-waybar --timeout 120 ~/scripts/updates.sh   # a read that may be slow
+    i3blocks-waybar --hint 'right: df' ~/scripts/disk.sh # say what a click does
+
+A read gives up after 10s by default, so one stuck bluetoothctl cannot freeze a
+block. updates.sh runs checkupdates on a cold cache, which takes longer.
+
+A click is not a read, and it runs differently:
+
+  * No timeout. A click often opens a rofi menu and waits for you. A timeout
+    killed the script under the open menu, and whatever you picked went nowhere.
+  * No captured output. Scripts start `alacritty ... &`; a captured stdout kept
+    the adapter alive until that terminal closed.
+  * A fixed menu position. The scripts place rofi at `xdotool getmouselocation`.
+    On niri that is the XWayland pointer, which only moves over X11 windows, so
+    over waybar it is stale and the menu opened where the pointer last left an
+    X11 window.
+    A shim answers with the top-right corner, just under the bar, instead.
+  * --signal N sends SIGRTMIN+N to waybar when the script returns, and again a
+    few seconds later for the things scripts start in the background
+    (bluetoothctl connect, wg-quick up), so the block shows the new state.
+"""
+import html
+import json
+import os
+import subprocess
+import sys
+import time
+
+READ_TIMEOUT = 10
+# Widest rofi menu the scripts open is 320px; keep it clear of the screen edge.
+MENU_WIDTH = 340
+BAR_HEIGHT = 27
+RESIGNAL_AFTER = 4
+
+SHIM = """#!/bin/sh
+if [ "$1" = getmouselocation ]; then
+    echo "X=$I3BW_MENU_X"
+    echo "Y=$I3BW_MENU_Y"
+    echo "SCREEN=0"
+    echo "WINDOW=0"
+    exit 0
+fi
+exec /usr/bin/xdotool "$@"
+"""
+
+
+def shim_dir() -> str:
+    path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "i3blocks-waybar")
+    shim = os.path.join(path, "xdotool")
+    try:
+        with open(shim) as f:
+            if f.read() == SHIM:
+                return path
+    except OSError:
+        pass
+    os.makedirs(path, exist_ok=True)
+    with open(shim, "w") as f:
+        f.write(SHIM)
+    os.chmod(shim, 0o755)
+    return path
+
+
+def output_width() -> int:
+    try:
+        out = subprocess.run(
+            ["niri", "msg", "-j", "focused-output"], capture_output=True, text=True, timeout=2
+        ).stdout
+        return int(json.loads(out)["logical"]["width"])
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return 1920
+
+
+def signal_waybar(number: int) -> None:
+    subprocess.run(["pkill", f"-RTMIN+{number}", "-x", "waybar"], check=False)
+
+
+def click(script: str, button: str, signal_number: int | None) -> int:
+    env = dict(os.environ, BLOCK_BUTTON=button)
+    if env.get("WAYLAND_DISPLAY"):
+        env["PATH"] = shim_dir() + os.pathsep + env.get("PATH", "")
+        env["I3BW_MENU_X"] = str(max(0, output_width() - MENU_WIDTH))
+        env["I3BW_MENU_Y"] = str(BAR_HEIGHT + 2)
+    try:
+        subprocess.run([script], env=env, stdout=subprocess.DEVNULL, check=False)
+    except OSError:
+        return 1
+    if signal_number is not None:
+        signal_waybar(signal_number)
+        time.sleep(RESIGNAL_AFTER)
+        signal_waybar(signal_number)
+    return 0
+
+
+def read(script: str, timeout: int, hint: str) -> int:
+    try:
+        out = subprocess.run(
+            [script], capture_output=True, text=True, timeout=timeout
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        print(json.dumps({"text": ""}), flush=True)
+        return 0
+
+    lines = out.split("\n")
+    full = lines[0].strip() if lines else ""
+    short = lines[1].strip() if len(lines) > 1 else ""
+    colour = lines[2].strip() if len(lines) > 2 else ""
+
+    if not full:
+        print(json.dumps({"text": ""}), flush=True)
+        return 0
+
+    # i3blocks scripts already emit pango markup in some cases; only escape when
+    # there is no markup to preserve.
+    text = full if "<" in full else html.escape(full)
+    if colour.startswith("#"):
+        text = f'<span color="{colour}">{text}</span>'
+
+    # short_text is often the bare icon, which tells you nothing on hover.
+    tooltip = short if len(short.split()) > 1 else full
+    if hint:
+        tooltip = f"{tooltip}\n{hint}"
+    print(json.dumps({"text": text, "tooltip": tooltip}), flush=True)
+    return 0
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    signal_number = None
+    timeout = READ_TIMEOUT
+    hint = ""
+    while len(args) >= 2 and args[0] in ("--signal", "--timeout", "--hint"):
+        if args[0] == "--signal":
+            signal_number = int(args[1])
+        elif args[0] == "--timeout":
+            timeout = int(args[1])
+        else:
+            hint = args[1]
+        args = args[2:]
+    if not args:
+        print(json.dumps({"text": "", "tooltip": "usage: i3blocks-waybar [--signal N] [--timeout S] [--hint TEXT] <script> [button]"}))
+        return 2
+
+    script = os.path.expanduser(args[0])
+    if len(args) > 1:
+        return click(script, args[1], signal_number)
+    return read(script, timeout, hint)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""waybar custom module: where am I in the scroll strip?
+
+A scrolling layout can show one small window while a dozen more sit off-screen
+to the left. Nothing on screen says so. This prints `3/7` — focused column 3 of
+7 on this workspace — so the hidden ones are always accounted for.
+
+Driven by niri's event stream, so it updates instantly and costs nothing when
+idle. waybar reads one JSON object per line on stdout.
+"""
+import json
+import subprocess
+import sys
+
+windows: dict[int, dict] = {}
+workspaces: dict[int, dict] = {}
+
+
+def emit() -> None:
+    focused_ws = next((w for w in workspaces.values() if w.get("is_focused")), None)
+    if focused_ws is None:
+        print(json.dumps({"text": ""}), flush=True)
+        return
+
+    mine = [w for w in windows.values() if w["workspace_id"] == focused_ws["id"]]
+    cols = sorted({w["layout"]["pos_in_scrolling_layout"][0] for w in mine})
+
+    # One column or none: nothing can be hidden, so say nothing.
+    if len(cols) <= 1:
+        print(json.dumps({"text": ""}), flush=True)
+        return
+
+    focused = next((w for w in mine if w.get("is_focused")), None)
+    cur = focused["layout"]["pos_in_scrolling_layout"][0] if focused else cols[0]
+    pos = cols.index(cur) + 1 if cur in cols else 1
+
+    left, right = pos - 1, len(cols) - pos
+    text = f"{pos}/{len(cols)}"
+    # Arrows only on the side that actually has something hidden.
+    if left:
+        text = f"◀{left} " + text
+    if right:
+        text = text + f" {right}▶"
+
+    lines = [f"{len(cols)} columns, {len(mine)} windows on '{focused_ws.get('name') or focused_ws['idx']}'"]
+    for c in cols:
+        stack = [w for w in mine if w["layout"]["pos_in_scrolling_layout"][0] == c]
+        stack.sort(key=lambda w: w["layout"]["pos_in_scrolling_layout"][1])
+        mark = "▶" if c == cur else " "
+        for i, w in enumerate(stack):
+            label = f"col {c}" if i == 0 else "     "
+            title = w["title"] or w["app_id"] or "?"
+            lines.append(f"{mark} {label}  {title[:60]}")
+
+    print(json.dumps({"text": text, "tooltip": "\n".join(lines)}), flush=True)
+
+
+def main() -> int:
+    proc = subprocess.Popen(
+        ["niri", "msg", "-j", "event-stream"],
+        stdout=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        for kind, data in ev.items():
+            if kind == "WindowsChanged":
+                windows.clear()
+                windows.update({w["id"]: w for w in data["windows"]})
+            elif kind == "WindowOpenedOrChanged":
+                w = data["window"]
+                windows[w["id"]] = w
+                if w.get("is_focused"):
+                    for other in windows.values():
+                        if other["id"] != w["id"]:
+                            other["is_focused"] = False
+            elif kind == "WindowClosed":
+                windows.pop(data["id"], None)
+            elif kind == "WindowFocusChanged":
+                for w in windows.values():
+                    w["is_focused"] = w["id"] == data.get("id")
+            elif kind == "WorkspacesChanged":
+                workspaces.clear()
+                workspaces.update({w["id"]: w for w in data["workspaces"]})
+            elif kind == "WorkspaceActivated":
+                if data.get("focused"):
+                    for w in workspaces.values():
+                        w["is_focused"] = w["id"] == data["id"]
+            else:
+                continue
+            emit()
+    return proc.wait()
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(0)
