@@ -54,10 +54,13 @@ if [[ -n $force_geom ]]; then
     [[ $force_geom =~ ^([0-9]+)x([0-9]+)$ ]] || { echo "bad --aspect: $force_geom" >&2; exit 2; }
     screen_aspect=$(( BASH_REMATCH[1] * 1000 / BASH_REMATCH[2] ))
 elif command -v niri >/dev/null && niri msg --json focused-output >/dev/null 2>&1; then
-    # Ask niri first. xrandr under niri queries XWAYLAND's root, which is a
-    # synthetic 1920x1080-ish screen unrelated to the real monitor — so the
-    # 21:9/16:9 pick below was made against the wrong aspect on every Wayland
-    # run, and quietly: xrandr answers, it just answers about the wrong screen.
+    # Ask niri first, because niri is the authority on its own outputs.
+    # NOT because xrandr is wrong: xwayland-satellite mirrors the real output
+    # layout into the X screen, so `xrandr --query` here does report
+    # "DP-1 connected primary 2560x1440+0+0" (verified 22 Sep 2026). What it
+    # depends on is Xwayland being up at all — with no satellite running, the
+    # xrandr branch falls through and the aspect ends up unset. The niri branch
+    # has no such dependency.
     # `|| true`: this file runs under `set -e`, so a python that exits non-zero
     # on a shape it did not expect would abort the whole wallpaper pick.
     geom=$(niri msg --json focused-output 2>/dev/null |

@@ -17,7 +17,12 @@ case $BLOCK_BUTTON in
         if [[ -n "$CHOICE" && "$CHOICE" != "$CURRENT" ]]; then
             echo "$CHOICE" | sudo tee "$PROFILE_PATH" > /dev/null
             CURRENT="$CHOICE"
-            pkill -RTMIN+12 i3blocks
+            # Refresh whichever bar is running. i3blocks is dead under niri, so the
+        # click used to leave the reading stale until the next 30s tick;
+        # waybar declares `signal: 12` for this module and takes the same
+        # RTMIN offset. Signalling both keeps the i3 session working too.
+        pkill -RTMIN+12 i3blocks 2>/dev/null
+        pkill -RTMIN+12 waybar 2>/dev/null
         fi
         ;;
 esac
