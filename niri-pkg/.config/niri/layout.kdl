@@ -49,6 +49,10 @@ layout {
         urgent-color "#d3869b"
     }
     border {
+        // `on` is REQUIRED here. In an included file niri merges this block onto
+        // its defaults, and the default border is off: without `on`, the width
+        // and colours below load and nothing is drawn (the split lost it once).
+        on
         width 4
         active-color "#98971a"
         inactive-color "#3c3836"

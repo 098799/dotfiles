@@ -119,6 +119,12 @@ anything. When a key needs two actions, or a check first, it runs a script.
   To record one window, use the portal picker.
 - No runtime action for gaps, and no sticky windows. So the w95-sysmon
   drop-down stays on one workspace.
+- **In an included file, a block that is off by default needs an explicit
+  `on`.** niri merges each block onto its defaults. `border { width 4 … }`
+  with no `on` loads the width and colours and draws nothing, and you get no
+  error. That is how the split of `config.kdl` lost the focus border. To check
+  the border on the live session: `niri msg focused-window` must show
+  `window_offset_in_tile` = `[4.0, 4.0]`; `[0.0, 0.0]` means no border.
 - Wayland app-ids are not X11 classes. A rule that matches nothing gives no
   error.
 - niri runs under `systemd --user` and inherits its environment. This is why
