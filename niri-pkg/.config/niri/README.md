@@ -25,6 +25,7 @@ Everything is in `~/dotfiles/niri-pkg/` and GNU Stow links it into `~`.
 | `~/.config/hypr/hyprlock.conf` | Lock screen: look, and the fingerprint + password setup. |
 | `pam.d/hyprlock-password` | The lock screen's password-only PAM file. It is **not** stowed: install it with `sudo cp pam.d/hyprlock-password /etc/pam.d/`. `install.sh` warns when the copy in `/etc` differs. |
 | `~/.config/swaylock/config` | Colours for swaylock, the old locker. Only a fallback now. |
+| `~/.config/xdg-desktop-portal/niri-portals.conf` | Portal backends. It sends the file picker (Chrome's Upload, Save as) to the GTK picker, not Nautilus. |
 | `~/bin/niri-*`, `barmenu`, `i3blocks-waybar` | Helper scripts (table below). |
 
 `~/.config/niri` and `~/.config/waybar` link to whole directories, so a new
@@ -153,6 +154,10 @@ display. `kill -USR1` unlocks it.
   `environment.kdl` exists.
 - Screen sharing goes through xdg-desktop-portal. A portal left over from an
   i3 session has no screen-cast support. `startup.kdl` restarts it.
+- Native Wayland GTK apps (Thunar, the file picker) ignore `settings.ini` and
+  xsettingsd. They read the GTK theme and icons from gsettings
+  (`org.gnome.desktop.interface`). `theme` writes those keys too. Set them by
+  hand with `gsettings set org.gnome.desktop.interface icon-theme Faenza-Darkest`.
 
 ## Not ported from i3
 

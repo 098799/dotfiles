@@ -184,6 +184,12 @@ fi
 if [[ -f $gtkrc2 ]]; then
     sed -i -E "s|^gtk-theme-name=.*|gtk-theme-name=\"$gtk_name\"|" "$gtkrc2"
 fi
+# Native Wayland GTK apps under niri (Thunar, the file picker) ignore
+# settings.ini and xsettingsd; they read gsettings only.
+if [[ -z $w95_mode ]] && command -v gsettings >/dev/null; then
+    gsettings set org.gnome.desktop.interface gtk-theme "$gtk_name"
+    gsettings set org.gnome.desktop.interface icon-theme Faenza-Darkest
+fi
 
 xs_conf=$HOME/.config/xsettingsd/xsettingsd.conf
 [[ -n $w95_mode ]] && xs_conf=/dev/null
