@@ -1,0 +1,571 @@
+#!/usr/bin/env python3
+"""Minimap of the scroll strip, shown for a moment after you move.
+
+A niri workspace is an endless row of columns, and the screen shows one piece
+of it. Nothing on screen says how much of the row is off to the left or right.
+This draws the whole row, scaled down, across the middle of the screen for
+about a second:
+
+  frame        the part of the row that is on the screen now
+  rectangles   windows at their true widths: the focused one is green, the
+               others are brighter the more of them is on the screen
+  ◀2 · 1▶     how many columns are off the screen (fully or partly) each side
+
+It shows when the focused workspace changes, when the view scrolls, and when
+columns open, close or change width. A focus change that does not scroll (a
+mouse hover with focus-follows-mouse, a key to a column already on screen)
+shows nothing, because nothing that was hidden has moved.
+
+It is an overlay layer surface with an empty input region: clicks and keys go
+through it.
+
+The widths are exact, because niri reports every tile's size. The frame is an
+estimate: niri's IPC does not say where the view is (`tile_pos_in_workspace_view`
+is null for tiled windows), so this script replays niri's own view rule for
+`center-focused-column "never"` + `always-center-single-column` on every
+change. That is exact for keyboard moves. A touchpad swipe or a mouse drag of
+the view is not replayed, so after one the frame can be off until niri next
+has to scroll to a column (it then snaps to that column's edge again).
+
+  niri-minimap              run the daemon (niri starts it; a second run replaces the first)
+  niri-minimap --show       show the minimap now
+  niri-minimap --png FILE [WORKSPACE]
+                            draw a workspace (default: the focused one) into FILE, no window
+"""
+import json
+import math
+import os
+import re
+import signal
+import subprocess
+import sys
+
+import cairo
+import gi
+
+gi.require_version("Gdk", "3.0")
+gi.require_version("Gtk", "3.0")
+gi.require_version("GtkLayerShell", "0.1")
+gi.require_version("PangoCairo", "1.0")
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
+
+SHOW_MS = 1100  # fully visible for this long after the last change
+FADE_MS = 250
+MAX_SCALE = 0.18  # one screen of strip is never drawn bigger than this
+SIDE_MARGIN = 60  # px left free at each side of the screen
+PAD = 14  # px around the strip, inside the dark backing
+LABEL_H = 24
+FONT = "Terminess Nerd Font 12"
+SMALL_FONT = "Terminess Nerd Font 9"
+DEFAULT_GAP = 10.0
+LAYOUT_KDL = os.path.expanduser("~/.config/niri/layout.kdl")
+PIDFILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap.pid")
+
+# gruvbox-dark, as in ~/.config/waybar/style.css
+BG = (0x28 / 255, 0x28 / 255, 0x28 / 255)
+FG = (0xEB / 255, 0xDB / 255, 0xB2 / 255)
+DIM = (0xA8 / 255, 0x99 / 255, 0x84 / 255)
+ACCENT = (0x98 / 255, 0x97 / 255, 0x1A / 255)
+
+windows: dict[int, dict] = {}
+workspaces: dict[int, dict] = {}
+outputs: dict[str, dict] = {}
+# ws id -> (anchor window id, view x minus the anchor column's x). niri keeps
+# the view offset relative to the active column the same way, so a column
+# opening or closing to the left moves the view with the row, as on screen.
+views: dict[int, tuple[int | None, float]] = {}
+
+
+def niri_json(*args: str):
+    out = subprocess.run(
+        ["niri", "msg", "-j", *args], capture_output=True, text=True, check=False
+    ).stdout
+    try:
+        return json.loads(out)
+    except json.JSONDecodeError:
+        return None
+
+
+def read_outputs() -> None:
+    data = niri_json("outputs") or {}
+    outputs.clear()
+    outputs.update({name: o["logical"] for name, o in data.items() if o.get("logical")})
+
+
+def gaps() -> float:
+    # niri-gaps rewrites this line at runtime, so read it each time.
+    try:
+        with open(LAYOUT_KDL, encoding="utf-8") as f:
+            m = re.search(r"^\s*gaps\s+(\d+(?:\.\d+)?)", f.read(), re.M)
+    except OSError:
+        return DEFAULT_GAP
+    return float(m.group(1)) if m else DEFAULT_GAP
+
+
+def columns_of(ws_id: int) -> list[list[dict]]:
+    """Tiled windows of a workspace, as columns left to right, tiles top to bottom."""
+    cols: dict[int, list[dict]] = {}
+    for w in windows.values():
+        pos = w.get("layout", {}).get("pos_in_scrolling_layout")
+        if w["workspace_id"] == ws_id and not w["is_floating"] and pos:
+            cols.setdefault(pos[0], []).append(w)
+    return [
+        sorted(cols[c], key=lambda w: w["layout"]["pos_in_scrolling_layout"][1])
+        for c in sorted(cols)
+    ]
+
+
+def col_width(col: list[dict]) -> float:
+    return max(w["layout"]["tile_size"][0] for w in col)
+
+
+def col_xs(cols: list[list[dict]], gap: float) -> list[float]:
+    xs, x = [], 0.0
+    for c in cols:
+        xs.append(x)
+        x += col_width(c) + gap
+    return xs
+
+
+def fit(cur_x: float, view_w: float, col_x: float, width: float, gap: float) -> float:
+    """niri's compute_new_view_offset: the view offset from col_x that shows the column."""
+    if view_w <= width:
+        return 0.0  # wider than the screen: left-aligned, no padding
+    padding = min(max((view_w - width) / 2, 0.0), gap)
+    left, right = col_x - padding, col_x + width + padding
+    if cur_x <= left and right <= cur_x + view_w:
+        return cur_x - col_x  # already fully on screen: the view stays
+    if abs(cur_x - left) <= abs(cur_x + view_w - right):
+        return -padding
+    return -(view_w - padding - width)
+
+
+def column_index(cols: list[list[dict]], window_id: int | None) -> int | None:
+    for i, c in enumerate(cols):
+        if any(w["id"] == window_id for w in c):
+            return i
+    return None
+
+
+def update_view(ws_id: int) -> None:
+    ws = workspaces.get(ws_id)
+    cols = columns_of(ws_id)
+    out = outputs.get(ws.get("output") or "") if ws else None
+    if not cols or not out:
+        views.pop(ws_id, None)
+        return
+    view_w, gap = out["width"], gaps()
+    xs = col_xs(cols, gap)
+    active_id = ws.get("active_window_id")
+    ai = column_index(cols, active_id)
+    if ai is None:
+        ai, active_id = 0, cols[0][0]["id"]
+    width = col_width(cols[ai])
+
+    if len(cols) == 1:
+        off = 0.0 if width >= view_w else -(view_w - width) / 2
+    else:
+        prev = views.get(ws_id)
+        if prev is None:
+            cur_x = -gap  # never seen: assume the row starts at the left edge
+        else:
+            anchor, prev_off = prev
+            pi = column_index(cols, anchor)
+            cur_x = xs[ai if pi is None else pi] + prev_off
+        off = fit(cur_x, view_w, xs[ai], width, gap)
+    views[ws_id] = (active_id, off)
+
+
+def snapshot(ws_id: int) -> dict | None:
+    """Everything the drawing needs, frozen, so a fade-out shows what it showed."""
+    ws = workspaces.get(ws_id)
+    out = outputs.get(ws.get("output") or "") if ws else None
+    if not ws or not out:
+        return None
+    cols = columns_of(ws_id)
+    gap = gaps()
+    xs = col_xs(cols, gap)
+    anchor_x = 0.0
+    if ws_id in views and cols:
+        anchor, off = views[ws_id]
+        i = column_index(cols, anchor)
+        anchor_x = xs[i if i is not None else 0] + off
+    elif cols:
+        anchor_x = -gap
+    return {
+        "ws_id": ws_id,
+        "name": ws.get("name") or str(ws["idx"]),
+        "output": ws.get("output"),
+        "out": dict(out),
+        "gap": gap,
+        "cols": [[dict(w) for w in c] for c in cols],
+        "xs": xs,
+        "view_x": anchor_x,
+        "focused_id": next((w["id"] for w in windows.values() if w.get("is_focused")), None),
+    }
+
+
+def signature(snap: dict | None):
+    if snap is None:
+        return None
+    widths = tuple(round(col_width(c)) for c in snap["cols"])
+    return (snap["ws_id"], round(snap["view_x"]), widths)
+
+
+# ---- drawing -------------------------------------------------------------------
+
+
+def window_height(out: dict) -> int:
+    return int(out["height"] * MAX_SCALE + LABEL_H + 2 * PAD + 8)
+
+
+def rounded(cr, x, y, w, h, r) -> None:
+    r = min(r, w / 2, h / 2)
+    cr.new_sub_path()
+    cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
+    cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
+    cr.arc(x + r, y + h - r, r, math.pi / 2, math.pi)
+    cr.arc(x + r, y + r, r, math.pi, 3 * math.pi / 2)
+    cr.close_path()
+
+
+def text(cr, s: str, font: str, x: float, y: float, rgba, max_w: float | None = None) -> None:
+    layout = PangoCairo.create_layout(cr)
+    layout.set_font_description(Pango.FontDescription.from_string(font))
+    layout.set_text(s, -1)
+    if max_w is not None:
+        layout.set_width(int(max_w * Pango.SCALE))
+        layout.set_ellipsize(Pango.EllipsizeMode.END)
+    cr.set_source_rgba(*rgba)
+    cr.move_to(x, y)
+    PangoCairo.show_layout(cr, layout)
+
+
+def draw(cr, width: int, height: int, snap: dict, alpha: float) -> None:
+    cr.set_operator(cairo.OPERATOR_SOURCE)
+    cr.set_source_rgba(0, 0, 0, 0)
+    cr.paint()
+    cr.set_operator(cairo.OPERATOR_OVER)
+    if alpha <= 0:
+        return
+
+    out, gap, cols, xs = snap["out"], snap["gap"], snap["cols"], snap["xs"]
+    view_w, out_h, view_x = out["width"], out["height"], snap["view_x"]
+    end = xs[-1] + col_width(cols[-1]) + gap if cols else view_w
+    lo, hi = min(-gap, view_x), max(end, view_x + view_w)
+    s = min(MAX_SCALE, (width - 2 * SIDE_MARGIN - 2 * PAD) / (hi - lo))
+    strip_w, strip_h = (hi - lo) * s, out_h * s
+    ox = (width - strip_w) / 2
+    oy = (height - strip_h - LABEL_H) / 2 + LABEL_H
+
+    def X(x: float) -> float:
+        return ox + (x - lo) * s
+
+    # backing
+    rounded(cr, ox - PAD, oy - LABEL_H - PAD / 2, strip_w + 2 * PAD, strip_h + LABEL_H + 1.5 * PAD, 8)
+    cr.set_source_rgba(*BG, 0.72 * alpha)
+    cr.fill()
+
+    # label: workspace name, then what is hidden each side
+    left = sum(1 for c, x in zip(cols, xs) if x < view_x - 0.5)
+    right = sum(1 for c, x in zip(cols, xs) if x + col_width(c) > view_x + view_w + 0.5)
+    hidden = f"◀{left} · {right}▶" if left or right else "all on screen" if cols else "empty"
+    text(cr, snap["name"], FONT, ox, oy - LABEL_H - 2, (*FG, alpha))
+    layout = PangoCairo.create_layout(cr)
+    layout.set_font_description(Pango.FontDescription.from_string(FONT))
+    layout.set_text(hidden, -1)
+    tw = layout.get_pixel_size()[0]
+    text(cr, hidden, FONT, ox + strip_w - tw, oy - LABEL_H - 2, (*DIM, alpha))
+
+    # the screen
+    vx, vw = X(view_x), view_w * s
+    cr.rectangle(vx, oy, vw, strip_h)
+    cr.set_source_rgba(*FG, 0.07 * alpha)
+    cr.fill()
+
+    # windows
+    for col, x in zip(cols, xs):
+        cw = col_width(col)
+        heights = [w["layout"]["tile_size"][1] for w in col]
+        stacked_h = sum(heights) + gap * (len(col) - 1)
+        tabbed = len(col) > 1 and stacked_h > out_h - 2 * gap + 1
+        if tabbed:
+            focused_in = next((w for w in col if w["id"] == snap["focused_id"]), None)
+            shown = [focused_in or col[0]]
+            top = out_h - gap - max(heights)
+        else:
+            shown = col
+            top = out_h - gap - stacked_h
+        on = max(0.0, min(x + cw, view_x + view_w) - max(x, view_x)) / cw
+        y = top
+        for w in shown:
+            th = w["layout"]["tile_size"][1]
+            rx, ry, rw, rh = X(x), oy + y * s, cw * s, th * s
+            if w["id"] == snap["focused_id"]:
+                cr.set_source_rgba(*ACCENT, 0.85 * alpha)
+            else:
+                cr.set_source_rgba(*FG, (0.12 + 0.33 * on) * alpha)
+            rounded(cr, rx + 1, ry + 1, rw - 2, rh - 2, 3)
+            cr.fill_preserve()
+            cr.set_source_rgba(*FG, 0.45 * alpha)
+            cr.set_line_width(1)
+            cr.stroke()
+            if rw > 36 and rh > 16:
+                label = w.get("app_id") or w.get("title") or ""
+                ink = (*BG, alpha) if w["id"] == snap["focused_id"] else (*FG, (0.5 + 0.5 * on) * alpha)
+                text(cr, label, SMALL_FONT, rx + 5, ry + 3, ink, max_w=rw - 10)
+            y += th + gap
+        if tabbed:
+            # one segment per tab along the top, like niri's tab strip
+            seg = cw * s / len(col)
+            for i, w in enumerate(col):
+                cr.rectangle(X(x) + i * seg + 1, oy + top * s - 4, seg - 2, 3)
+                cr.set_source_rgba(*(ACCENT if w in shown else FG), 0.8 * alpha)
+                cr.fill()
+
+    # the screen's frame last, over the windows
+    cr.rectangle(vx, oy, vw, strip_h)
+    cr.set_source_rgba(*ACCENT, alpha)
+    cr.set_line_width(2)
+    cr.stroke()
+
+
+# ---- daemon --------------------------------------------------------------------
+
+
+class Minimap:
+    def __init__(self) -> None:
+        self.snap: dict | None = None
+        self.last_sig = None
+        self.alpha = 0.0
+        self.hide_id = 0
+        self.fade_id = 0
+        self.monitor_xy: tuple[int, int] | None = None
+        self.overview = False
+        self.primed = False  # ignore the burst of state niri sends on connect
+
+        self.win = Gtk.Window()
+        self.win.set_app_paintable(True)
+        visual = self.win.get_screen().get_rgba_visual()
+        if visual is not None:
+            self.win.set_visual(visual)
+        GtkLayerShell.init_for_window(self.win)
+        GtkLayerShell.set_namespace(self.win, "niri-minimap")
+        GtkLayerShell.set_layer(self.win, GtkLayerShell.Layer.OVERLAY)
+        GtkLayerShell.set_keyboard_mode(self.win, GtkLayerShell.KeyboardMode.NONE)
+        GtkLayerShell.set_exclusive_zone(self.win, -1)
+        GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.LEFT, True)
+        GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.RIGHT, True)
+        self.win.connect("draw", self.on_draw)
+        # An empty input region: the pointer goes straight through to the windows.
+        self.win.connect("realize", lambda w: w.input_shape_combine_region(cairo.Region()))
+
+    def on_draw(self, widget, cr) -> bool:
+        if self.snap:
+            alloc = widget.get_allocation()
+            draw(cr, alloc.width, alloc.height, self.snap, self.alpha)
+        return True
+
+    def monitor_for(self, out: dict):
+        display = Gdk.Display.get_default()
+        for i in range(display.get_n_monitors()):
+            m = display.get_monitor(i)
+            g = m.get_geometry()
+            if (g.x, g.y) == (out["x"], out["y"]):
+                return m
+        return None
+
+    def show(self, snap: dict) -> None:
+        self.snap = snap
+        out = snap["out"]
+        xy = (out["x"], out["y"])
+        if xy != self.monitor_xy:
+            # A layer surface picks its output when it maps: remap to move it.
+            self.win.hide()
+            GtkLayerShell.set_monitor(self.win, self.monitor_for(out))
+            self.monitor_xy = xy
+        self.win.set_size_request(-1, window_height(out))
+        if self.fade_id:
+            GLib.source_remove(self.fade_id)
+            self.fade_id = 0
+        self.alpha = 1.0
+        self.win.show_all()
+        self.win.queue_draw()
+        if self.hide_id:
+            GLib.source_remove(self.hide_id)
+        self.hide_id = GLib.timeout_add(SHOW_MS, self.start_fade)
+
+    def start_fade(self) -> bool:
+        self.hide_id = 0
+        step = 1.0 / max(1, FADE_MS // 16)
+
+        def tick() -> bool:
+            self.alpha -= step
+            if self.alpha <= 0:
+                self.alpha = 0
+                self.fade_id = 0
+                self.win.hide()
+                return False
+            self.win.queue_draw()
+            return True
+
+        self.fade_id = GLib.timeout_add(16, tick)
+        return False
+
+    def show_now(self) -> bool:
+        ws = focused_workspace()
+        snap = snapshot(ws["id"]) if ws else None
+        if snap:
+            self.show(snap)
+        return True
+
+    def after_event(self) -> None:
+        for ws_id in workspaces:
+            update_view(ws_id)
+        ws = focused_workspace()
+        snap = snapshot(ws["id"]) if ws else None
+        sig = signature(snap)
+        changed = sig != self.last_sig
+        self.last_sig = sig
+        if changed and self.primed and not self.overview and snap and snap["cols"]:
+            self.show(snap)
+
+    def handle(self, ev: dict) -> None:
+        for kind, data in ev.items():
+            if kind == "WindowsChanged":
+                windows.clear()
+                windows.update({w["id"]: w for w in data["windows"]})
+            elif kind == "WindowOpenedOrChanged":
+                w = data["window"]
+                windows[w["id"]] = w
+                if w.get("is_focused"):
+                    for other in windows.values():
+                        other["is_focused"] = other["id"] == w["id"]
+            elif kind == "WindowClosed":
+                windows.pop(data["id"], None)
+            elif kind == "WindowFocusChanged":
+                for w in windows.values():
+                    w["is_focused"] = w["id"] == data.get("id")
+            elif kind == "WindowLayoutsChanged":
+                for wid, layout in data["changes"]:
+                    if wid in windows:
+                        windows[wid]["layout"] = layout
+            elif kind == "WorkspacesChanged":
+                workspaces.clear()
+                workspaces.update({w["id"]: w for w in data["workspaces"]})
+                read_outputs()
+            elif kind == "WorkspaceActivated":
+                target = workspaces.get(data["id"])
+                if target:
+                    for w in workspaces.values():
+                        if w.get("output") == target.get("output"):
+                            w["is_active"] = w["id"] == data["id"]
+                        if data.get("focused"):
+                            w["is_focused"] = w["id"] == data["id"]
+            elif kind == "WorkspaceActiveWindowChanged":
+                if data["workspace_id"] in workspaces:
+                    workspaces[data["workspace_id"]]["active_window_id"] = data["active_window_id"]
+            elif kind == "OverviewOpenedOrClosed":
+                self.overview = data["is_open"]
+                continue
+            else:
+                continue
+            self.after_event()
+
+    def run(self) -> int:
+        read_outputs()
+        proc = Gio.Subprocess.new(
+            ["niri", "msg", "-j", "event-stream"], Gio.SubprocessFlags.STDOUT_PIPE
+        )
+        stream = Gio.DataInputStream.new(proc.get_stdout_pipe())
+
+        def on_line(src, res) -> None:
+            line, _ = src.read_line_finish_utf8(res)
+            if line is None:  # niri went away
+                Gtk.main_quit()
+                return
+            line = line.strip()
+            if line:
+                try:
+                    self.handle(json.loads(line))
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    pass
+            src.read_line_async(GLib.PRIORITY_DEFAULT, None, on_line)
+
+        stream.read_line_async(GLib.PRIORITY_DEFAULT, None, on_line)
+        GLib.timeout_add(600, self.prime)
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self.show_now)
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: Gtk.main_quit() or False)
+        Gtk.main()
+        proc.force_exit()
+        return 0
+
+    def prime(self) -> bool:
+        self.primed = True
+        return False
+
+
+def focused_workspace() -> dict | None:
+    return next((w for w in workspaces.values() if w.get("is_focused")), None)
+
+
+def running_pid() -> int | None:
+    try:
+        with open(PIDFILE) as f:
+            pid = int(f.read().strip())
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            if b"niri-minimap" in f.read():
+                return pid
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def render_png(path: str, name: str | None) -> int:
+    """One-shot drawing of a workspace, for checking the look."""
+    read_outputs()
+    workspaces.update({w["id"]: w for w in niri_json("workspaces") or []})
+    windows.update({w["id"]: w for w in niri_json("windows") or []})
+    for ws_id in workspaces:
+        update_view(ws_id)
+    if name is None:
+        ws = focused_workspace()
+    else:
+        ws = next((w for w in workspaces.values() if (w.get("name") or str(w["idx"])) == name), None)
+    snap = snapshot(ws["id"]) if ws else None
+    if not snap:
+        print(f"no workspace {name or '(focused)'}", file=sys.stderr)
+        return 1
+    w, h = int(snap["out"]["width"]), window_height(snap["out"])
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w, h)
+    draw(cairo.Context(surface), w, h, snap, 1.0)
+    surface.write_to_png(path)
+    print(path)
+    return 0
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if args[:1] == ["--show"]:
+        pid = running_pid()
+        if pid is None:
+            print("niri-minimap is not running", file=sys.stderr)
+            return 1
+        os.kill(pid, signal.SIGUSR1)
+        return 0
+    if args[:1] == ["--png"] and len(args) in (2, 3):
+        return render_png(args[1], args[2] if len(args) == 3 else None)
+    if args:
+        print(__doc__, file=sys.stderr)
+        return 2
+
+    old = running_pid()
+    if old is not None and old != os.getpid():
+        os.kill(old, signal.SIGTERM)
+    with open(PIDFILE, "w") as f:
+        f.write(str(os.getpid()))
+    return Minimap().run()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
