@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""Minimap of the scroll strip, shown for a moment after you move.
+"""Minimap of the scroll strip, shown for a moment when you change workspace.
 
 A niri workspace is an endless row of columns, and the screen shows one piece
 of it. Nothing on screen says how much of the row is off to the left or right.
-This draws the whole row, scaled down, across the middle of the screen for
-about a second:
+When you switch to another workspace, this draws that workspace's whole row,
+scaled down, in the middle of the screen for about a second:
 
-  frame        the part of the row that is on the screen now
-  rectangles   windows at their true widths: the focused one is green, the
-               others are brighter the more of them is on the screen
-  ◀2 · 1▶     how many columns are off the screen (fully or partly) each side
+  frame        the part of the row that is on the screen now; the rest is dimmed
+  tiles        windows at their true widths, with app icon and title; the
+               focused one is green
+  header       workspace name, focused column (3 / 7), and how many columns are
+               off screen each side (◀ 2   1 ▶)
 
-It shows when the focused workspace changes, when the view scrolls, and when
-columns open, close or change width. A focus change that does not scroll (a
-mouse hover with focus-follows-mouse, a key to a column already on screen)
-shows nothing, because nothing that was hidden has moved.
+Only a workspace switch brings it up. While it is up it follows the workspace:
+a scroll slides the frame, a new or closed column redraws the row.
 
 It is an overlay layer surface with an empty input region: clicks and keys go
 through it.
@@ -49,23 +48,49 @@ gi.require_version("GtkLayerShell", "0.1")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-SHOW_MS = 1100  # fully visible for this long after the last change
-FADE_MS = 250
+SHOW_MS = 1100  # fully visible for this long after it comes up
+FADE_IN_MS = 110
+FADE_OUT_MS = 260
+SLIDE_MS = 180  # the frame's glide when the view scrolls while it is up
 MAX_SCALE = 0.18  # one screen of strip is never drawn bigger than this
-SIDE_MARGIN = 60  # px left free at each side of the screen
-PAD = 14  # px around the strip, inside the dark backing
-LABEL_H = 24
-FONT = "Terminess Nerd Font 12"
-SMALL_FONT = "Terminess Nerd Font 9"
+SIDE_MARGIN = 64  # px left free at each side of the screen
 DEFAULT_GAP = 10.0
 LAYOUT_KDL = os.path.expanduser("~/.config/niri/layout.kdl")
 PIDFILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap.pid")
 
-# gruvbox-dark, as in ~/.config/waybar/style.css
-BG = (0x28 / 255, 0x28 / 255, 0x28 / 255)
-FG = (0xEB / 255, 0xDB / 255, 0xB2 / 255)
-DIM = (0xA8 / 255, 0x99 / 255, 0x84 / 255)
-ACCENT = (0x98 / 255, 0x97 / 255, 0x1A / 255)
+# Spacing. Everything sits on a 4px grid, and radii nest: an inner corner's
+# radius is the outer one's minus the space between them, so the curves run
+# parallel instead of pinching.
+PAD = 16  # card edge to the outermost ink (cap tops, the frame line), all four sides
+HEADER_GAP = 12  # header baseline to the frame line's outer edge
+SHADOW = 24  # room for the soft shadow around the card
+GUTTER = 4  # px between two tiles, and between a tile and the frame line
+FRAME_OUT = GUTTER // 2 + 1  # strip edge to the frame line's outer edge (3)
+FRAME_R = 6  # the row's track; the frame line's outer edge is FRAME_R + FRAME_OUT
+CARD_R = FRAME_R + FRAME_OUT + PAD  # 25
+TILE_INSET = 8  # tile edge to its icon/title
+TABS_INSET = 4  # tile edge to a tabbed column's tab strip
+FONT = "Terminess Nerd Font Propo"
+NAME_PX = 17
+META_PX = 14
+TITLE_PX = 12
+
+# gruvbox-dark, the palette of ~/.config/waybar/style.css and niri's borders
+
+
+def hex_rgb(h: str) -> tuple[float, float, float]:
+    return tuple(int(h[i : i + 2], 16) / 255 for i in (1, 3, 5))
+
+
+BG0_H = hex_rgb("#1d2021")
+BG1 = hex_rgb("#3c3836")
+BG2 = hex_rgb("#504945")
+FG = hex_rgb("#ebdbb2")
+FG4 = hex_rgb("#a89984")
+GRAY = hex_rgb("#7c6f64")
+GREEN = hex_rgb("#98971a")
+BRIGHT = hex_rgb("#b8bb26")
+ACCENT_FG = hex_rgb("#fbf1c7")  # waybar's text on a focused (green) pill
 
 windows: dict[int, dict] = {}
 workspaces: dict[int, dict] = {}
@@ -185,42 +210,30 @@ def snapshot(ws_id: int) -> dict | None:
     cols = columns_of(ws_id)
     gap = gaps()
     xs = col_xs(cols, gap)
-    anchor_x = 0.0
+    view_x, active = -gap, 0
     if ws_id in views and cols:
         anchor, off = views[ws_id]
         i = column_index(cols, anchor)
-        anchor_x = xs[i if i is not None else 0] + off
-    elif cols:
-        anchor_x = -gap
+        active = i if i is not None else 0
+        view_x = xs[active] + off
     return {
         "ws_id": ws_id,
         "name": ws.get("name") or str(ws["idx"]),
-        "output": ws.get("output"),
         "out": dict(out),
         "gap": gap,
         "cols": [[dict(w) for w in c] for c in cols],
         "xs": xs,
-        "view_x": anchor_x,
+        "view_x": view_x,
+        "active": active,
         "focused_id": next((w["id"] for w in windows.values() if w.get("is_focused")), None),
     }
-
-
-def signature(snap: dict | None):
-    if snap is None:
-        return None
-    widths = tuple(round(col_width(c)) for c in snap["cols"])
-    return (snap["ws_id"], round(snap["view_x"]), widths)
 
 
 # ---- drawing -------------------------------------------------------------------
 
 
-def window_height(out: dict) -> int:
-    return int(out["height"] * MAX_SCALE + LABEL_H + 2 * PAD + 8)
-
-
 def rounded(cr, x, y, w, h, r) -> None:
-    r = min(r, w / 2, h / 2)
+    r = max(0.0, min(r, w / 2, h / 2))
     cr.new_sub_path()
     cr.arc(x + w - r, y + r, r, -math.pi / 2, 0)
     cr.arc(x + w - r, y + h - r, r, 0, math.pi / 2)
@@ -229,19 +242,195 @@ def rounded(cr, x, y, w, h, r) -> None:
     cr.close_path()
 
 
-def text(cr, s: str, font: str, x: float, y: float, rgba, max_w: float | None = None) -> None:
-    layout = PangoCairo.create_layout(cr)
-    layout.set_font_description(Pango.FontDescription.from_string(font))
-    layout.set_text(s, -1)
-    if max_w is not None:
-        layout.set_width(int(max_w * Pango.SCALE))
-        layout.set_ellipsize(Pango.EllipsizeMode.END)
-    cr.set_source_rgba(*rgba)
-    cr.move_to(x, y)
-    PangoCairo.show_layout(cr, layout)
+class Text:
+    """A one-line Pango layout that knows its ink box and baseline."""
+
+    def __init__(self, cr, s: str, px: float, bold: bool = False, max_w: float | None = None):
+        self.layout = PangoCairo.create_layout(cr)
+        desc = Pango.FontDescription.from_string(FONT)
+        desc.set_absolute_size(px * Pango.SCALE)
+        if bold:
+            desc.set_weight(Pango.Weight.BOLD)
+        self.layout.set_font_description(desc)
+        self.layout.set_text(s, -1)
+        if max_w is not None:
+            self.layout.set_width(int(max(1, max_w) * Pango.SCALE))
+            self.layout.set_ellipsize(Pango.EllipsizeMode.END)
+        ink, logical = self.layout.get_pixel_extents()
+        self.width = logical.width if max_w is None else min(logical.width, max_w)
+        self.ink_x, self.ink_w = ink.x, ink.width
+        self.baseline = self.layout.get_baseline() / Pango.SCALE
+        # cap height, measured on the font's own "H": the box a label optically fills
+        probe = PangoCairo.create_layout(cr)
+        probe.set_font_description(desc)
+        probe.set_text("H", -1)
+        h_ink, _ = probe.get_pixel_extents()
+        self.cap = probe.get_baseline() / Pango.SCALE - h_ink.y
+
+    def draw(self, cr, x: float, baseline_y: float, rgba) -> None:
+        """Draw with the baseline at baseline_y, and the first ink column at x."""
+        cr.set_source_rgba(*rgba)
+        cr.move_to(round(x - self.ink_x), round(baseline_y - self.baseline))
+        PangoCairo.show_layout(cr, self.layout)
 
 
-def draw(cr, width: int, height: int, snap: dict, alpha: float) -> None:
+_apps: dict[str, tuple] = {}
+
+
+def app_info(app_id: str) -> tuple:
+    """(Gio.Icon or None, display name or None) for a Wayland app_id, cached."""
+    if app_id in _apps:
+        return _apps[app_id]
+    found = (None, None)
+    for cand in dict.fromkeys((app_id, app_id.lower())):
+        try:
+            info = Gio.DesktopAppInfo.new(f"{cand}.desktop")
+        except TypeError:
+            info = None
+        if info is not None:
+            found = (info.get_icon(), info.get_name())
+            break
+    if found[0] is None and app_id:
+        found = (Gio.ThemedIcon.new_with_default_fallbacks(app_id.lower()), found[1])
+    _apps[app_id] = found
+    return found
+
+
+_pixbufs: dict[tuple[str, int], object] = {}
+
+
+def app_pixbuf(app_id: str, size: int):
+    key = (app_id, size)
+    if key not in _pixbufs:
+        pix = None
+        gicon, _ = app_info(app_id)
+        theme = Gtk.IconTheme.get_default()
+        if gicon is not None and theme is not None:
+            info = theme.lookup_by_gicon(gicon, size, Gtk.IconLookupFlags.FORCE_SIZE)
+            if info is not None:
+                try:
+                    pix = info.load_icon()
+                except GLib.Error:
+                    pix = None
+        _pixbufs[key] = pix
+    return _pixbufs[key]
+
+
+def short_title(w: dict) -> str:
+    """The title without a trailing ' - Google Chrome' that only repeats the app."""
+    title = (w.get("title") or "").strip()
+    _, name = app_info(w.get("app_id") or "")
+    for suffix in filter(None, (name, w.get("app_id"))):
+        for sep in (" - ", " — ", " – "):
+            if title.lower().endswith((sep + suffix).lower()):
+                return title[: -len(sep + suffix)].strip()
+    return title or (w.get("app_id") or "")
+
+
+def draw_tile(cr, w: dict, x: int, y: int, tw: int, th: int, focused: bool, alpha: float) -> None:
+    """One window. (x, y, tw, th) are whole pixels: the tile's outer edge."""
+    r = max(1.0, min(FRAME_R - GUTTER / 2, tw / 6, th / 6))
+    # Fill the whole pixel box, then stroke 0.5px inside it, so a 1px border
+    # lands on exactly one row of pixels instead of smearing over two.
+    rounded(cr, x, y, tw, th, r)
+    grad = cairo.LinearGradient(0, y, 0, y + th)
+    if focused:
+        grad.add_color_stop_rgba(0, *mix(GREEN, BG0_H, 0.78), alpha)
+        grad.add_color_stop_rgba(1, *mix(GREEN, BG0_H, 0.60), alpha)
+    else:
+        grad.add_color_stop_rgba(0, *BG2, alpha)
+        grad.add_color_stop_rgba(1, *BG1, alpha)
+    cr.set_source(grad)
+    cr.fill()
+    rounded(cr, x + 0.5, y + 0.5, tw - 1, th - 1, r - 0.5)
+    cr.set_line_width(1)
+    cr.set_source_rgba(*(BRIGHT if focused else FG4), (0.95 if focused else 0.26) * alpha)
+    cr.stroke()
+    if th > 2 * r + 2 and tw > 2 * r + 2:  # a 1px lip of light along the top edge
+        cr.move_to(x + r, y + 1.5)
+        cr.line_to(x + tw - r, y + 1.5)
+        cr.set_source_rgba(*FG, (0.20 if focused else 0.09) * alpha)
+        cr.stroke()
+
+    # Icon over title, the pair centred as one block. Each drops out when the
+    # tile cannot hold it with TILE_INSET clear on every side.
+    inner_w, inner_h = tw - 2 * TILE_INSET, th - 2 * TILE_INSET
+    icon = min(40, int(inner_w * 0.4), int(inner_h * 0.34)) // 2 * 2
+    icon = icon if icon >= 16 else 0
+    title = Text(cr, short_title(w), TITLE_PX, max_w=inner_w) if inner_w >= 40 else None
+    line_h = TITLE_PX + 3
+    gap_it = 8 if icon else 0
+    block = icon + ((gap_it + line_h) if title else 0)
+    if title and block > inner_h:
+        title, block = None, icon
+    if not block:
+        return
+    top = y + round((th - block) / 2)
+    if icon:
+        pix = app_pixbuf(w.get("app_id") or "", icon)
+        if pix is not None:
+            Gdk.cairo_set_source_pixbuf(cr, pix, x + (tw - icon) // 2, top)
+            cr.paint_with_alpha((1.0 if focused else 0.9) * alpha)
+    if title:
+        tx = x + (tw - title.width) / 2
+        ink = (*ACCENT_FG, alpha) if focused else (*FG, 0.85 * alpha)
+        # baseline so the cap height sits in the lower line box, optically centred
+        title.draw(cr, tx + title.ink_x, top + icon + gap_it + (line_h + title.cap) / 2, ink)
+
+
+def mix(a, b, t: float) -> tuple[float, float, float]:
+    """a over b at opacity t, as an opaque colour: nothing behind shows through."""
+    return tuple(x * t + y * (1 - t) for x, y in zip(a, b))
+
+
+def column_shape(col: list[dict], gap: float, out_h: float, focused_id) -> tuple[list[dict], float, bool]:
+    """(tiles to draw, top y of the first, tabbed?) for one column."""
+    heights = [w["layout"]["tile_size"][1] for w in col]
+    stacked_h = sum(heights) + gap * (len(col) - 1)
+    if len(col) > 1 and stacked_h > out_h - 2 * gap + 1:  # tabbed: tiles overlap
+        return [next((w for w in col if w["id"] == focused_id), col[0])], out_h - gap - max(heights), True
+    return col, out_h - gap - stacked_h, False
+
+
+def geometry(width: int, snap: dict, view_x: float) -> dict:
+    """Where everything goes, in whole pixels where it matters."""
+    out, gap, cols, xs = snap["out"], snap["gap"], snap["cols"], snap["xs"]
+    view_w, out_h = out["width"], out["height"]
+    end = xs[-1] + col_width(cols[-1]) + gap if cols else view_w
+    # The extent always takes in the snapshot's frame, so a slide never rescales.
+    lo = min(-gap, snap["view_x"], view_x)
+    hi = max(end, snap["view_x"] + view_w, view_x + view_w)
+    s = min(MAX_SCALE, (width - 2 * SIDE_MARGIN - 2 * (PAD + FRAME_OUT)) / (hi - lo))
+    # The frame maps the working area, not the whole output: waybar's strip
+    # would otherwise leave more room above the tiles than below them.
+    tops = [column_shape(c, gap, out_h, None)[1] for c in cols]
+    area_top = max(0.0, min(tops) - gap) if tops else 0.0
+    return {"lo": lo, "end": end, "s": s, "area_top": area_top,
+            "strip_w": round((hi - lo) * s), "strip_h": round((out_h - area_top) * s)}
+
+
+_cap: float | None = None
+
+
+def cap_height() -> float:
+    """Cap height of the name font: the header's optical height."""
+    global _cap
+    if _cap is None:
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, 8, 8)
+        _cap = Text(cairo.Context(surf), "H", NAME_PX, bold=True).cap
+    return _cap
+
+
+def header_h() -> int:
+    return round(cap_height())
+
+
+def window_height(out: dict) -> int:
+    body = round(out["height"] * MAX_SCALE) + 2 * FRAME_OUT
+    return body + header_h() + HEADER_GAP + 2 * PAD + 2 * SHADOW
+
+
+def draw(cr, width: int, height: int, snap: dict, alpha: float, view_x: float | None = None) -> None:
     cr.set_operator(cairo.OPERATOR_SOURCE)
     cr.set_source_rgba(0, 0, 0, 0)
     cr.paint()
@@ -250,99 +439,154 @@ def draw(cr, width: int, height: int, snap: dict, alpha: float) -> None:
         return
 
     out, gap, cols, xs = snap["out"], snap["gap"], snap["cols"], snap["xs"]
-    view_w, out_h, view_x = out["width"], out["height"], snap["view_x"]
-    end = xs[-1] + col_width(cols[-1]) + gap if cols else view_w
-    lo, hi = min(-gap, view_x), max(end, view_x + view_w)
-    s = min(MAX_SCALE, (width - 2 * SIDE_MARGIN - 2 * PAD) / (hi - lo))
-    strip_w, strip_h = (hi - lo) * s, out_h * s
-    ox = (width - strip_w) / 2
-    oy = (height - strip_h - LABEL_H) / 2 + LABEL_H
+    view_w, out_h = out["width"], out["height"]
+    if view_x is None:
+        view_x = snap["view_x"]
+    g = geometry(width, snap, view_x)
+    lo, s, strip_w, strip_h, area_top = g["lo"], g["s"], g["strip_w"], g["strip_h"], g["area_top"]
+
+    # Box model, outside in: card | PAD | outermost ink (the frame's outer
+    # line edge, FRAME_OUT beyond the strip) | the strip the row is drawn in.
+    card_w = strip_w + 2 * (FRAME_OUT + PAD)
+    card_h = header_h() + HEADER_GAP + strip_h + 2 * FRAME_OUT + 2 * PAD
+    cx = (width - card_w) // 2
+    cy = (height - card_h) // 2
+    content_l, content_r = cx + PAD, cx + card_w - PAD
+    ox = content_l + FRAME_OUT  # strip left
+    oy = cy + PAD + header_h() + HEADER_GAP + FRAME_OUT  # strip top
 
     def X(x: float) -> float:
         return ox + (x - lo) * s
 
-    # backing
-    rounded(cr, ox - PAD, oy - LABEL_H - PAD / 2, strip_w + 2 * PAD, strip_h + LABEL_H + 1.5 * PAD, 8)
-    cr.set_source_rgba(*BG, 0.72 * alpha)
-    cr.fill()
+    def Y(y: float) -> float:
+        return oy + (y - area_top) * s
 
-    # label: workspace name, then what is hidden each side
-    left = sum(1 for c, x in zip(cols, xs) if x < view_x - 0.5)
+    # shadow: a stack of faint rounded rects, offset down a little
+    steps = SHADOW // 2
+    for i in range(steps, 0, -1):
+        grow = i * 2
+        rounded(cr, cx - grow, cy - grow + 6, card_w + 2 * grow, card_h + 2 * grow, CARD_R + grow)
+        cr.set_source_rgba(0, 0, 0, 0.05 * alpha * (1 - i / (steps + 1)) ** 2)
+        cr.fill()
+
+    # card, with a hairline edge that catches the light
+    rounded(cr, cx, cy, card_w, card_h, CARD_R)
+    cr.set_source_rgba(*BG0_H, 0.96 * alpha)
+    cr.fill()
+    rounded(cr, cx + 0.5, cy + 0.5, card_w - 1, card_h - 1, CARD_R - 0.5)
+    cr.set_line_width(1)
+    cr.set_source_rgba(*FG, 0.08 * alpha)
+    cr.stroke()
+
+    # header: one baseline; cap tops sit exactly PAD below the card's edge
+    baseline = cy + PAD + header_h()
+    name = Text(cr, snap["name"], NAME_PX, bold=True)
+    name.draw(cr, content_l, baseline, (*FG, alpha))
+    left = sum(1 for x in xs if x < view_x - 0.5)
     right = sum(1 for c, x in zip(cols, xs) if x + col_width(c) > view_x + view_w + 0.5)
-    hidden = f"◀{left} · {right}▶" if left or right else "all on screen" if cols else "empty"
-    text(cr, snap["name"], FONT, ox, oy - LABEL_H - 2, (*FG, alpha))
-    layout = PangoCairo.create_layout(cr)
-    layout.set_font_description(Pango.FontDescription.from_string(FONT))
-    layout.set_text(hidden, -1)
-    tw = layout.get_pixel_size()[0]
-    text(cr, hidden, FONT, ox + strip_w - tw, oy - LABEL_H - 2, (*DIM, alpha))
+    if cols:
+        Text(cr, f"{snap['active'] + 1} / {len(cols)}", META_PX).draw(
+            cr, content_l + name.ink_w + 12, baseline, (*FG4, 0.9 * alpha)
+        )
+        r_txt = Text(cr, f"{right} ▶", META_PX, bold=right > 0)
+        l_txt = Text(cr, f"◀ {left}", META_PX, bold=left > 0)
+        r_x = content_r - r_txt.ink_w
+        r_txt.draw(cr, r_x, baseline, (*(BRIGHT if right else GRAY), alpha))
+        l_txt.draw(cr, r_x - 16 - l_txt.ink_w, baseline, (*(BRIGHT if left else GRAY), alpha))
+    else:
+        note = Text(cr, "empty", META_PX)
+        note.draw(cr, content_r - note.ink_w, baseline, (*GRAY, alpha))
 
-    # the screen
-    vx, vw = X(view_x), view_w * s
-    cr.rectangle(vx, oy, vw, strip_h)
-    cr.set_source_rgba(*FG, 0.07 * alpha)
+    # the row's track: the whole row, a faint lane the tiles sit in
+    track_l, track_r = round(X(-gap)), round(X(g["end"]))
+    track_t, track_b = oy, oy + strip_h
+    rounded(cr, track_l, track_t, track_r - track_l, strip_h, FRAME_R)
+    cr.set_source_rgba(*BG1, 0.40 * alpha)
     cr.fill()
 
-    # windows
+    # tiles. Scaled, niri's 10px gap is under 2px, so tiles would touch; each
+    # tile gives up GUTTER/2 on every side instead, which keeps the true
+    # widths' proportions and a clean, equal seam everywhere.
+    inset = max(GUTTER / 2, gap * s / 2)
+    focused_id = snap["focused_id"]
     for col, x in zip(cols, xs):
         cw = col_width(col)
-        heights = [w["layout"]["tile_size"][1] for w in col]
-        stacked_h = sum(heights) + gap * (len(col) - 1)
-        tabbed = len(col) > 1 and stacked_h > out_h - 2 * gap + 1
-        if tabbed:
-            focused_in = next((w for w in col if w["id"] == snap["focused_id"]), None)
-            shown = [focused_in or col[0]]
-            top = out_h - gap - max(heights)
-        else:
-            shown = col
-            top = out_h - gap - stacked_h
-        on = max(0.0, min(x + cw, view_x + view_w) - max(x, view_x)) / cw
+        shown, top, tabbed = column_shape(col, gap, out_h, focused_id)
+        l, r = round(X(x - gap / 2) + inset), round(X(x + cw + gap / 2) - inset)
         y = top
+        first_t = None
         for w in shown:
-            th = w["layout"]["tile_size"][1]
-            rx, ry, rw, rh = X(x), oy + y * s, cw * s, th * s
-            if w["id"] == snap["focused_id"]:
-                cr.set_source_rgba(*ACCENT, 0.85 * alpha)
-            else:
-                cr.set_source_rgba(*FG, (0.12 + 0.33 * on) * alpha)
-            rounded(cr, rx + 1, ry + 1, rw - 2, rh - 2, 3)
-            cr.fill_preserve()
-            cr.set_source_rgba(*FG, 0.45 * alpha)
-            cr.set_line_width(1)
-            cr.stroke()
-            if rw > 36 and rh > 16:
-                label = w.get("app_id") or w.get("title") or ""
-                ink = (*BG, alpha) if w["id"] == snap["focused_id"] else (*FG, (0.5 + 0.5 * on) * alpha)
-                text(cr, label, SMALL_FONT, rx + 5, ry + 3, ink, max_w=rw - 10)
-            y += th + gap
+            wh = w["layout"]["tile_size"][1]
+            t, b = round(Y(y - gap / 2) + inset), round(Y(y + wh + gap / 2) - inset)
+            first_t = t if first_t is None else first_t
+            draw_tile(cr, w, l, t, r - l, b - t, w["id"] == focused_id, alpha)
+            y += wh + gap
         if tabbed:
-            # one segment per tab along the top, like niri's tab strip
-            seg = cw * s / len(col)
+            # one segment per tab just inside the top edge, like niri's tab strip
+            n, seam = len(col), 2
+            seg = (r - l - 2 * TABS_INSET - (n - 1) * seam) / n
             for i, w in enumerate(col):
-                cr.rectangle(X(x) + i * seg + 1, oy + top * s - 4, seg - 2, 3)
-                cr.set_source_rgba(*(ACCENT if w in shown else FG), 0.8 * alpha)
+                rounded(cr, l + TABS_INSET + i * (seg + seam), first_t + TABS_INSET, seg, 2, 1)
+                cr.set_source_rgba(*(BRIGHT if w in shown else FG4), (0.9 if w in shown else 0.45) * alpha)
                 cr.fill()
 
-    # the screen's frame last, over the windows
-    cr.rectangle(vx, oy, vw, strip_h)
-    cr.set_source_rgba(*ACCENT, alpha)
+    # The frame box sits FRAME_OUT - 1 outside the screen's true edge, so its
+    # 2px line clears the tiles by the same GUTTER the tiles keep between them.
+    e = FRAME_OUT - 1
+    fx0, fx1 = round(X(view_x)) - e, round(X(view_x + view_w)) + e
+    fy0, fy1 = track_t - e, track_b + e
+    frame_r = FRAME_R + e
+
+    # everything off screen sinks back: dim the track outside the frame
+    cr.save()
+    rounded(cr, track_l, track_t, track_r - track_l, strip_h, FRAME_R)
+    cr.clip()
+    cr.rectangle(track_l, track_t, track_r - track_l, strip_h)
+    rounded(cr, fx0, fy0, fx1 - fx0, fy1 - fy0, frame_r)
+    cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
+    cr.set_source_rgba(*BG0_H, 0.66 * alpha)
+    cr.fill()
+    cr.restore()
+
+    # the frame: a soft glow, then a crisp 2px line
+    for lw, a in ((8, 0.06), (5, 0.12)):
+        rounded(cr, fx0, fy0, fx1 - fx0, fy1 - fy0, frame_r)
+        cr.set_line_width(lw)
+        cr.set_source_rgba(*BRIGHT, a * alpha)
+        cr.stroke()
+    rounded(cr, fx0, fy0, fx1 - fx0, fy1 - fy0, frame_r)
     cr.set_line_width(2)
+    cr.set_source_rgba(*BRIGHT, 0.95 * alpha)
     cr.stroke()
 
 
 # ---- daemon --------------------------------------------------------------------
 
 
+def now_ms() -> float:
+    return GLib.get_monotonic_time() / 1000
+
+
+def ease_out(t: float) -> float:
+    t = min(1.0, max(0.0, t))
+    return 1 - (1 - t) ** 3
+
+
 class Minimap:
     def __init__(self) -> None:
         self.snap: dict | None = None
-        self.last_sig = None
-        self.alpha = 0.0
-        self.hide_id = 0
-        self.fade_id = 0
+        self.last_ws = None
         self.monitor_xy: tuple[int, int] | None = None
         self.overview = False
         self.primed = False  # ignore the burst of state niri sends on connect
+        self.visible = False
+        self.hide_id = 0
+        self.tick_id = 0
+        # animation: alpha goes a0 -> a1 from t_a over dur_a; the frame x0 -> x1 from t_x
+        self.a0 = self.a1 = 0.0
+        self.t_a, self.dur_a = 0.0, 1.0
+        self.x0 = self.x1 = 0.0
+        self.t_x = 0.0
 
         self.win = Gtk.Window()
         self.win.set_app_paintable(True)
@@ -360,11 +604,40 @@ class Minimap:
         # An empty input region: the pointer goes straight through to the windows.
         self.win.connect("realize", lambda w: w.input_shape_combine_region(cairo.Region()))
 
+    # -- animation
+
+    def alpha(self) -> float:
+        return self.a0 + (self.a1 - self.a0) * ease_out((now_ms() - self.t_a) / self.dur_a)
+
+    def frame_x(self) -> float:
+        return self.x0 + (self.x1 - self.x0) * ease_out((now_ms() - self.t_x) / SLIDE_MS)
+
+    def fade_to(self, target: float, dur: float) -> None:
+        self.a0, self.a1, self.t_a, self.dur_a = self.alpha(), target, now_ms(), dur
+        self.animate()
+
+    def animate(self) -> None:
+        if not self.tick_id:
+            self.tick_id = GLib.timeout_add(16, self.tick)
+
+    def tick(self) -> bool:
+        t = now_ms()
+        self.win.queue_draw()
+        if t - self.t_a < self.dur_a or t - self.t_x < SLIDE_MS:
+            return True
+        self.tick_id = 0
+        if self.a1 <= 0:
+            self.visible = False
+            self.win.hide()
+        return False
+
     def on_draw(self, widget, cr) -> bool:
         if self.snap:
             alloc = widget.get_allocation()
-            draw(cr, alloc.width, alloc.height, self.snap, self.alpha)
+            draw(cr, alloc.width, alloc.height, self.snap, self.alpha(), self.frame_x())
         return True
+
+    # -- showing
 
     def monitor_for(self, out: dict):
         display = Gdk.Display.get_default()
@@ -376,40 +649,38 @@ class Minimap:
         return None
 
     def show(self, snap: dict) -> None:
-        self.snap = snap
+        """Bring the map up (or keep it up) for SHOW_MS."""
         out = snap["out"]
         xy = (out["x"], out["y"])
         if xy != self.monitor_xy:
             # A layer surface picks its output when it maps: remap to move it.
             self.win.hide()
+            self.visible = False
             GtkLayerShell.set_monitor(self.win, self.monitor_for(out))
             self.monitor_xy = xy
         self.win.set_size_request(-1, window_height(out))
-        if self.fade_id:
-            GLib.source_remove(self.fade_id)
-            self.fade_id = 0
-        self.alpha = 1.0
+        if not self.visible:
+            self.a0 = self.a1 = 0.0
+        self.set_snap(snap, slide=False)
+        self.visible = True
         self.win.show_all()
-        self.win.queue_draw()
+        self.fade_to(1.0, FADE_IN_MS)
         if self.hide_id:
             GLib.source_remove(self.hide_id)
         self.hide_id = GLib.timeout_add(SHOW_MS, self.start_fade)
 
+    def set_snap(self, snap: dict, slide: bool) -> None:
+        if slide:
+            self.x0, self.x1, self.t_x = self.frame_x(), snap["view_x"], now_ms()
+        else:
+            self.x0 = self.x1 = snap["view_x"]
+            self.t_x = 0.0
+        self.snap = snap
+        self.animate()
+
     def start_fade(self) -> bool:
         self.hide_id = 0
-        step = 1.0 / max(1, FADE_MS // 16)
-
-        def tick() -> bool:
-            self.alpha -= step
-            if self.alpha <= 0:
-                self.alpha = 0
-                self.fade_id = 0
-                self.win.hide()
-                return False
-            self.win.queue_draw()
-            return True
-
-        self.fade_id = GLib.timeout_add(16, tick)
+        self.fade_to(0.0, FADE_OUT_MS)
         return False
 
     def show_now(self) -> bool:
@@ -424,11 +695,20 @@ class Minimap:
             update_view(ws_id)
         ws = focused_workspace()
         snap = snapshot(ws["id"]) if ws else None
-        sig = signature(snap)
-        changed = sig != self.last_sig
-        self.last_sig = sig
-        if changed and self.primed and not self.overview and snap and snap["cols"]:
-            self.show(snap)
+        ws_id = snap["ws_id"] if snap else None
+        switched = ws_id != self.last_ws
+        self.last_ws = ws_id
+        if snap is None:
+            return
+        if switched:
+            # Only a workspace switch brings it up (an empty workspace needs no map).
+            if self.primed and not self.overview and snap["cols"]:
+                self.show(snap)
+            elif self.visible:
+                self.start_fade()
+        elif self.visible and self.a1 > 0:
+            # Already up on this workspace: follow it, without extending its time.
+            self.set_snap(snap, slide=True)
 
     def handle(self, ev: dict) -> None:
         for kind, data in ev.items():
@@ -467,6 +747,8 @@ class Minimap:
                     workspaces[data["workspace_id"]]["active_window_id"] = data["active_window_id"]
             elif kind == "OverviewOpenedOrClosed":
                 self.overview = data["is_open"]
+                if self.overview and self.visible:
+                    self.start_fade()
                 continue
             else:
                 continue
