@@ -176,13 +176,13 @@ gtk3_ini=$HOME/.config/gtk-3.0/settings.ini
 gtkrc2=$HOME/.gtkrc-2.0
 if [[ -n $w95_mode ]]; then gtk3_ini=/dev/null; gtkrc2=/dev/null; fi
 if [[ -f $gtk3_ini ]]; then
-    sed -i -E \
+    sed -i --follow-symlinks -E \
         -e "s|^gtk-theme-name=.*|gtk-theme-name=$gtk_name|" \
         -e "s|^gtk-application-prefer-dark-theme=.*|gtk-application-prefer-dark-theme=$prefer_dark_ini|" \
         "$gtk3_ini"
 fi
 if [[ -f $gtkrc2 ]]; then
-    sed -i -E "s|^gtk-theme-name=.*|gtk-theme-name=\"$gtk_name\"|" "$gtkrc2"
+    sed -i --follow-symlinks -E "s|^gtk-theme-name=.*|gtk-theme-name=\"$gtk_name\"|" "$gtkrc2"
 fi
 # Native Wayland GTK apps under niri (Thunar, the file picker) ignore
 # settings.ini and xsettingsd; they read gsettings only.
@@ -194,7 +194,7 @@ fi
 xs_conf=$HOME/.config/xsettingsd/xsettingsd.conf
 [[ -n $w95_mode ]] && xs_conf=/dev/null
 if [[ -f $xs_conf ]]; then
-    sed -i -E \
+    sed -i --follow-symlinks -E \
         -e "s|^Net/ThemeName .*|Net/ThemeName \"$gtk_name\"|" \
         -e "s|^Gtk/ApplicationPreferDarkTheme .*|Gtk/ApplicationPreferDarkTheme $prefer_dark_xs|" \
         "$xs_conf"
@@ -323,7 +323,7 @@ btop_conf=$HOME/.config/btop/btop.conf
 if command -v btop >/dev/null && [[ -n ${btop_theme:-} ]]; then
     mkdir -p "$HOME/.config/btop"
     if [[ -f $btop_conf ]] && grep -q '^color_theme' "$btop_conf"; then
-        sed -i -E "s|^color_theme.*|color_theme = \"$btop_theme\"|" "$btop_conf"
+        sed -i --follow-symlinks -E "s|^color_theme.*|color_theme = \"$btop_theme\"|" "$btop_conf"
     else
         printf 'color_theme = "%s"\n' "$btop_theme" >>"$btop_conf"
     fi

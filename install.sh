@@ -34,13 +34,14 @@ rm -f ~/.zshrc ~/.gitconfig ~/.gitignore_global ~/.config/alacritty/alacritty.to
 rm -f ~/scripts ~/.screenlayout
 rm -f ~/.config/i3/config
 rm -rf ~/.config/i3blocks ~/.config/rofi
+rm -f ~/.gtkrc-2.0 ~/.config/gtk-3.0/settings.ini ~/.config/gtk-3.0/gtk.css ~/.config/xsettingsd/xsettingsd.conf
 
 # Create necessary directories
 mkdir -p ~/.config/i3
 
 # Core packages (always install)
 echo "Stowing core packages..."
-stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
+stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg gtk-pkg
 
 # niri: the scrolling-tiling Wayland session next to i3 (lightdm lists both).
 # ~/.config/niri, ~/.config/waybar, ~/.config/swaylock and the niri-* helpers in

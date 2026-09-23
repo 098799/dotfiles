@@ -11,6 +11,7 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 | `alacritty-pkg` | `.config/alacritty/alacritty.toml` |
 | `i3-pkg` | i3 config, i3blocks, rofi, screenlayout, scripts |
 | `niri-pkg` | niri (Wayland) session: config, waybar, swaylock, `niri-*` scripts. Start at [`niri-pkg/.config/niri/README.md`](niri-pkg/.config/niri/README.md) |
+| `gtk-pkg` | GTK theme, icons and fonts for both sessions: `.gtkrc-2.0`, `.config/gtk-3.0/{settings.ini,gtk.css}`, `.config/xsettingsd/xsettingsd.conf`. `theme` and `w95` edit these files in place, so a theme switch shows in `git status`. Native Wayland apps under niri read gsettings instead; `theme` (run at login by `theme-restore`) sets those keys. |
 | `bin-pkg` | `~/bin/` helper scripts (theme switching) |
 | `espanso-pkg` | Text expansion config |
 | `logid-pkg` | Logitech mouse (logid) config |
