@@ -1,9 +1,30 @@
 #!/bin/sh
-# swaylock with the current wallpaper as the saver, like ~/bin/lockscreen does
-# with xsecurelock. PAM goes through /etc/pam.d/swaylock -> login, which carries
-# pam_fprintd, so the fingerprint reader arms on its own.
+# Lock the niri session with hyprlock (~/.config/hypr/hyprlock.conf), showing
+# the current wallpaper. The fingerprint reader and the password field are live
+# at the same time: either one unlocks. (swaylock needed the password AND then
+# a finger, because it only starts PAM after Enter.)
+#
+# Returns once the session is LOCKED and leaves hyprlock running, like
+# `swaylock -f`: swayidle's `before-sleep` waits for this, so the machine does
+# not suspend with the desktop still visible.
+
+pidof -q hyprlock && exit 0
+
 wp=$(grep -oE '/[^ ]+\.(png|jpg|jpeg|webp)' "$HOME/.fehbg" 2>/dev/null | tail -1)
-if [ -n "$wp" ]; then
-    exec swaylock -f -i "$wp"
-fi
-exec swaylock -f
+[ -f "$wp" ] || wp=""
+mkdir -p "$HOME/.cache"
+# Empty path = hyprlock's plain `color` background.
+printf '$wallpaper = %s\n' "$wp" > "$HOME/.cache/hyprlock-wallpaper.conf"
+
+log="${XDG_RUNTIME_DIR:-/tmp}/hyprlock.log"
+hyprlock --verbose > "$log" 2>&1 &
+pid=$!
+
+# Wait until the compositor confirms the lock (max 3 s), or hyprlock dies.
+i=0
+while [ $i -lt 30 ]; do
+    grep -q 'onLockLocked' "$log" 2>/dev/null && exit 0
+    kill -0 "$pid" 2>/dev/null || exit 1
+    sleep 0.1
+    i=$((i + 1))
+done

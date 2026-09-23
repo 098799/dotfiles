@@ -1,0 +1,6 @@
+# pam.d/ goes to /etc/pam.d, not ~ — install.sh checks it. A local ignore file
+# replaces stow's defaults, so keep the Syncthing conflict and backup patterns.
+^/pam\.d
+.*sync-conflict-.*
+.*\.pre-stow
+__pycache__

@@ -22,7 +22,9 @@ Everything is in `~/dotfiles/niri-pkg/` and GNU Stow links it into `~`.
 | `~/.config/niri/startup.kdl` | Programs started at login (waybar, dunst, syncthing, …). |
 | `~/.config/niri/environment.kdl` | Env vars for started programs. Mostly a list of vars to remove. |
 | `~/.config/waybar/` | The bar. It runs the same `~/scripts/*.sh` blocks as i3blocks. |
-| `~/.config/swaylock/config` | Lock screen colours. |
+| `~/.config/hypr/hyprlock.conf` | Lock screen: look, and the fingerprint + password setup. |
+| `pam.d/hyprlock-password` | The lock screen's password-only PAM file. It is **not** stowed: install it with `sudo cp pam.d/hyprlock-password /etc/pam.d/`. `install.sh` warns when the copy in `/etc` differs. |
+| `~/.config/swaylock/config` | Colours for swaylock, the old locker. Only a fallback now. |
 | `~/bin/niri-*`, `barmenu`, `i3blocks-waybar` | Helper scripts (table below). |
 
 `~/.config/niri` and `~/.config/waybar` link to whole directories, so a new
@@ -86,7 +88,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `niri-record` (+ `-desktop`, `-window`, `-region`) | `Mod+Alt+Shift+L`, `;`, `R` | Start/stop screen recording with gpu-screen-recorder. Add `Ctrl` to record without audio. | ffmpeg x11grab records nothing on Wayland. |
 | `niri-screenshot-clip` | `Mod+Alt+Shift+J` | Copy a screenshot of a region to the clipboard. | Two tools in a pipe. |
 | `niri-autoclick` | `Mod+Alt+Shift+C` | Start/stop an autoclicker (ydotool). | xdotool cannot click on Wayland. |
-| `niri-lock` | `Ctrl+Alt+L`, idle | swaylock with the current wallpaper. | Reads the wallpaper path. |
+| `niri-lock` | `Ctrl+Alt+L`, idle | hyprlock with the current wallpaper. A finger **or** the password unlocks. Returns only when the screen is locked. | Reads the wallpaper path, and waits for the lock so that `before-sleep` does not suspend an open desktop. |
 | `niri-idle` | startup | Lock after 10 min, turn the screens off 30 s later, lock before sleep. | swayidle command line. |
 | `niri-wallpaper` | startup, `wallpaper-pick` | Show the wallpaper from `~/.fehbg` with swaybg. | feh cannot draw on Wayland. |
 
@@ -104,13 +106,32 @@ anything. When a key needs two actions, or a check first, it runs a script.
   next login, not on save.
 - **A new terminal has a stale variable** (a wrong venv, `TMUX`, kube
   context). Add `NAME null` to `environment.kdl`.
-- **Colours.** They are fixed hex values in `layout.kdl`, `swaylock/config`
+- **Colours.** They are fixed hex values in `layout.kdl`, `hypr/hyprlock.conf`
   and `waybar/style.css`. The theme scripts (`dark-gruv` etc.) do not change
   them.
 - **See the live state:** `niri msg windows`, `niri msg workspaces`,
   `niri msg outputs`, `niri msg -j event-stream`.
 - **The niri log:** `journalctl --user -t niri`. Each reload writes a
   `loaded config` line there.
+
+## Lock screen: finger OR password
+
+swaylock needed the password **and** then a finger. It starts PAM only
+after Enter, and the PAM stack (`swaylock` → `login` → `system-auth`) asks
+`pam_fprintd` first. So the typed password waited for a finger.
+
+hyprlock reads the fingerprint itself, over fprintd's D-Bus API, at the same
+time as the password field. Its PAM service must therefore **not** contain
+`pam_fprintd`. If it does, a typed password waits for a finger again. The
+stock `/etc/pam.d/hyprlock` includes `login`, so `hyprlock.conf` uses
+`hyprlock-password` instead. That file is `system-auth` without its
+`pam_fprintd` line and without faillock: when the finger unlocks, hyprlock
+cancels the waiting password call, and faillock counts that as a failed login.
+Three finger unlocks would then lock the password for 10 min.
+
+To test without locking your session, run a nested niri (`niri -c <empty
+file>`), then `WAYLAND_DISPLAY=wayland-N hyprlock -v`, and `grim` that
+display. `kill -USR1` unlocks it.
 
 ## niri limits that shaped this setup (niri 26.04)
 

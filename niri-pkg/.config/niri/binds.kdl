@@ -177,7 +177,7 @@ binds {
 
     // ---- session ------------------------------------------------------------
     Mod+Shift+X { quit; }                                  // asks first, like i3-nagbar
-    Ctrl+Alt+L  { spawn "niri-lock"; }                     // xsecurelock → swaylock
+    Ctrl+Alt+L  { spawn "niri-lock"; }                     // xsecurelock → hyprlock (finger OR password)
     Mod+Shift+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
     // ---- screenshots (scrot → grim/slurp/niri) ------------------------------

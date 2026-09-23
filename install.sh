@@ -44,9 +44,18 @@ stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
 
 # niri: the scrolling-tiling Wayland session next to i3 (lightdm lists both).
 # ~/.config/niri, ~/.config/waybar, ~/.config/swaylock and the niri-* helpers in
-# ~/bin. Packages: niri xwayland-satellite waybar swaybg swaylock swayidle
+# ~/bin. Packages: niri xwayland-satellite waybar swaybg hyprlock swayidle
 # wl-clipboard grim slurp brightnessctl xdg-desktop-portal-gnome
 stow -v -t ~ niri-pkg
+# The lock screen's PAM file lives in /etc, so stow cannot place it. Without it
+# hyprlock's password path fails, and only the fingerprint unlocks. Needs root,
+# so it stays a warning.
+_pam=niri-pkg/pam.d/hyprlock-password
+if ! cmp -s "$_pam" /etc/pam.d/hyprlock-password; then
+    echo "  WARNING: /etc/pam.d/hyprlock-password is missing or differs from $_pam"
+    echo "           sudo install -m 644 $PWD/$_pam /etc/pam.d/hyprlock-password"
+fi
+unset _pam
 
 # Seed the i3 active palette symlink if it's missing — i3's `include` silently
 # no-ops on a missing file, which would drop the bar{} block and client.*
