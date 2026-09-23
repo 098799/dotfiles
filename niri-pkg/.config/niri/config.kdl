@@ -290,16 +290,17 @@ binds {
 
     // focus: i3 j/k/l/; = left/down/up/right
     //
-    // Left/right are the COMBINED actions, not plain focus-column-*. A tabbed
-    // column lays its tabs out horizontally, so "previous tab" reads as left,
-    // not up — and plain focus-column-left would skip the whole column instead
-    // of stepping through its tabs. focus-window-up-or-column-left steps to the
-    // previous tab first, and only jumps to the column on the left once it runs
-    // out. That is how i3 tabs behaved: left/right walked the tabs, then moved on.
-    Mod+J         { focus-window-up-or-column-left; }
-    Mod+Semicolon { focus-window-down-or-column-right; }
-    Mod+Left      { focus-window-up-or-column-left; }
-    Mod+Right     { focus-window-down-or-column-right; }
+    // Left/right go through niri-focus-lr, not a plain action. A tabbed
+    // column lays its tabs out horizontally, so there "previous tab" reads as
+    // left: the script runs focus-window-up-or-column-left and walks the tabs
+    // first, as i3 tabs did. A STACKED column is a split, and left means left:
+    // the script runs plain focus-column-left. (The combined action on its own
+    // walked a 1:(1:1) split bottom-right -> top-right -> left.) niri allows one
+    // action per key and has no "if tabbed" action, so the check is a script.
+    Mod+J         { spawn "niri-focus-lr" "left"; }
+    Mod+Semicolon { spawn "niri-focus-lr" "right"; }
+    Mod+Left      { spawn "niri-focus-lr" "left"; }
+    Mod+Right     { spawn "niri-focus-lr" "right"; }
     // k/l stay PURE vertical, so there is still a way to move inside a stacked
     // column without the left/right fallback kicking in at the ends.
     Mod+K         { focus-window-down; }

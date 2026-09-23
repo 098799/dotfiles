@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""niri-focus-lr left|right — i3's Mod+J / Mod+; in niri (tabs aware).
+
+i3 left/right walked the tabs of a tabbed container first, and only then moved
+to the next container. niri's nearest action, focus-window-up-or-column-left,
+does that for a TABBED column. But it also walks a STACKED column: from the
+bottom-right window of a 1:(1:1) split, Mod+J went to the top-right window
+first, not to the left one. i3 never did that. In a split, left is left.
+
+niri binds one action per key and has no "if tabbed" action. So this script
+does the check and then runs the correct action:
+
+  tabbed column, 2+ tabs  -> focus-window-up/down-or-column-left/right
+  anything else           -> focus-column-left/right
+
+The IPC does not tell if a column is tabbed. Tile heights do: in a stacked
+column the tiles share the output height, so the sum is at most the height. In
+a tabbed column each tab has the full column height, so the sum is n times the
+height.
+"""
+import json
+import subprocess
+import sys
+
+TABBED = {"left": "focus-window-up-or-column-left", "right": "focus-window-down-or-column-right"}
+PLAIN = {"left": "focus-column-left", "right": "focus-column-right"}
+
+
+def msg(*args: str):
+    return json.loads(subprocess.run(["niri", "msg", "-j", *args], check=True, capture_output=True, text=True).stdout)
+
+
+def is_tabbed(focused: dict, windows: list[dict]) -> bool:
+    col = focused["layout"]["pos_in_scrolling_layout"][0]
+    tiles = [
+        w for w in windows
+        if w["workspace_id"] == focused["workspace_id"]
+        and w["layout"]["pos_in_scrolling_layout"]
+        and w["layout"]["pos_in_scrolling_layout"][0] == col
+    ]
+    if len(tiles) < 2:
+        return False
+    ws = next(w for w in msg("workspaces") if w["id"] == focused["workspace_id"])
+    height = msg("outputs")[ws["output"]]["logical"]["height"]
+    return sum(t["layout"]["tile_size"][1] for t in tiles) > 1.1 * height
+
+
+def main() -> int:
+    if len(sys.argv) != 2 or sys.argv[1] not in PLAIN:
+        print("usage: niri-focus-lr left|right", file=sys.stderr)
+        return 2
+    side = sys.argv[1]
+    windows = msg("windows")
+    focused = next((w for w in windows if w["is_focused"]), None)
+    action = PLAIN[side]
+    try:
+        if focused and focused["layout"]["pos_in_scrolling_layout"] and is_tabbed(focused, windows):
+            action = TABBED[side]
+    except (KeyError, StopIteration, TypeError):
+        # Unexpected IPC shape: keep the old tab-walking behaviour, not a dead key.
+        action = TABBED[side]
+    subprocess.run(["niri", "msg", "action", action], check=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
