@@ -118,7 +118,9 @@ binds {
     // niri opens every new window as a new column on the right; this one opens
     // the terminal under the focused window instead, in the same column.
     Mod+Shift+Z hotkey-overlay-title="alacritty below" { spawn "niri-spawn-below" "alacritty"; }
-    Mod+X hotkey-overlay-title="neomacs"   { spawn "neomacs-try"; }
+    // GNU Emacs for now, so niri is the only new thing under test. -a "" starts
+    // the daemon if it is not up. Neomacs again: { spawn "neomacs-try"; }
+    Mod+X hotkey-overlay-title="emacs"     { spawn "emacsclient" "-c" "-a" ""; }
     Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
     Mod+S hotkey-overlay-title="System Monitor" { spawn "w95-sysmon"; }
     Mod+Shift+S hotkey-overlay-title="cmon" { spawn "alacritty" "-e" "/home/tgrining/bin/cmon"; }

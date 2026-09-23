@@ -7,7 +7,7 @@
 // or app starts with a variable it should not have.
 
 environment {
-    // GTK/Qt/Electron pick Wayland; the neomacs/emacs frames go via Xwayland.
+    // GTK/Qt/Electron pick Wayland; the Emacs frames go via Xwayland.
     QT_QPA_PLATFORM "wayland;xcb"
     MOZ_ENABLE_WAYLAND "1"
     NIXOS_OZONE_WL "1"

@@ -11,7 +11,8 @@ spawn-at-startup "niri-minimap"             // overlay map of the scroll strip o
 spawn-sh-at-startup "command -v copyq >/dev/null && copyq --start-server"
 spawn-at-startup "nm-applet"
 spawn-sh-at-startup "$HOME/Programs/emacs/src/emacs --daemon"
-spawn-at-startup "neomacs-try" "--daemon"
+// Neomacs is paused while niri is under test; Mod+X opens GNU Emacs.
+// spawn-at-startup "neomacs-try" "--daemon"
 spawn-at-startup "thunar" "--daemon"
 spawn-at-startup "syncthing"
 spawn-at-startup "gammastep"                // uses wlr-gamma-control on niri
