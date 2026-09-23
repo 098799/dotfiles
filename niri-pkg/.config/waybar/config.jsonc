@@ -3,8 +3,9 @@
 // Every block runs the SAME ~/scripts/*.sh as ~/.config/i3blocks/config, through
 // ~/bin/i3blocks-waybar, so both bars show the same icons, text and colours and
 // keep the same click menus. Order, intervals and signal numbers follow that
-// file. Seven modules are native, each for a reason:
-//   cpu, temperature, memory    tick every 1-2s at no cost, so a load change
+// file. Eight modules are native, each for a reason:
+//   cpu, temperature, memory,
+//   memory#swap                 tick every 1-2s at no cost, so a load change
 //                               shows at once (see the native section);
 //   pulseaudio, pulseaudio#mic  follow PulseAudio events, so no key bind has to
 //                               signal the bar (the i3 binds had to);
@@ -15,7 +16,7 @@
 // Nerd Font icons here are raw private-use characters (U+F0000 and up). Some
 // editors and tools drop them silently and leave a plain space — that is how
 // every native icon went missing once. After an edit, check they survived:
-//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 9
+//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 10
 {
     "layer": "top",
     "position": "top",
@@ -28,7 +29,7 @@
     "modules-left": ["niri/workspaces", "custom/cols"],
     "modules-center": [],
     "modules-right": [
-        "custom/claude", "cpu", "temperature", "memory", "custom/disk",
+        "custom/claude", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
         "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
         "custom/bt-headphones", "custom/bt-keyboard",
         "pulseaudio", "pulseaudio#mic",
@@ -158,6 +159,15 @@
         "tooltip-format": "{percentage}% used\nleft: htop by memory · right: free -h",
         "on-click": "alacritty -e htop -s PERCENT_MEM",
         "on-click-right": "alacritty -e bash -c \"free -h; read -p 'Press enter to close...'\""
+    },
+    // Swap next to RAM. No "states": the memory module computes them from RAM
+    // use, not swap use, so they would colour this block by the wrong number.
+    // style.css reaches it as #memory.swap, so it gets the #memory padding.
+    "memory#swap": {
+        "format": "󰓡 {swapUsed:0.1f}G/{swapTotal:0.1f}G", "interval": 2,
+        "tooltip-format": "swap {swapPercentage}% used\nleft: htop by memory · right: swapon --show",
+        "on-click": "alacritty -e htop -s PERCENT_MEM",
+        "on-click-right": "alacritty -e bash -c \"swapon --show; read -p 'Press enter to close...'\""
     },
     // volume.sh / mic.sh look: red when muted, mic icon only.
     "pulseaudio": {
