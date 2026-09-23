@@ -1,0 +1,66 @@
+// Environment for every program niri starts (binds and autostart).
+// Included from config.kdl.
+//
+// Most of this is a SCRUB list: `name null` removes a variable. niri runs under
+// systemd --user and inherits whatever a shell pushed into it, which leaks
+// per-terminal state into every new app. Add a line here when a fresh terminal
+// or app starts with a variable it should not have.
+
+environment {
+    // GTK/Qt/Electron pick Wayland; the neomacs/emacs frames go via Xwayland.
+    QT_QPA_PLATFORM "wayland;xcb"
+    MOZ_ENABLE_WAYLAND "1"
+    NIXOS_OZONE_WL "1"
+    ELECTRON_OZONE_PLATFORM_HINT "auto"
+    // Same PATH i3 had (the `set $PATH` line), so ~/bin scripts spawn from binds.
+    PATH "/home/tgrining/bin:/home/tgrining/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/lib/jvm/default/bin"
+
+    // --- scrub the stale shell env that systemd --user carries into the session ---
+    // `dbus-update-activation-environment --all` in ~/.zshrc pushed a whole
+    // interactive pane's env into systemd --user. Under i3 that was invisible.
+    // niri runs as `niri --session` under systemd --user, so niri inherits it and
+    // hands it to every app it spawns. ZDOTDIR is the one that breaks the shell:
+    // it was imported EMPTY, and an empty ZDOTDIR makes zsh read /.zshrc instead
+    // of ~/.zshrc — so a terminal opens with no aliases and no `claw`.
+    ZDOTDIR null
+    // Same source: per-pane state that must not leak into a fresh terminal.
+    TMUX null
+    TMUX_PANE null
+    TERM_PROGRAM null
+    TERM_PROGRAM_VERSION null
+    VIRTUAL_ENV null
+    VIRTUAL_ENV_PROMPT null
+    VIRTUAL_ENV_DISABLE_PROMPT null
+    // i3 is gone; a live I3SOCK makes i3-aware tools talk to a dead compositor.
+    I3SOCK null
+    // niri sets TERM per app; a session-wide TERM=alacritty lies to everything else.
+    TERM null
+    // Set to a LITERAL `~/legartis` by `set -a && source ~/bin/.env`. ~ does not
+    // expand inside a var, so every consumer got a path that cannot resolve, and
+    // .zshrc's `: ${LEGARTIS_REPO:=$HOME/legartis}` only fires when UNSET — so the
+    // broken value won. Unset it here and let .zshrc compute it.
+    LEGARTIS_REPO null
+    // Rest of the same import: session-scoped state that is wrong once stale.
+    KUBECONFIG null
+    KUBIE_ACTIVE null
+    KUBIE_DEPTH null
+    KUBIE_KUBECONFIG null
+    KUBIE_SESSION null
+    KUBIE_SHELL null
+    KUBIE_STATE null
+    CLAUDECODE null
+    CLAUDE_CODE_CHILD_SESSION null
+    CLAUDE_CODE_ENTRYPOINT null
+    CLAUDE_CODE_MESSAGING_SOCKET null
+    CLAUDE_CODE_MESSAGING_TOKEN null
+    CLAUDE_CODE_SESSION_ID null
+    CLAUDE_CODE_SESSION_ATTENDED null
+    CLAUDE_PID null
+    ALACRITTY_LOG null
+    ALACRITTY_SOCKET null
+    ALACRITTY_WINDOW_ID null
+    WINDOWID null
+    PSQL_DB null
+    PYTHONPATH null
+    OLDPWD null
+}

@@ -3,10 +3,11 @@
 # (Mod+Alt+G / Mod+Alt+Shift+G).
 #
 #   niri-gaps 0 | niri-gaps 10 | niri-gaps toggle | niri-gaps restore
+#   niri-gaps get      # print the current gap (niri-spawn-below reads it)
 #
 # niri has NO runtime gap action — `niri msg action` offers nothing for the
 # layout block, so the i3 binding has no direct twin. What niri does have is a
-# config watcher: it re-reads config.kdl on every save and animates the layout
+# config watcher: it re-reads its files on every save and animates the layout
 # to the new value. So the toggle is a one-line rewrite of the config, which
 # is why the gap survives a restart (i3's `gaps set` did not) and why the
 # resting value lives in the file rather than in this script.
@@ -17,7 +18,8 @@
 
 set -euo pipefail
 
-CONFIG="${NIRI_CONFIG:-$HOME/.config/niri/config.kdl}"
+# The layout block lives in layout.kdl, which config.kdl includes.
+CONFIG="${NIRI_LAYOUT:-$HOME/.config/niri/layout.kdl}"
 STATE="${XDG_RUNTIME_DIR:-/tmp}/niri-gaps.last"
 DEFAULT_GAP=10
 
@@ -59,6 +61,9 @@ now=$(current)
 [[ -n "$now" ]] || { echo "niri-gaps: no 'gaps' line in the layout block of $CONFIG" >&2; exit 1; }
 
 case "${1:-toggle}" in
+    get)
+        echo "$now"
+        ;;
     toggle)
         if [[ "$now" == "0" ]]; then
             set_gap "$(cat "$STATE" 2>/dev/null || echo $DEFAULT_GAP)"
@@ -76,5 +81,5 @@ case "${1:-toggle}" in
     [0-9]*)
         set_gap "$1"
         ;;
-    *)  echo "usage: niri-gaps [0|<n>|toggle|restore]" >&2; exit 2 ;;
+    *)  echo "usage: niri-gaps [0|<n>|toggle|restore|get]" >&2; exit 2 ;;
 esac

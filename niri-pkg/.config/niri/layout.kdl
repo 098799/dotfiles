@@ -1,0 +1,68 @@
+// Look of the tiled layout: gaps, column widths, borders, tab strip, shadow.
+// Included from config.kdl.
+//
+// niri-gaps (Mod+Alt+G / Mod+Alt+Shift+G) REWRITES the `gaps` line below in
+// place. Keep it as a plain `gaps N` line inside `layout {`, or that script
+// cannot find it.
+
+layout {
+    // i3: gaps inner 10 / outer 0.
+    gaps 10
+    center-focused-column "never"
+    always-center-single-column
+
+    // Mod+E / Mod+Shift+E cycle through these, forward / back (i3 had "layout toggle split" and
+    // the resize mode). One-third, half, two-thirds, full.
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+        proportion 1.0
+    }
+    default-column-width { proportion 0.5; }
+
+    // i3: default_border pixel 4, client.focused = gruvbox accent, unfocused = bg_alt,
+    // urgent = $urgent. The ring is off: one 4px border is the focus indicator.
+    focus-ring { off; }
+
+    // i3's tabbed layout drew a row of TITLE BARS you could read and click.
+    // niri has no titlebars at all, so its tabs are a colour strip instead —
+    // and `render-titles` is not a valid option here, so no config brings the
+    // names back. The default strip is a thin sliver out in the wallpaper gap,
+    // which is near-invisible. Make it read like an i3 tab row instead:
+    //   position top    - along the top of the column, where i3 put tabs
+    //   place-within-column - inside the column, not floating in the gap
+    //   length 1.0      - spans the full column width, one segment per window
+    //   width 8         - thick enough to actually see
+    //   hide-when-single-tab - no strip on a one-window column
+    // Colours match the border block below; niri colours are static here, the
+    // dark-gruv/light-gruv/*-sele scripts do not touch this file.
+    tab-indicator {
+        hide-when-single-tab
+        place-within-column
+        position "top"
+        width 8
+        gap 4
+        length total-proportion=1.0
+        active-color "#98971a"
+        inactive-color "#3c3836"
+        urgent-color "#d3869b"
+    }
+    border {
+        width 4
+        active-color "#98971a"
+        inactive-color "#3c3836"
+        urgent-color "#d3869b"
+    }
+
+    // picom: shadow-radius 24, shadow-opacity 0.55
+    shadow {
+        on
+        softness 24
+        spread 4
+        offset x=0 y=6
+        color "#0008"
+    }
+
+    struts { }
+}

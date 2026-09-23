@@ -10,6 +10,7 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 | `git` | `.gitconfig`, `.gitignore_global` |
 | `alacritty-pkg` | `.config/alacritty/alacritty.toml` |
 | `i3-pkg` | i3 config, i3blocks, rofi, screenlayout, scripts |
+| `niri-pkg` | niri (Wayland) session: config, waybar, swaylock, `niri-*` scripts. Start at [`niri-pkg/.config/niri/README.md`](niri-pkg/.config/niri/README.md) |
 | `bin-pkg` | `~/bin/` helper scripts (theme switching) |
 | `espanso-pkg` | Text expansion config |
 | `logid-pkg` | Logitech mouse (logid) config |

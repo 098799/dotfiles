@@ -1,0 +1,41 @@
+// Per-app window rules. Included from config.kdl.
+//
+// To find the app-id and title to match on: focus the window, then run
+//   niri msg focused-window
+// The Wayland app-id is NOT the X11 class that i3 matched on. A rule that
+// matches nothing gives no error — the window simply opens tiled.
+
+// picom: corner-radius 10
+window-rule {
+    geometry-corner-radius 10
+    clip-to-geometry true
+}
+// i3: for_window [window_role=pop-up|bubble|task_dialog|Preferences], window_type=dialog|menu
+// niri has no window_role; dialogs are floated by their parent relationship already.
+// i3 matched this on the X11 class, `for_window [class="W95sysmon"]`. The
+// Wayland app-id is NOT the WM_CLASS: it is "w95-sysmon", lower case and
+// hyphenated, so the ported regex matched nothing and the System Monitor
+// opened TILED — a full-width column shoving the workspace sideways, with no
+// error to say why. Checked against `niri msg --json windows`.
+window-rule {
+    match app-id=r#"^w95-sysmon$"#
+    open-floating true
+    // i3: `for_window [instance="w95-sysmon-drop"] border none`. There is no
+    // instance name on Wayland — both shapes share one app-id — so the border
+    // comes off for both. The other half of that rule, `sticky enable`, has no
+    // niri twin at all: niri has no sticky windows, so the drop-down panel
+    // lives on one workspace instead of following you across them.
+    border { off; }
+}
+window-rule {
+    match app-id=r#"^copyq$"#
+    open-floating true
+}
+window-rule {
+    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+window-rule {
+    match app-id=r#"^(google-chrome|chromium)"# title="^(Open|Save) File$"
+    open-floating true
+}

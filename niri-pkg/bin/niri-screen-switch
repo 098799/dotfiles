@@ -1,0 +1,115 @@
+#!/bin/bash
+# niri port of ~/scripts/screen_switch (i3, Mod+BackSpace).
+#
+# The old menu mixed two unrelated things: theme/font switches, which are
+# display-server agnostic and carry over untouched, and the ~/.screenlayout/*.sh
+# xrandr scripts, which do not exist on Wayland. The layouts below are the same
+# five arrangements expressed with `niri msg output`.
+#
+# Output names differ from X11: eDP -> eDP-1, DisplayPort-0 -> DP-1,
+# HDMI-A-0 -> HDMI-A-1. Run `niri msg outputs` to confirm on a new dock.
+
+set -u
+
+LAPTOP=eDP-1
+EXTERNAL=DP-1
+HDMI=HDMI-A-1
+
+# The wallpaper set is mixed 16:9 / 21:9 and the scaler ignores aspect, so a
+# layout change without this leaves the previous ratio squashed on the new
+# screen. Re-pick against the geometry niri has just set.
+repaper() {
+    sleep 0.3
+    "$HOME/bin/wallpaper-pick" 2>/dev/null || true
+    "$HOME/bin/niri-wallpaper" 2>/dev/null || true
+}
+
+layout_laptop() {
+    niri msg output "$EXTERNAL" off
+    niri msg output "$HDMI" off 2>/dev/null
+    niri msg output "$LAPTOP" on
+    niri msg output "$LAPTOP" mode 1920x1200
+    niri msg output "$LAPTOP" position set 0 0
+    repaper
+}
+
+layout_narrow() {
+    niri msg output "$HDMI" off 2>/dev/null
+    niri msg output "$EXTERNAL" on
+    niri msg output "$EXTERNAL" mode 2560x1440
+    niri msg output "$EXTERNAL" position set 0 0
+    niri msg output "$LAPTOP" off
+    repaper
+}
+
+layout_wide() {
+    niri msg output "$HDMI" off 2>/dev/null
+    niri msg output "$EXTERNAL" on
+    niri msg output "$EXTERNAL" mode 3440x1440
+    niri msg output "$EXTERNAL" position set 0 0
+    niri msg output "$LAPTOP" off
+    repaper
+}
+
+layout_hdmi() {
+    niri msg output "$EXTERNAL" off
+    niri msg output "$HDMI" on
+    niri msg output "$HDMI" mode 2560x1440
+    niri msg output "$HDMI" position set 0 0
+    niri msg output "$LAPTOP" off
+    repaper
+}
+
+# No xrandr twin: under i3 every layout turned the laptop panel off, because
+# arranging two X screens by hand was the annoying part. niri places outputs
+# itself, so keeping both is now cheap enough to be worth a menu entry.
+layout_both() {
+    niri msg output "$HDMI" off 2>/dev/null
+    niri msg output "$EXTERNAL" on
+    niri msg output "$EXTERNAL" mode 2560x1440
+    niri msg output "$EXTERNAL" position set 0 0
+    niri msg output "$LAPTOP" on
+    niri msg output "$LAPTOP" mode 1920x1200
+    niri msg output "$LAPTOP" position set 320 1440
+    repaper
+}
+
+if [[ ${1-} == layout-* ]]; then
+    "layout_${1#layout-}"
+    exit $?
+fi
+
+choice=$(printf '%s\n' \
+    "Screen: laptop only" \
+    "Screen: external 2560x1440" \
+    "Screen: external 3440x1440 (wide)" \
+    "Screen: HDMI 2560x1440" \
+    "Screen: external + laptop" \
+    "Theme: w95" \
+    "Theme: dark-gruv" \
+    "Theme: light-gruv" \
+    "Theme: dark-sele" \
+    "Theme: light-sele" \
+    "Font: small" \
+    "Font: middle" \
+    "Font: big" \
+    "Font: huge" \
+    | rofi -dmenu -i -lines 14 -font "Ubuntu 25" -p "switch")
+
+case "$choice" in
+    "Screen: laptop only")                layout_laptop ;;
+    "Screen: external 2560x1440")         layout_narrow ;;
+    "Screen: external 3440x1440 (wide)")  layout_wide ;;
+    "Screen: HDMI 2560x1440")             layout_hdmi ;;
+    "Screen: external + laptop")          layout_both ;;
+    "Theme: w95")        "$HOME/.local/bin/w95-rofi" ;;
+    "Theme: dark-gruv")  "$HOME/bin/dark-gruv" ;;
+    "Theme: light-gruv") "$HOME/bin/light-gruv" ;;
+    "Theme: dark-sele")  "$HOME/bin/dark-sele" ;;
+    "Theme: light-sele") "$HOME/bin/light-sele" ;;
+    "Font: small")  "$HOME/bin/small-font" ;;
+    "Font: middle") "$HOME/bin/middle-font" ;;
+    "Font: big")    "$HOME/bin/big-font" ;;
+    "Font: huge")   "$HOME/bin/huge-font" ;;
+    *) exit 0 ;;
+esac

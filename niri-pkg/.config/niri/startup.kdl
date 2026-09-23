@@ -1,0 +1,32 @@
+// Programs niri starts at login (i3's `exec` block). Included from config.kdl.
+// These run once per session; a save does NOT re-run them.
+
+spawn-at-startup "waybar"
+spawn-at-startup "theme-restore"            // i3's `exec theme-restore`: re-apply the saved theme
+spawn-at-startup "niri-wallpaper"           // feh --bg-scale → swaybg, reads ~/.fehbg
+spawn-at-startup "dunst"
+spawn-at-startup "niri-idle"                // xss-lock → swayidle
+spawn-at-startup "niri-auto-width"          // lone terminal 2/3, two terminals 1/2 each
+spawn-sh-at-startup "command -v copyq >/dev/null && copyq --start-server"
+spawn-at-startup "nm-applet"
+spawn-sh-at-startup "$HOME/Programs/emacs/src/emacs --daemon"
+spawn-at-startup "neomacs-try" "--daemon"
+spawn-at-startup "thunar" "--daemon"
+spawn-at-startup "syncthing"
+spawn-at-startup "gammastep"                // uses wlr-gamma-control on niri
+spawn-sh-at-startup "bluetoothctl power on"
+spawn-at-startup "w95-sysmon" "--hidden"
+// xsettingsd still matters: it is what tells the Xwayland apps (Emacs, the
+// espanso X11 build, anything not yet ported) their DPI, theme and fonts.
+spawn-at-startup "xsettingsd"
+// Screen sharing (Slack, Meet, OBS, and `niri-record-window`'s picker) goes
+// through xdg-desktop-portal, which reads XDG_CURRENT_DESKTOP ONCE at start to
+// choose a backend. systemd --user outlives a logout, so the portal left over
+// from the i3 session stays up with XDG_CURRENT_DESKTOP=i3 and never gains a
+// ScreenCast interface at all — screen sharing then fails with no error that
+// names the cause. try-restart touches it only when such a leftover exists; a
+// portal that is not running dbus-activates later with the right environment.
+spawn-sh-at-startup "systemctl --user try-restart xdg-desktop-portal.service"
+// i3-only, no Wayland twin: picom (niri composites), xsettingsd, volumeicon
+// (waybar's pulseaudio module), autokey-gtk, espanso (the X11 build; the
+// wayland build is a separate package), theme-restore (writes X-only files).
