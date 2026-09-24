@@ -16,3 +16,6 @@ __pycache__/
 #   mr-reviewer-*   employer-internal tooling (ticket ids, internal hostnames)
 ssh/
 webkit/snippets/mr-reviewer-keys/
+
+# Syncthing folder marker, per host
+.stfolder/
