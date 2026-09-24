@@ -576,7 +576,9 @@ class Minimap:
     def __init__(self) -> None:
         self.snap: dict | None = None
         self.last_ws = None
-        self.monitor_xy: tuple[int, int] | None = None
+        # The GdkMonitor the layer surface is bound to. Not its position: when an
+        # output goes away, the one left often moves to the same (0, 0).
+        self.monitor = None
         self.overview = False
         self.primed = False  # ignore the burst of state niri sends on connect
         self.visible = False
@@ -603,6 +605,14 @@ class Minimap:
         self.win.connect("draw", self.on_draw)
         # An empty input region: the pointer goes straight through to the windows.
         self.win.connect("realize", lambda w: w.input_shape_combine_region(cairo.Region()))
+        # The compositor closes the surface with its output; map it afresh next time.
+        Gdk.Display.get_default().connect("monitor-removed", self.on_monitor_removed)
+
+    def on_monitor_removed(self, display, monitor) -> None:
+        if monitor == self.monitor:
+            self.win.hide()
+            self.visible = False
+            self.monitor = None
 
     # -- animation
 
@@ -651,13 +661,13 @@ class Minimap:
     def show(self, snap: dict) -> None:
         """Bring the map up (or keep it up) for SHOW_MS."""
         out = snap["out"]
-        xy = (out["x"], out["y"])
-        if xy != self.monitor_xy:
+        monitor = self.monitor_for(out)
+        if monitor is None or monitor != self.monitor:
             # A layer surface picks its output when it maps: remap to move it.
             self.win.hide()
             self.visible = False
-            GtkLayerShell.set_monitor(self.win, self.monitor_for(out))
-            self.monitor_xy = xy
+            GtkLayerShell.set_monitor(self.win, monitor)
+            self.monitor = monitor
         self.win.set_size_request(-1, window_height(out))
         if not self.visible:
             self.a0 = self.a1 = 0.0
