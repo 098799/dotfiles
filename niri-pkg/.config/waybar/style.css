@@ -19,13 +19,15 @@
 @define-color block_orange #cb4b16;
 
 * {
-    /* The terminal font, at the terminal size (alacritty: UbuntuMono 12), so
-     * the bar looks like the rest of the screen. i3bar had Terminess Nerd Font
-     * 14: wider and heavier, and on the laptop it did not fit.
-     * "Propo" is UbuntuMono with the Nerd icons at their real width; the plain
-     * "UbuntuMono Nerd Font" squeezes an icon into one cell, and it runs over
-     * the text next to it. */
-    font-family: "UbuntuMono Nerd Font Propo", "UbuntuMono Nerd Font", monospace;
+    /* The terminal font, at the terminal size (alacritty: "UbuntuMono" 12, which
+     * fontconfig resolves to Ubuntu Mono), so the bar looks like the rest of the
+     * screen. i3bar had Terminess Nerd Font 14: wider and heavier, and on the
+     * laptop it did not fit.
+     * Ubuntu Mono has no icons, so pango takes them from the next family.
+     * "Propo" has the Nerd icons at their real width; the plain "UbuntuMono
+     * Nerd Font" squeezes an icon into one cell, and it runs over the text next
+     * to it. */
+    font-family: "Ubuntu Mono", "UbuntuMono Nerd Font Propo", monospace;
     font-size: 12pt;
     min-height: 0;
     border: none;
@@ -38,8 +40,11 @@ tooltip label { color: @title_fg; }
 /* i3's bar colors{} block, mapped onto waybar's niri/workspaces classes.
  * The niri module exposes .focused / .active / .urgent / .empty — there is no
  * .visible (that belongs to the sway module). */
+/* min-width 0: the GTK theme gives every button a minimum width, so a
+ * one-letter workspace ("1") was as wide as "work". */
 #workspaces button {                                                    /* inactive_workspace */
-    padding: 0 6px;
+    padding: 0 4px;
+    min-width: 0;
     color: @fg_dim;
     background: @bg_main;
 }
