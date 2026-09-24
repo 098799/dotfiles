@@ -4,7 +4,7 @@
 A niri workspace is an endless row of columns, and the screen shows one piece
 of it. Nothing on screen says how much of the row is off to the left or right.
 When you switch to another workspace, this draws that workspace's whole row,
-scaled down, in the middle of the screen for about a second:
+scaled down, in the bottom-right corner for a few seconds:
 
   frame        the part of the row that is on the screen now; the rest is dimmed
   tiles        windows at their true widths, with app icon and title; the
@@ -48,12 +48,12 @@ gi.require_version("GtkLayerShell", "0.1")
 gi.require_version("PangoCairo", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell, Pango, PangoCairo  # noqa: E402
 
-SHOW_MS = 1100  # fully visible for this long after it comes up
+SHOW_MS = 4000  # fully visible for this long after it comes up
 FADE_IN_MS = 110
 FADE_OUT_MS = 260
 SLIDE_MS = 180  # the frame's glide when the view scrolls while it is up
-MAX_SCALE = 0.18  # one screen of strip is never drawn bigger than this
-SIDE_MARGIN = 64  # px left free at each side of the screen
+MAX_SCALE = 0.12  # one screen of strip is never drawn bigger than this
+MAX_W_FRAC = 0.40  # the card never takes more than this share of the screen width
 DEFAULT_GAP = 10.0
 LAYOUT_KDL = os.path.expanduser("~/.config/niri/layout.kdl")
 PIDFILE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-minimap.pid")
@@ -400,7 +400,7 @@ def geometry(width: int, snap: dict, view_x: float) -> dict:
     # The extent always takes in the snapshot's frame, so a slide never rescales.
     lo = min(-gap, snap["view_x"], view_x)
     hi = max(end, snap["view_x"] + view_w, view_x + view_w)
-    s = min(MAX_SCALE, (width - 2 * SIDE_MARGIN - 2 * (PAD + FRAME_OUT)) / (hi - lo))
+    s = min(MAX_SCALE, (width * MAX_W_FRAC - 2 * (PAD + FRAME_OUT)) / (hi - lo))
     # The frame maps the working area, not the whole output: waybar's strip
     # would otherwise leave more room above the tiles than below them.
     tops = [column_shape(c, gap, out_h, None)[1] for c in cols]
@@ -449,8 +449,9 @@ def draw(cr, width: int, height: int, snap: dict, alpha: float, view_x: float | 
     # line edge, FRAME_OUT beyond the strip) | the strip the row is drawn in.
     card_w = strip_w + 2 * (FRAME_OUT + PAD)
     card_h = header_h() + HEADER_GAP + strip_h + 2 * FRAME_OUT + 2 * PAD
-    cx = (width - card_w) // 2
-    cy = (height - card_h) // 2
+    # bottom-right, the shadow's room between the card and the screen edges
+    cx = width - SHADOW - card_w
+    cy = height - SHADOW - card_h
     content_l, content_r = cx + PAD, cx + card_w - PAD
     ox = content_l + FRAME_OUT  # strip left
     oy = cy + PAD + header_h() + HEADER_GAP + FRAME_OUT  # strip top
@@ -599,9 +600,10 @@ class Minimap:
         GtkLayerShell.set_namespace(self.win, "niri-minimap")
         GtkLayerShell.set_layer(self.win, GtkLayerShell.Layer.OVERLAY)
         GtkLayerShell.set_keyboard_mode(self.win, GtkLayerShell.KeyboardMode.NONE)
-        GtkLayerShell.set_exclusive_zone(self.win, -1)
+        GtkLayerShell.set_exclusive_zone(self.win, 0)  # stays clear of waybar's zone
         GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.LEFT, True)
         GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.RIGHT, True)
+        GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.BOTTOM, True)
         self.win.connect("draw", self.on_draw)
         # An empty input region: the pointer goes straight through to the windows.
         self.win.connect("realize", lambda w: w.input_shape_combine_region(cairo.Region()))
