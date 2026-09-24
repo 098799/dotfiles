@@ -391,6 +391,10 @@ bindsym $mod+$mod1+Shift+j --release exec --no-startup-id /home/tgrining/bin/scr
 bindsym $mod+$mod1+Shift+s --release exec --no-startup-id scrot -s
 bindsym $mod+$mod1+Shift+l --release exec --no-startup-id record-desktop
 bindsym $mod+$mod1+Shift+semicolon --release exec --no-startup-id record-window
+# Same two recorders, silent. Both scripts read AUDIO, and both toggle off on
+# the plain combo above as well — the second press does not care how it began.
+bindsym $mod+$mod1+Shift+Ctrl+l --release exec --no-startup-id env AUDIO=none record-desktop
+bindsym $mod+$mod1+Shift+Ctrl+semicolon --release exec --no-startup-id env AUDIO=none record-window
 bindsym $mod+$mod1+Shift+c --release exec --no-startup-id $HOME/bin/autoclick
 
 # Notification control. dunst dropped its own [shortcuts] section in 1.7, so
