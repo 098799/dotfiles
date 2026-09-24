@@ -388,9 +388,11 @@ _claw_help() {
   print -r -- "only way onto it, and with no other account free claw refuses rather than"
   print -r -- "falling back to \$HOME."
   print -r -- ""
-  print -r -- "Every other word goes to claude, in any order — the home is picked out"
-  print -r -- "wherever it sits, so these are the same:"
-  print -r -- "       claw builder -c            claw -c builder"
+  print -r -- "Only the FIRST word can name the account. When it is not an account, the"
+  print -r -- "whole line goes to claude unchanged, so a prompt that happens to contain an"
+  print -r -- "account name is never cut:"
+  print -r -- "       claw builder -c            -c on builder"
+  print -r -- "       claw -c builder            -c and the prompt \"builder\", selector picks"
   print -r -- ""
   print -r -- "claude's own flags still work, the short ones included:"
   print -r -- "       -c, --continue             resume the last session in this directory"
@@ -403,6 +405,13 @@ _claw_help() {
 # checkout somewhere else; silently unused if the repo isn't there.
 : ${LEGARTIS_REPO:=$HOME/legartis}
 
+# True when $1 names an account: "main" (the real $HOME) or a claude-<name> home.
+# claw, fable and foreman all read the account from the FIRST word only, through
+# this, so the three agree on what counts.
+_claw_is_home() {
+  [[ -n "$1" && ( "$1" == main || -d "$(_claw_root)/claude-$1/.claude" ) ]]
+}
+
 claw() {
   local root="$(_claw_root)"
 
@@ -411,23 +420,16 @@ claw() {
     return 0
   fi
 
-  # The home may sit anywhere in the line, so `claw -c builder` works as well as
-  # `claw builder -c`. Only a whole argument matching a real home counts; every
-  # other word keeps its order and goes to claude. "main" is a name too — it means
-  # the real $HOME, and it has to be matched here or it would be passed to claude
-  # as a prompt.
-  local chome="" cname="" a picked=""
-  local -a rest
-  for a in "$@"; do
-    if [[ -z "$chome" && -z "$cname" && "$a" == main ]]; then
-      cname=main
-    elif [[ -z "$chome" && "$cname" != main && -d "$root/claude-$a/.claude" ]]; then
-      cname="$a"; chome="$root/claude-$a"
-    else
-      rest+=("$a")
-    fi
-  done
-  set -- "${rest[@]}"
+  # Only the first word can name the account. It used to be picked out anywhere
+  # in the line, which cut a word like "sales" out of the middle of a prompt.
+  # "main" means the real $HOME: no HOME override. If the first word is not an
+  # account, every word goes to claude as it is.
+  local chome="" cname="" picked=""
+  if _claw_is_home "$1"; then
+    cname="$1"
+    [[ "$cname" != main ]] && chome="$root/claude-$cname"
+    shift
+  fi
 
   # No account named: ask the selector, exactly as a "C" spawn does, and let it
   # count this session as in-flight load so a second claw a minute later lands
@@ -496,16 +498,37 @@ _claw() {
 # fable [home] [claude args...] — claw on Fable 5.1 at low effort. Same account
 # picking, same tmux naming. The defaults go BEFORE "$@" on purpose: claude takes
 # the LAST occurrence of --model/--effort, so this is what lets your own
-# --model/--effort on the fable line win. claw finds a home name at any position.
+# --model/--effort on the fable line win. The account must stay the first word
+# claw sees, so peel it off here and hand it over in front of the defaults.
 fable() {
   if [[ "$1" == (--help|-h) ]]; then
     print -r -- "fable — claw with --model claude-fable-5-1 --effort low"
     print -r -- "usage: fable [home|main] [claude args...]   (see claw --help)"
     return 0
   fi
-  claw --model claude-fable-5-1 --effort low "$@"
+  local -a acct
+  _claw_is_home "$1" && { acct=("$1"); shift }
+  claw "${acct[@]}" --model claude-fable-5-1 --effort low "$@"
 }
 (( $+functions[compdef] )) && compdef _claw fable
+
+# foreman [home] [text...] — claw started on "/foreman <text>". The first word is
+# the account if it names one; all the other words are joined into ONE prompt, so
+# `foreman main please make queue work` opens main on "/foreman please make queue
+# work". If the first word is not an account, it is part of the text too.
+foreman() {
+  if [[ "$1" == (--help|-h) ]]; then
+    print -r -- "foreman — claw started on the prompt \"/foreman <text>\""
+    print -r -- "usage: foreman [home|main] [text...]   (see claw --help for homes)"
+    print -r -- "       foreman main please make queue work"
+    print -r -- "       foreman !7301                 selector picks the account"
+    return 0
+  fi
+  local -a acct
+  _claw_is_home "$1" && { acct=("$1"); shift }
+  claw "${acct[@]}" "/foreman${*:+ $*}"
+}
+(( $+functions[compdef] )) && compdef _claw foreman
 
 #---------------------------------------------------------------------------
 # External tools
