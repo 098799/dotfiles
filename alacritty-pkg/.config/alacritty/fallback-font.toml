@@ -1,0 +1,6 @@
+# Fallback font size used only if active-font.toml is missing.
+# Imported BEFORE active-font.toml so the size scripts (small/middle/big/huge-font)
+# override it. It must not live inline in alacritty.toml: an inline value beats
+# every import, which pinned the size at 16 and made the size scripts do nothing.
+[font]
+size = 16
