@@ -24,12 +24,11 @@ esac
 
 # How long a fetched response is reused. 120s rather than the old 300s because
 # the history below is now charted: at a 60s i3blocks tick that puts a sample
-# every two minutes, which is the cadence mr-reviewer's usage-pusher settled on
-# for the same endpoint.
+# every two minutes, a cadence the endpoint is known to tolerate.
 CACHE_TTL=${CLAUDE_USAGE_TTL:-120}
 
 # Append-only sample log, one row per account per sample — the Win95 System
-# Monitor charts it. Deliberately NOT mr-reviewer's wide layout (one row per
+# Monitor charts it. Deliberately NOT a wide layout (one row per
 # sample, two positional columns per account, "never reorder this list"): a row
 # that names its own account survives an account being added, renamed or
 # dropped, which on a laptop happens all the time.
@@ -40,7 +39,7 @@ HISTORY_DAYS=${CLAUDE_USAGE_HISTORY_DAYS:-14}
 # Accounts in display order: the three legacy ones first, then any extra
 # discovered from either a claude-cookies-<name> file in $CONFIG_DIR or a
 # ~/claude-<name> alt HOME holding a Claude Code login — the same two
-# conventions rcmon/cmon auto-discover (!5956). A cookie alone is enough, and
+# conventions the other monitors auto-discover. A cookie alone is enough, and
 # so is a login alone: usage falls back to the OAuth endpoint (see
 # fetch_usage_oauth) when there's no cookie, which is what a `/login`-only
 # account like sales has.
@@ -68,7 +67,7 @@ declare -A LABELS=([work]=W [private]=P [builder]=B [sales]=S [success]=CS)
 # read "S:3% S:81%" with nothing to say which was which. The length is chosen once
 # and applied to all of them, so they stay the same width and a new account
 # widens the set rather than making one odd label longer than its neighbours.
-# Only the bar cares — rcmon, cmon and the System Monitor key everything by
+# Only the bar cares — the other monitors and the System Monitor key everything by
 # account name (the monitor's fallback bar-line parse is the one exception, and
 # that only runs against a copy of this script older than --json).
 _cap() { printf '%s%s' "$(printf '%s' "${1:0:1}" | tr '[:lower:]' '[:upper:]')" "${1:1:$2-1}"; }
@@ -151,11 +150,10 @@ case $BLOCK_BUTTON in
         ;;
 esac
 
-# Newest credentials file backing an account, or nothing. Mirrors rcmon's
-# home_agents.credential_source: the ~/.claude/.credentials-<acct>.json backup
+# Newest credentials file backing an account, or nothing. The ~/.claude/.credentials-<acct>.json backup
 # this script maintains can be months stale (it only refreshes when the rofi
 # switcher swaps accounts), while the alt HOME's copy is refreshed by every
-# cmon/cherd spawn under that HOME. Newest wins.
+# agent spawn under that HOME. Newest wins.
 creds_for() {
     local acct="$1" newest="" c
     local -a cands=("$HOME/.claude/.credentials-$acct.json")
@@ -177,8 +175,8 @@ creds_for() {
 #
 # Deliberately does NOT refresh an expired access token: that endpoint is rate
 # limited PER REFRESH TOKEN, and a 60s i3blocks tick hammering it would keep
-# the account permanently 429'd — exactly what wedged the mr-reviewer VM's
-# backups for a week. An expired token just reads "?" here until the next
+# the account permanently 429'd — that has wedged a backup job for a week
+# before. An expired token just reads "?" here until the next
 # Claude Code session under that account refreshes it in passing.
 fetch_usage_oauth() {
     local acct="$1" creds token
@@ -547,7 +545,9 @@ for acct in "${ACCOUNTS[@]}"; do
     label="${LABELS[$acct]:-${acct:0:1}}"
     [[ "$acct" == "$ACCOUNT" ]] && active=1 || active=0
     SPANS="${SPANS}$(format_account "$label" "$U" "$C" "$R" "$active") "
-    SHORT="${SHORT}${label}:${U}% "
+    # short_text: the same coloured spans without the reset timers. The laptop
+    # waybar shows it (no room for the timers); i3bar did on overflow too.
+    SHORT="${SHORT}$(format_account "$label" "$U" "$C" "" "$active") "
 done
 
 echo " 󰚩 ${SPANS}"

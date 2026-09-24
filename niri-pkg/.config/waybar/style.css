@@ -19,10 +19,14 @@
 @define-color block_orange #cb4b16;
 
 * {
-    font-family: "Terminess Nerd Font", "Ubuntu Mono", monospace;
-    /* i3: `font pango:Terminess Nerd Font 14`. Pango sizes are POINTS, so 14px
-     * here rendered ~25% smaller than the i3bar did. GTK CSS takes pt directly. */
-    font-size: 14pt;
+    /* The terminal font, at the terminal size (alacritty: UbuntuMono 12), so
+     * the bar looks like the rest of the screen. i3bar had Terminess Nerd Font
+     * 14: wider and heavier, and on the laptop it did not fit.
+     * "Propo" is UbuntuMono with the Nerd icons at their real width; the plain
+     * "UbuntuMono Nerd Font" squeezes an icon into one cell, and it runs over
+     * the text next to it. */
+    font-family: "UbuntuMono Nerd Font Propo", "UbuntuMono Nerd Font", monospace;
+    font-size: 12pt;
     min-height: 0;
     border: none;
     border-radius: 0;

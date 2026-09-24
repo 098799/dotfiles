@@ -8,8 +8,8 @@ translates the protocol.
 i3blocks: up to 3 lines on stdout -- full_text, short_text, colour (#rrggbb).
 Clicks arrive as $BLOCK_BUTTON (1 left, 2 middle, 3 right, 4/5 scroll).
 
-waybar: one JSON object with "text"/"tooltip". waybar renders labels as pango
-markup, so the colour becomes a <span>.
+waybar: one JSON object with "text" (full_text), "alt" (short_text) and
+"tooltip". waybar renders labels as pango markup, so the colour becomes a <span>.
 
     i3blocks-waybar ~/scripts/uptime.sh                  # read it
     i3blocks-waybar ~/scripts/cpu-cap.sh 1               # left-click it
@@ -108,15 +108,22 @@ def read(script: str, timeout: int, hint: str) -> int:
 
     # i3blocks scripts already emit pango markup in some cases; only escape when
     # there is no markup to preserve.
-    text = full if "<" in full else html.escape(full)
-    if colour.startswith("#"):
-        text = f'<span color="{colour}">{text}</span>'
+    def markup(line: str) -> str:
+        return line if "<" in line else html.escape(line)
 
-    # short_text is often the bare icon, which tells you nothing on hover.
-    tooltip = short if len(short.split()) > 1 else full
+    def coloured(line: str) -> str:
+        if colour.startswith("#"):
+            return f'<span color="{colour}">{markup(line)}</span>'
+        return markup(line)
+
+    # "alt" is short_text, for a bar with too little room (the laptop bar shows
+    # it with "format": "{alt}"). i3bar switched to it by itself on overflow.
+    # A script with no short_text gets its full_text, as in i3bar.
+    # The tooltip always has the full text, so a short block loses nothing.
+    tooltip = markup(full)
     if hint:
         tooltip = f"{tooltip}\n{hint}"
-    print(json.dumps({"text": text, "tooltip": tooltip}), flush=True)
+    print(json.dumps({"text": coloured(full), "alt": coloured(short or full), "tooltip": tooltip}), flush=True)
     return 0
 
 

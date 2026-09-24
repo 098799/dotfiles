@@ -1,27 +1,30 @@
-// The i3bar/i3blocks twin for niri.
+// Two bars: one for the laptop screen, one for every other screen. They show
+// the same blocks in the same order. The module definitions are in
+// modules.jsonc, which both bars include; a bar overrides single keys only.
 //
-// Every block runs the SAME ~/scripts/*.sh as ~/.config/i3blocks/config, through
-// ~/bin/i3blocks-waybar, so both bars show the same icons, text and colours and
-// keep the same click menus. Order, intervals and signal numbers follow that
-// file. Eight modules are native, each for a reason:
-//   cpu, temperature, memory,
-//   memory#swap                 tick every 1-2s at no cost, so a load change
-//                               shows at once (see the native section);
-//   pulseaudio, pulseaudio#mic  follow PulseAudio events, so no key bind has to
-//                               signal the bar (the i3 binds had to);
-//   tray, clock                 no script can do these.
-// Menus the scripts open (`rofi -dmenu`) come up in ~/bin/barmenu instead: under
-// the block you clicked, and a click outside closes them.
+// Why the laptop gets its own bar: eDP-1 is 1920x1200 at scale 1.25, so the bar
+// has 1536 logical px. The full blocks need ~2070, and waybar does not shorten
+// anything: it cuts off the right end, so the clock, battery, tray and six
+// more blocks were simply not there. i3bar solved this by itself: when the bar
+// overflowed it showed every block's short_text (the second line an i3blocks
+// script prints). The laptop bar does the same by choice: "{alt}" is that short
+// text (see ~/bin/i3blocks-waybar), and the native modules get shorter formats.
+// The full text is in every block's tooltip.
 //
 // Nerd Font icons here are raw private-use characters (U+F0000 and up). Some
-// editors and tools drop them silently and leave a plain space — that is how
-// every native icon went missing once. After an edit, check they survived:
-//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 10
+// editors and tools drop them silently and leave a plain space. After an edit,
+// check they survived:
+//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 3
+[
 {
+    "name": "main",
+    "output": ["!eDP-1", "*"],
+    "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
-    // i3bar's height at this font. ~/bin/i3blocks-waybar opens menus just under it.
-    "height": 27,
+    // One terminal line of UbuntuMono 12 plus a little air. ~/bin/barmenu
+    // opens menus just under it (BAR_HEIGHT there).
+    "height": 22,
     "spacing": 0,
     // No window title: i3bar had none, and with every i3 block on the right there
     // is no room left for one. The focused window has the accent border, and the
@@ -35,165 +38,40 @@
         "pulseaudio", "pulseaudio#mic",
         "custom/cpu-boost", "custom/cpu-cap", "custom/power-profile",
         "custom/battery", "custom/screenshot", "custom/uptime", "tray", "clock"
+    ]
+},
+{
+    "name": "laptop",
+    "output": "eDP-1",
+    "include": ["~/.config/waybar/modules.jsonc"],
+    "layer": "top",
+    "position": "top",
+    // Same as the main bar, so ~/bin/barmenu needs one number only.
+    "height": 22,
+    "spacing": 0,
+    "modules-left": ["niri/workspaces", "custom/cols"],
+    "modules-center": [],
+    "modules-right": [
+        "custom/claude", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
+        "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
+        "custom/bt-headphones", "custom/bt-keyboard",
+        "pulseaudio", "pulseaudio#mic",
+        "custom/cpu-boost", "custom/cpu-cap", "custom/power-profile",
+        "custom/battery", "custom/screenshot", "custom/uptime", "tray", "clock"
     ],
-    "niri/workspaces": {
-        "format": "{value}",
-        "current-only": false
-    },
-    // Scroll-strip position: "3/7" means focused column 3 of 7 on this workspace,
-    // with arrows for however many are hidden off-screen left/right. Blank when a
-    // workspace has one column or none, since nothing can be hidden then.
-    // Event-driven off `niri msg -j event-stream`, so no polling interval.
-    "custom/cols": {
-        "exec": "~/bin/niri-colcount",
-        "return-type": "json",
-        "tooltip": true
-    },
-
-    // ---- i3blocks blocks ----------------------------------------------------
-    // exec reads the block; on-click / on-click-right pass the button as
-    // $BLOCK_BUTTON, as i3blocks did. --signal N redraws the block after a click
-    // (`pkill -RTMIN+N waybar` does the same by hand). --hint is the hover text.
-    "custom/claude": {
-        "exec": "~/bin/i3blocks-waybar --hint 'right: switch account' ~/scripts/claude-usage.sh",
-        "return-type": "json", "interval": 60, "signal": 15,
-        "on-click-right": "~/bin/i3blocks-waybar --signal 15 ~/scripts/claude-usage.sh 3"
-    },
-    "custom/disk": {
-        "exec": "~/bin/i3blocks-waybar --hint 'left: biggest dirs (sudo du) · right: df -h' ~/scripts/disk.sh",
-        "return-type": "json", "interval": 60,
-        "on-click": "~/bin/i3blocks-waybar ~/scripts/disk.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar ~/scripts/disk.sh 3"
-    },
-    "custom/updates": {
-        "exec": "~/bin/i3blocks-waybar --timeout 120 --hint 'left: re-check · right: pacman -Syu' ~/scripts/updates.sh",
-        "return-type": "json", "interval": 3600, "signal": 17,
-        "on-click": "~/bin/i3blocks-waybar --signal 17 ~/scripts/updates.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar --signal 17 ~/scripts/updates.sh 3"
-    },
-    "custom/network": {
-        "exec": "~/bin/i3blocks-waybar --hint 'right: rescan / link rates / reconnect / reset adapter / nmtui / speedtest' ~/scripts/network.sh",
-        "return-type": "json", "interval": 10, "signal": 19,
-        "on-click-right": "~/bin/i3blocks-waybar --signal 19 ~/scripts/network.sh 3"
-    },
-    "custom/vpn": {
-        "exec": "~/bin/i3blocks-waybar --hint 'right: wg_1 / wg_2 / off' ~/scripts/vpn.sh",
-        "return-type": "json", "interval": 10, "signal": 18,
-        "on-click-right": "~/bin/i3blocks-waybar --signal 18 ~/scripts/vpn.sh 3"
-    },
-    "custom/bluetooth": {
-        "exec": "~/bin/i3blocks-waybar --hint 'right: bluetoothctl / power / nuke_bt / restart logid' ~/scripts/bluetooth.sh",
-        "return-type": "json", "interval": 5, "signal": 20,
-        "on-click-right": "~/bin/i3blocks-waybar --signal 20 ~/scripts/bluetooth.sh 3"
-    },
-    "custom/bt-headphones": {
-        "exec": "~/bin/i3blocks-waybar --hint 'click: connect / disconnect' ~/scripts/bt-headphones.sh",
-        "return-type": "json", "interval": 5, "signal": 21,
-        "on-click": "~/bin/i3blocks-waybar --signal 21 ~/scripts/bt-headphones.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar --signal 21 ~/scripts/bt-headphones.sh 3"
-    },
-    "custom/bt-keyboard": {
-        "exec": "~/bin/i3blocks-waybar --hint 'click: connect / disconnect' ~/scripts/bt-keyboard.sh",
-        "return-type": "json", "interval": 5, "signal": 22,
-        "on-click": "~/bin/i3blocks-waybar --signal 22 ~/scripts/bt-keyboard.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar --signal 22 ~/scripts/bt-keyboard.sh 3"
-    },
-    "custom/cpu-boost": {
-        "exec": "~/bin/i3blocks-waybar --hint 'click: toggle turbo boost' ~/scripts/cpu-boost.sh",
-        "return-type": "json", "interval": 30, "signal": 13,
-        "on-click": "~/bin/i3blocks-waybar --signal 13 ~/scripts/cpu-boost.sh 1"
-    },
-    "custom/cpu-cap": {
-        "exec": "~/bin/i3blocks-waybar --hint 'left: pick a CPU cap · right: 100% ↔ 80%' ~/scripts/cpu-cap.sh",
-        "return-type": "json", "interval": 30, "signal": 14,
-        "on-click": "~/bin/i3blocks-waybar --signal 14 ~/scripts/cpu-cap.sh 1",
-        "on-click-right": "~/bin/i3blocks-waybar --signal 14 ~/scripts/cpu-cap.sh 3"
-    },
-    "custom/power-profile": {
-        "exec": "~/bin/i3blocks-waybar --hint 'click: next power profile' ~/scripts/power-profile.sh",
-        "return-type": "json", "interval": 30, "signal": 12,
-        "on-click": "~/bin/i3blocks-waybar --signal 12 ~/scripts/power-profile.sh 1"
-    },
-    "custom/battery": {
-        "exec": "~/bin/i3blocks-waybar --hint 'right: upower details' ~/scripts/battery.sh",
-        "return-type": "json", "interval": 30,
-        "on-click-right": "~/bin/i3blocks-waybar ~/scripts/battery.sh 3"
-    },
-    "custom/uptime": {
-        "exec": "~/bin/i3blocks-waybar --hint 'right: systemd-analyze blame' ~/scripts/uptime.sh",
-        "return-type": "json", "interval": 60,
-        "on-click-right": "~/bin/i3blocks-waybar ~/scripts/uptime.sh 3"
-    },
-
-    // i3's screenshot.sh shells out to scrot, which is X11-only and does nothing
-    // here. Same button, niri's own screenshot actions behind it.
-    "custom/screenshot": {
-        "exec": "~/bin/i3blocks-waybar --hint 'left: region · right: whole screen' ~/scripts/screenshot.sh",
-        "return-type": "json", "interval": "once",
-        "on-click": "niri msg action screenshot",
-        "on-click-right": "niri msg action screenshot-screen"
-    },
-
-    // ---- native -------------------------------------------------------------
-    // cpu / temp / memory: cpu.sh, temp.sh, memory.sh as native modules. They read
-    // /proc and /sys inside waybar, so they can tick every 1-2s for free; the
-    // scripts cost a bash + python spawn per tick and ran every 5-10s, so a load
-    // change took that long to show. Same text; the states are the scripts'
-    // colour thresholds (style.css paints them).
-    "cpu": {
-        "format": "󰍛 {usage}%", "interval": 1,
-        "on-click": "alacritty -e htop",
-        "on-click-right": "alacritty -e htop -s PERCENT_CPU"
-    },
-    // temp.sh asks for coretemp, which this AMD box does not have, and falls back
-    // to the hottest thermal zone: zone 0 (acpitz) is the only one. This module
-    // takes no "states", only these two thresholds (see style.css).
-    "temperature": {
-        "thermal-zone": 0,
-        "format": "󰔏 {temperatureC}°C", "interval": 2,
-        "warning-threshold": 70, "critical-threshold": 85
-    },
-    "memory": {
-        "format": "󰘚 {used:0.1f}G/{total:0.1f}G", "interval": 2,
-        "states": { "m60": 60, "m75": 75, "m90": 90 },
-        "tooltip-format": "{percentage}% used\nleft: htop by memory · right: free -h",
-        "on-click": "alacritty -e htop -s PERCENT_MEM",
-        "on-click-right": "alacritty -e bash -c \"free -h; read -p 'Press enter to close...'\""
-    },
-    // Swap next to RAM. No "states": the memory module computes them from RAM
-    // use, not swap use, so they would colour this block by the wrong number.
-    // style.css reaches it as #memory.swap, so it gets the #memory padding.
-    "memory#swap": {
-        "format": "󰓡 {swapUsed:0.1f}G/{swapTotal:0.1f}G", "interval": 2,
-        "tooltip-format": "swap {swapPercentage}% used\nleft: htop by memory · right: swapon --show",
-        "on-click": "alacritty -e htop -s PERCENT_MEM",
-        "on-click-right": "alacritty -e bash -c \"swapon --show; read -p 'Press enter to close...'\""
-    },
-    // volume.sh / mic.sh look: red when muted, mic icon only.
-    "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-muted": "󰖁 MUTE",
-        "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
-        "tooltip-format": "{desc}\nleft: mute · right: pavucontrol · scroll: ±5%",
-        "on-click": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
-        "on-click-right": "pavucontrol",
-        "scroll-step": 5
-    },
-    "pulseaudio#mic": {
-        "format": "{format_source}",
-        "format-source": "󰍬",
-        "format-source-muted": "󰍭",
-        "tooltip-format": "mic {source_volume}%\nclick: mute",
-        "on-click": "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
-        "on-click-right": "pactl set-source-mute @DEFAULT_SOURCE@ toggle"
-    },
-    "tray": { "spacing": 8 },
-    // datetime.sh's format and clicks. Native because it ticks on the minute;
-    // the script polled every 30s.
-    "clock": {
-        "format": "{:%a %d %b %H:%M}",
-        "tooltip-format": "<tt>{calendar}</tt>",
-        "on-click": "alacritty -e bash -c \"cal -3; read -p 'Press enter to close...'\"",
-        "on-click-right": "alacritty -e bash -c \"cal -y; read -p 'Press enter to close...'\""
-    }
+    // short_text. Claude drops the reset timers; the device and network blocks
+    // drop their names and keep the icon, whose colour still says on / off.
+    "custom/claude":        { "format": "{alt}" },
+    "custom/disk":          { "format": "{alt}" },
+    "custom/network":       { "format": "{alt}" },
+    "custom/vpn":           { "format": "{alt}" },
+    "custom/bluetooth":     { "format": "{alt}" },
+    "custom/bt-headphones": { "format": "{alt}" },
+    "custom/bt-keyboard":   { "format": "{alt}" },
+    // Percentages, not "40.1G/86.1G". The tooltip has the other number.
+    "memory":      { "format": "󰘚 {percentage}%", "tooltip-format": "{used:0.1f}G of {total:0.1f}G used\nleft: htop by memory · right: free -h" },
+    "memory#swap": { "format": "󰓡 {swapPercentage}%", "tooltip-format": "swap {swapUsed:0.1f}G of {swapTotal:0.1f}G used\nleft: htop by memory · right: swapon --show" },
+    // The red icon says muted; the word is not needed.
+    "pulseaudio":  { "format-muted": "󰖁" }
 }
+]

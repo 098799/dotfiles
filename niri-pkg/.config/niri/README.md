@@ -21,7 +21,7 @@ Everything is in `~/dotfiles/niri-pkg/` and GNU Stow links it into `~`.
 | `~/.config/niri/binds.kdl` | All key bindings, grouped by topic. |
 | `~/.config/niri/startup.kdl` | Programs started at login (waybar, dunst, syncthing, …). |
 | `~/.config/niri/environment.kdl` | Env vars for started programs. Mostly a list of vars to remove. |
-| `~/.config/waybar/` | The bar. It runs the same `~/scripts/*.sh` blocks as i3blocks. |
+| `~/.config/waybar/` | The bar. It runs the same `~/scripts/*.sh` blocks as i3blocks. Font = the terminal font (UbuntuMono 12). Two bars: the laptop screen (eDP-1) shows the blocks' short texts, because the full bar is wider than 1536 logical px and waybar cuts off the right end, clock included. `config.jsonc` has the bars, `modules.jsonc` the blocks. |
 | `~/.config/hypr/hyprlock.conf` | Lock screen: look, and the fingerprint + password setup. |
 | `pam.d/hyprlock-password` | The lock screen's password-only PAM file. It is **not** stowed: install it with `sudo cp pam.d/hyprlock-password /etc/pam.d/`. `install.sh` warns when the copy in `/etc` differs. |
 | `~/.config/swaylock/config` | Colours for swaylock, the old locker. Only a fallback now. |

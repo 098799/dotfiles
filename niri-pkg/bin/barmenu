@@ -30,13 +30,13 @@ import sys
 
 REAL_ROFI = "/usr/bin/rofi"
 # waybar's height (config.jsonc); the menu opens just under it.
-BAR_HEIGHT = int(os.environ.get("BARMENU_BAR_HEIGHT", "27"))
+BAR_HEIGHT = int(os.environ.get("BARMENU_BAR_HEIGHT", "22"))
 EDGE = 4
 # If the overlay has not seen the pointer by then, open at the top-right.
 POINTER_WAIT_MS = 200
 
 CSS = b"""
-* { font-family: "Terminess Nerd Font", monospace; font-size: 14pt; }
+* { font-family: "UbuntuMono Nerd Font Propo", monospace; font-size: 12pt; }
 window { background: transparent; }
 .menu { background: #282828; border: 1px solid #504945; padding: 4px 0; min-width: 160px; }
 .prompt { color: #7c6f64; padding: 0 14px 4px; }
