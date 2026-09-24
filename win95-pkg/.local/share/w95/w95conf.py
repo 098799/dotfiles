@@ -76,7 +76,7 @@ SYSMON_SIZE = max(30, min(100, _V["sysmon_size"])) / 100.0
 # How often the resident monitor samples Claude usage into its history — the
 # one probe that keeps running while the window is hidden, because the chart is
 # drawn from the samples and a gap in them cannot be filled in later. 120s is
-# what the mr-reviewer usage pusher settled on against the same endpoint; 60s
+# a cadence the endpoint is known to tolerate; 60s
 # is the floor, and 0 turns background sampling off entirely (the chart then
 # only gains points while the monitor is on screen, or from the i3blocks bar
 # block in non-Win95 sessions).

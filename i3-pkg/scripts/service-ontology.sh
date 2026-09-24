@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ontology service status for i3blocks
+# Backend service status for i3blocks
 # Left-click: restart, Right-click: menu
 
 SERVICE="ontology"

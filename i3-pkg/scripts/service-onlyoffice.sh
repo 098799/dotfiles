@@ -1,5 +1,5 @@
 #!/bin/bash
-# OnlyOffice add-in service status for i3blocks
+# Document-editor add-in service status for i3blocks
 # Left-click: restart, Right-click: menu
 
 SERVICE="onlyoffice"

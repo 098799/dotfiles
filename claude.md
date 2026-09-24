@@ -14,7 +14,7 @@ This document describes the i3/i3blocks configuration managed by Claude Code. Ru
 │   └── rofi/
 │       └── config.rasi     # rofi menu styling (solarized dark)
 ├── scripts/                # i3blocks scripts
-│   ├── service-*.sh        # Service monitoring (ontology, consumer, frontend, user)
+│   ├── service-*.sh        # Dev service monitoring (backend, consumer, frontend, user)
 │   ├── claude-usage.sh     # Claude API usage monitor
 │   ├── vpn.sh              # WireGuard VPN status/menu
 │   ├── bluetooth.sh        # Bluetooth status/menu
@@ -54,8 +54,8 @@ rm -rf ~/.config/rofi && ln -s ~/dotfiles/.config/rofi ~/.config/rofi
 ### Service Monitoring (os, oc, fr, us)
 
 Four services are monitored:
-- **os** = ontology service
-- **oc** = ontology_consumer service
+- **os** = backend service
+- **oc** = backend consumer service
 - **fr** = frontend service (Angular)
 - **us** = user service
 
@@ -148,7 +148,7 @@ sudo alsactl store
 pkill -x i3blocks; i3-msg restart
 
 # Refresh specific block (by signal number)
-pkill -RTMIN+1 i3blocks  # ontology
+pkill -RTMIN+1 i3blocks  # backend
 pkill -RTMIN+2 i3blocks  # consumer
 pkill -RTMIN+3 i3blocks  # frontend
 pkill -RTMIN+4 i3blocks  # user

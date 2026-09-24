@@ -274,11 +274,11 @@ the i3blocks block in a normal session, the System Monitor in a Win95 one. The
 monitor keeps sampling while hidden — `claude_sample = 120` seconds in
 `~/.config/w95/settings`, `0` to only sample while the window is on screen —
 because the chart is only as good as the samples behind it. Cost is one cached
-HTTP call per account per two minutes, the cadence the mr-reviewer usage pusher
-settled on against the same endpoint. The file is trimmed to the last 14 days
+HTTP call per account per two minutes, a cadence the endpoint is known to
+tolerate. The file is trimmed to the last 14 days
 when it passes 4 MB; nothing else has to run.
 
-This is one row per *account*, not mr-reviewer's one row per *sample* with two
+This is one row per *account*, not one row per *sample* with two
 positional columns per account and a "never reorder this list" warning on it —
 a row that names its own account survives an account being added, renamed or
 dropped, which on this laptop happens all the time.

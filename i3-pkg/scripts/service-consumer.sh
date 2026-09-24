@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ontology consumer service status for i3blocks
+# Backend consumer service status for i3blocks
 # Left-click: restart, Right-click: menu
 
 SERVICE="ontology_consumer"

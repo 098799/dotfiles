@@ -13,7 +13,7 @@ __pycache__/
 # Local-only, synced between hosts by Syncthing but never published: this is a
 # public repo.
 #   ssh/            names a real host and its login user
-#   mr-reviewer-*   employer-internal tooling (ticket ids, internal hostnames)
+#   webkit keys     work-internal (ticket ids, internal hostnames)
 ssh/
 webkit/snippets/mr-reviewer-keys/
 

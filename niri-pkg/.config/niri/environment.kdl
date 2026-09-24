@@ -35,10 +35,10 @@ environment {
     I3SOCK null
     // niri sets TERM per app; a session-wide TERM=alacritty lies to everything else.
     TERM null
-    // Set to a LITERAL `~/legartis` by `set -a && source ~/bin/.env`. ~ does not
+    // Set to a LITERAL `~/…` path by `set -a && source ~/bin/.env`. ~ does not
     // expand inside a var, so every consumer got a path that cannot resolve, and
-    // .zshrc's `: ${LEGARTIS_REPO:=$HOME/legartis}` only fires when UNSET — so the
-    // broken value won. Unset it here and let .zshrc compute it.
+    // .zshrc's `:=` default only fires when UNSET — so the broken value won.
+    // Unset it here and let .zshrc compute it.
     LEGARTIS_REPO null
     // Rest of the same import: session-scoped state that is wrong once stale.
     KUBECONFIG null
