@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Mod+Shift+C: every key binding, fullscreen, in columns, searchable.
+
+niri's own hotkey overlay is one column, cannot scroll, and cuts off at the
+bottom of a laptop screen. This reads binds.kdl and shows it in rofi instead:
+one column per third (or quarter) of the screen, type to filter, Esc to close.
+
+- The `// ---- name ----` section comments of binds.kdl become the headers.
+- Keys with the same action are one row: `Mod+J / Left`.
+- A bind's `hotkey-overlay-title` is its label; without one, the action is.
+- The touchpad and mouse gestures are not binds, so they are listed below.
+
+niri's own overlay is still there, on Mod+Ctrl+Shift+C.
+"""
+import json
+import math
+import re
+import shlex
+import subprocess
+from pathlib import Path
+
+BINDS = Path.home() / ".config/niri/binds.kdl"
+
+# Built into niri or libinput, so they are in no config file.
+GESTURES = [
+    ("3 fingers left/right", "scroll the columns"),
+    ("3 fingers up/down", "next / previous workspace"),
+    ("4 fingers up/down", "overview on / off"),
+    ("top-left corner", "overview (hot corner)"),
+    ("2-finger tap", "right click"),
+    ("3-finger tap", "middle click (paste)"),
+    ("tap, tap+hold", "drag"),
+    ("Mod+drag", "move a window"),
+    ("Mod+right drag", "resize a window"),
+    ("Mod+middle drag", "drag the view"),
+    ("overview: drag", "window to another workspace"),
+]
+
+KEY_NAMES = {
+    # ASCII only: an arrow glyph comes from a fallback font with another width
+    # and pushes the label column out of line.
+    "Semicolon": ";", "Slash": "/", "Comma": ",", "Period": ".",
+    "BracketLeft": "[", "BracketRight": "]", "Grave": "`",
+    "Minus": "-", "Equal": "=", "Page_Up": "PgUp", "Page_Down": "PgDn",
+    "BackSpace": "Bksp", "Escape": "Esc", "Return": "Enter",
+    "KP_Add": "KP+", "KP_Subtract": "KP-",
+    "WheelScrollUp": "WheelUp", "WheelScrollDown": "WheelDown",
+    "WheelScrollLeft": "WheelLeft", "WheelScrollRight": "WheelRight",
+}
+
+SECTION = re.compile(r"^\s*//\s*-{3,}\s*(.+?)\s*-{3,}")
+BIND = re.compile(r"^(?!\s*//)\s*(?P<head>[^{/]\S*(?:\s+[^{]*)?)\{(?P<body>[^}]*)\}")
+
+
+def pretty_key(combo: str) -> str:
+    *mods, key = combo.split("+")
+    return "+".join(mods + [KEY_NAMES.get(key, key)])
+
+
+def label(props: dict[str, str], body: str) -> str:
+    if "hotkey-overlay-title" in props:
+        return props["hotkey-overlay-title"]
+    words = shlex.split(body.strip().rstrip(";"))
+    action, args = words[0], words[1:]
+    if action == "spawn":
+        return " ".join([Path(args[0]).name] + args[1:])
+    if action == "spawn-sh":
+        return args[0]
+    return " ".join([action.replace("-", " ")] + args)
+
+
+def join_keys(combos: list[str]) -> str:
+    """`Mod+J`, `Mod+Left` → `Mod+J / Left`: the shared modifiers print once."""
+    first = pretty_key(combos[0])
+    mods = first.rpartition("+")[0]
+    parts = [first]
+    for combo in combos[1:]:
+        key = pretty_key(combo)
+        parts.append(key.rpartition("+")[2] if mods and key.rpartition("+")[0] == mods else key)
+    return " / ".join(parts)
+
+
+def read_binds() -> list[tuple[str, list[tuple[str, str]]]]:
+    sections: list[tuple[str, dict[str, tuple[list[str], str]]]] = [("general", {})]
+    inside = False
+    for line in BINDS.read_text().splitlines():
+        if not inside:
+            inside = line.strip().startswith("binds")
+            continue
+        if m := SECTION.match(line):
+            sections.append((m[1], {}))
+            continue
+        if not (m := BIND.match(line)):
+            continue
+        combo, *rest = shlex.split(m["head"])
+        props = dict(p.split("=", 1) for p in rest if "=" in p)
+        body = " ".join(m["body"].split())
+        rows = sections[-1][1]
+        # Same action anywhere above ⇒ one row: add the key to it.
+        for _, other in sections:
+            if body in other:
+                other[body][0].append(combo)
+                break
+        else:
+            rows[body] = ([combo], label(props, body))
+    out = [(name, [(join_keys(keys), text) for keys, text in rows.values()]) for name, rows in sections]
+    out.append(("touchpad & mouse", GESTURES))
+    return [(name, rows) for name, rows in out if rows]
+
+
+def esc(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def output_width() -> int:
+    try:
+        out = subprocess.run(["niri", "msg", "--json", "focused-output"], capture_output=True, text=True, timeout=2)
+        return json.loads(out.stdout)["logical"]["width"]
+    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+        return 1536
+
+
+def main() -> None:
+    sections = read_binds()
+    width = max(len(keys) for _, rows in sections for keys, _ in rows)
+    lines: list[str] = []
+    headers: list[int] = []
+    for name, rows in sections:
+        headers.append(len(lines))
+        lines.append(f"<b>▸ {esc(name.upper())}</b>")
+        lines += [f"<b>{esc(keys.ljust(width))}</b>  {esc(text)}" for keys, text in rows]
+
+    columns = 4 if output_width() >= 2000 else 3
+    per_column = math.ceil(len(lines) / columns)
+    theme = (
+        "window { width: 100%; height: 100%; y-offset: 0; border: 0; border-radius: 0; }"
+        "inputbar { border-radius: 0; }"
+        f"listview {{ columns: {columns}; lines: {per_column}; fixed-columns: true; spacing: 0; flow: vertical; }}"
+        "element { padding: 1px 10px; border-radius: 4px; }"
+        "element-text { vertical-align: 0.5; }"
+        # The headers are rofi "active" rows; the shared theme styles only the
+        # normal and selected ones, so every second header got rofi's default slab.
+        "element alternate.active { background-color: transparent; text-color: @active; }"
+    )
+    subprocess.run(
+        ["rofi", "-dmenu", "-i", "-markup-rows", "-no-custom", "-p", "keys",
+         "-font", "Ubuntu Mono 11", "-a", ",".join(map(str, headers)), "-theme-str", theme],
+        input="\n".join(lines), text=True, capture_output=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

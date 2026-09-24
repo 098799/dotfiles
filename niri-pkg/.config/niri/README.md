@@ -65,6 +65,7 @@ The keys that act differently from plain niri:
 | `Mod+Shift+Z` | Terminal **below** the focused window, not in a new column. |
 | `Mod+Ctrl+1/2/3` | Resize the window to 50/75/90% and center it. |
 | `Mod+Tab` | Overview of all workspaces. |
+| `Mod+Shift+C` | All keys, fullscreen, in columns. Type to filter, `Esc` closes. niri's own overlay is on `Mod+Ctrl+Shift+C`. |
 | `Mod+Alt+G` / `Mod+Alt+Shift+G` | Gaps off / back on. |
 | `Mod+BackSpace` | Menu: screen layouts, theme, font size. |
 | `Mod+[` / `Mod+]` | Volume -/+10% (i3 muscle memory). niri's own use of these keys moved to `Mod+Shift+[` / `]`. |
@@ -82,6 +83,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `niri-gaps` | `Mod+Alt+G`, `Mod+Alt+Shift+G` | Set gaps to 0 or back. `niri-gaps get` prints the current gap. | niri has no gap action at runtime. The script rewrites the `gaps` line in `layout.kdl`, and niri reloads it. |
 | `niri-auto-width` | startup | One terminal alone gets 2/3 of the width; two terminals get 1/2 each. | niri has one fixed default width. The script listens to niri events and resizes. |
 | `niri-minimap` | startup | When you switch workspace, it shows that workspace's whole row of columns for about a second, scaled down in the middle of the screen: windows at their true widths with icon and title, a frame for the part on screen (the rest dimmed), `◀ 2   1 ▶` for the columns off screen. Nothing else brings it up; while it is up, a scroll slides the frame. Clicks go through it. `niri-minimap --show` shows it now; `--png FILE [WORKSPACE]` draws it to a file. | niri has no minimap. The IPC gives no view position, so the script replays niri's `center-focused-column "never"` rule to place the frame. After a touchpad swipe or a mouse drag of the view, the frame can be off until niri next scrolls to a column. |
+| `niri-keys` | `Mod+Shift+C` | Shows every bind of `binds.kdl` in a fullscreen rofi: 3 columns (4 on a screen 2000+ px wide), the `// ---- name ----` comments as headers, keys with the same action on one row, and the touchpad/mouse gestures at the end. The label is the bind's `hotkey-overlay-title`, or the action when there is none. | niri's overlay is one column and cannot scroll, so on the laptop screen the bottom is cut off. |
 | `niri-colcount` | waybar | Shows `◀2 3/7 4▶`: which column you are in, and how many are off screen. | Custom waybar module. |
 | `i3blocks-waybar` | waybar | Runs an i3blocks script and converts its output for waybar. | So that the two bars share one set of scripts. |
 | `barmenu` | `i3blocks-waybar` | Bar menus that open under the block you clicked and close on a click outside. | Wayland rofi cannot do either. |

@@ -1,5 +1,6 @@
 // Every key binding. Included from config.kdl.
-// Mod+Shift+C shows all of them on screen.
+// Mod+Shift+C shows all of them on screen (niri-keys; niri's own overlay is
+// Mod+Ctrl+Shift+C).
 //
 // Key grammar, kept from i3:
 //   j k l ;          left down up right (the arrow keys do the same)
@@ -12,7 +13,8 @@
 // something first), it spawns a script from ../../bin — see README.md.
 
 binds {
-    Mod+Shift+C { show-hotkey-overlay; }   // i3: reload — niri reloads on save; this shows the map
+    Mod+Shift+C hotkey-overlay-title="all keys" { spawn "niri-keys"; }   // i3: reload — niri reloads on save; this shows the map
+    Mod+Ctrl+Shift+C { show-hotkey-overlay; }   // niri's own overlay: one column, no scroll
 
     // ---- windows --------------------------------------------------------
     Mod+Shift+Q repeat=false { close-window; }
@@ -28,8 +30,8 @@ binds {
     // the script runs plain focus-column-left. (The combined action on its own
     // walked a 1:(1:1) split bottom-right -> top-right -> left.) niri allows one
     // action per key and has no "if tabbed" action, so the check is a script.
-    Mod+J         { spawn "niri-focus-lr" "left"; }
-    Mod+Semicolon { spawn "niri-focus-lr" "right"; }
+    Mod+J         hotkey-overlay-title="focus left (tabs first)" { spawn "niri-focus-lr" "left"; }
+    Mod+Semicolon hotkey-overlay-title="focus right (tabs first)" { spawn "niri-focus-lr" "right"; }
     Mod+Left      { spawn "niri-focus-lr" "left"; }
     Mod+Right     { spawn "niri-focus-lr" "right"; }
     // k/l stay PURE vertical, so there is still a way to move inside a stacked
@@ -106,9 +108,9 @@ binds {
     // resize mode `c`, and the 1/2/3 presets (50% / 75% / 90%, centred).
     Mod+Ctrl+C { center-window; }
     // Three actions, and a niri bind takes exactly one — hence the script.
-    Mod+Ctrl+1 { spawn "niri-preset-size" "50"; }
-    Mod+Ctrl+2 { spawn "niri-preset-size" "75"; }
-    Mod+Ctrl+3 { spawn "niri-preset-size" "90"; }
+    Mod+Ctrl+1 hotkey-overlay-title="window 50%, centred" { spawn "niri-preset-size" "50"; }
+    Mod+Ctrl+2 hotkey-overlay-title="window 75%, centred" { spawn "niri-preset-size" "75"; }
+    Mod+Ctrl+3 hotkey-overlay-title="window 90%, centred" { spawn "niri-preset-size" "90"; }
     // No twin for resize mode's h/n/u/m (grow ONE edge): niri sizes a window by
     // width and height about its centre and exposes no per-edge verb at all.
 
@@ -179,12 +181,12 @@ binds {
 
     // ---- session ------------------------------------------------------------
     Mod+Shift+X { quit; }                                  // asks first, like i3-nagbar
-    Ctrl+Alt+L  { spawn "niri-lock"; }                     // xsecurelock → hyprlock (finger OR password)
+    Ctrl+Alt+L  hotkey-overlay-title="lock" { spawn "niri-lock"; }                     // xsecurelock → hyprlock (finger OR password)
     Mod+Shift+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
     // ---- screenshots (scrot → grim/slurp/niri) ------------------------------
     Mod+Alt+Shift+K { screenshot-screen; }                 // scrot
-    Mod+Alt+Shift+J { spawn "niri-screenshot-clip"; }      // screenshot-clip: region → clipboard
+    Mod+Alt+Shift+J hotkey-overlay-title="screenshot region → clipboard" { spawn "niri-screenshot-clip"; }      // screenshot-clip: region → clipboard
     Mod+Alt+Shift+S { screenshot; }                        // scrot -s: niri's own picker
     Print           { screenshot; }
     Alt+Print       { screenshot-window; }
@@ -193,52 +195,52 @@ binds {
     // Same keys, same toggle: press once to start, again to stop. The plain
     // combo records system sound + microphone mixed to one track; +Ctrl is the
     // silent twin, exactly as in i3. See ~/bin/niri-record.
-    Mod+Alt+Shift+L         repeat=false { spawn "niri-record-desktop"; }
-    Mod+Alt+Shift+Semicolon repeat=false { spawn "niri-record-window"; }
-    Mod+Ctrl+Alt+Shift+L         repeat=false { spawn-sh "AUDIO=none niri-record-desktop"; }
-    Mod+Ctrl+Alt+Shift+Semicolon repeat=false { spawn-sh "AUDIO=none niri-record-window"; }
+    Mod+Alt+Shift+L         repeat=false hotkey-overlay-title="record screen" { spawn "niri-record-desktop"; }
+    Mod+Alt+Shift+Semicolon repeat=false hotkey-overlay-title="record window" { spawn "niri-record-window"; }
+    Mod+Ctrl+Alt+Shift+L         repeat=false hotkey-overlay-title="record screen, no sound" { spawn-sh "AUDIO=none niri-record-desktop"; }
+    Mod+Ctrl+Alt+Shift+Semicolon repeat=false hotkey-overlay-title="record window, no sound" { spawn-sh "AUDIO=none niri-record-window"; }
     // ~/bin/record-region was never bound under i3. slurp makes it the cheapest
     // of the three on Wayland, so it gets a key here.
-    Mod+Alt+Shift+R         repeat=false { spawn "niri-record-region"; }
+    Mod+Alt+Shift+R         repeat=false hotkey-overlay-title="record region" { spawn "niri-record-region"; }
 
     // ---- autoclick (xdotool -> ydotool) -------------------------------------
-    Mod+Alt+Shift+C repeat=false { spawn "niri-autoclick"; }
+    Mod+Alt+Shift+C repeat=false hotkey-overlay-title="autoclick on / off" { spawn "niri-autoclick"; }
 
     // ---- gaps (i3: gaps inner all set 0 / $gaps_inner) -----------------------
     // niri has no runtime gap action, so niri-gaps rewrites the `gaps` line in
     // layout.kdl and lets the config watcher animate it. Side effect over i3:
     // the choice now survives a restart.
-    Mod+Alt+G       { spawn "niri-gaps" "0"; }
-    Mod+Alt+Shift+G { spawn "niri-gaps" "restore"; }
+    Mod+Alt+G       hotkey-overlay-title="gaps off" { spawn "niri-gaps" "0"; }
+    Mod+Alt+Shift+G hotkey-overlay-title="gaps back" { spawn "niri-gaps" "restore"; }
 
     // i3: F14 -> ~/bin/set_keyboard (setxkbmap). The layouts are in the xkb
     // block of config.kdl; this walks them.
     F14 { switch-layout "next"; }
 
     // ---- notifications (dunst, same keys) -----------------------------------
-    Mod+Grave       { spawn "dunstctl" "close"; }
-    Mod+Shift+Grave { spawn "dunstctl" "close-all"; }
-    Ctrl+Mod+H      { spawn "dunstctl" "history-pop"; }
-    Ctrl+Alt+C      { spawn "dunstctl" "context"; }
+    Mod+Grave       hotkey-overlay-title="close notification" { spawn "dunstctl" "close"; }
+    Mod+Shift+Grave hotkey-overlay-title="close all notifications" { spawn "dunstctl" "close-all"; }
+    Ctrl+Mod+H      hotkey-overlay-title="last notification again" { spawn "dunstctl" "history-pop"; }
+    Ctrl+Alt+C      hotkey-overlay-title="notification actions" { spawn "dunstctl" "context"; }
 
     // ---- audio / brightness ---------------------------------------------------
-    XF86AudioRaiseVolume allow-when-locked=true { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+5%"; }
-    XF86AudioLowerVolume allow-when-locked=true { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-5%"; }
-    XF86AudioMute        allow-when-locked=true { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
-    XF86AudioMicMute     allow-when-locked=true { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
+    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="volume +5%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+5%"; }
+    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="volume -5%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-5%"; }
+    XF86AudioMute        allow-when-locked=true hotkey-overlay-title="mute" { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
+    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="mic mute" { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
     // i3: $mod+bracketleft / $mod+bracketright. Reclaimed from niri's default
     // consume-or-expel-window, which now sits on Mod+Shift+[ / Mod+Shift+].
-    Mod+BracketLeft  { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
-    Mod+BracketRight { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+10%"; }
+    Mod+BracketLeft  hotkey-overlay-title="volume -10%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
+    Mod+BracketRight hotkey-overlay-title="volume +10%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+10%"; }
     Mod+Escape { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
     Mod+Space  { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
-    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
+    XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="brightness +10%" { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="brightness -10%" { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
 
     // ---- FTL speedhack, as in i3 ---------------------------------------------
-    Mod+F9  { spawn "/home/tgrining/bin/ftl-speed" "3"; }
-    Mod+F10 { spawn "/home/tgrining/bin/ftl-speed" "100"; }
-    Mod+F11 { spawn "/home/tgrining/bin/ftl-speed"; }
+    Mod+F9  hotkey-overlay-title="FTL speed 3" { spawn "/home/tgrining/bin/ftl-speed" "3"; }
+    Mod+F10 hotkey-overlay-title="FTL speed 100" { spawn "/home/tgrining/bin/ftl-speed" "100"; }
+    Mod+F11 hotkey-overlay-title="FTL speed reset" { spawn "/home/tgrining/bin/ftl-speed"; }
 
     // i3 had this on ~/scripts/screen_switch. That menu is half xrandr layouts
     // and half theme/font switches; the niri port keeps the switches as they
