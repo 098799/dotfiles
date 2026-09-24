@@ -40,8 +40,12 @@ tooltip label { color: @title_fg; }
 /* i3's bar colors{} block, mapped onto waybar's niri/workspaces classes.
  * The niri module exposes .focused / .active / .urgent / .empty — there is no
  * .visible (that belongs to the sway module). */
-/* min-width 0: the GTK theme gives every button a minimum width, so a
- * one-letter workspace ("1") was as wide as "work". */
+/* min-width 0 and font-weight normal: the GTK theme (Adapta) gives every
+ * button a minimum width and a bold label, so a one-letter workspace ("1") was
+ * as wide as "work", and the names were heavier than the terminal text. */
+#workspaces button, #workspaces button label {
+    font-weight: normal;
+}
 #workspaces button {                                                    /* inactive_workspace */
     padding: 0 4px;
     min-width: 0;
