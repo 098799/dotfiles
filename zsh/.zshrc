@@ -89,7 +89,17 @@ py3clean() {
 export PATH_TO_HTML=/tmp
 
 # DBus activation
-dbus-update-activation-environment --all
+# NEVER `--all` here. `--all` pushes this pane's ENTIRE env into the dbus/systemd
+# user activation environment, and systemd --user outlives the session, so the
+# junk is inherited by the NEXT compositor and by every app it spawns. That is
+# what broke the niri switch: an empty ZDOTDIR got baked in, which makes zsh read
+# /.zshrc instead of ~/.zshrc, so terminals opened with no aliases and no `claw`.
+# Under `niri --session` (systemd-managed) the session exports these itself, so
+# only do this for a session that has no manager to do it — i.e. plain startx.
+if [[ -z "$XDG_SESSION_DESKTOP" && -n "$DISPLAY" ]]; then
+    dbus-update-activation-environment --systemd \
+        DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE 2>/dev/null
+fi
 
 # Compiler configuration
 export FC="gfortran"
@@ -178,9 +188,32 @@ lpy() {
     "$(_legartis_venv "$slot")/bin/python" "$@" )
 }
 
-# Deploy keycloak-configuration-staging from the Nth slot worktree.
-# Wraps the canonical `pnpm run devops:deploy:keycloak-conf:staging` (vault OIDC login included).
-# Usage: keycloak <slot> [extra cdktn args]  e.g. keycloak 0 --auto-approve
+# Sync THIS BRANCH's new Keycloak roles to dev, additively, from the Nth slot
+# worktree. Wraps `pnpm run deploy:branch-roles:with-login` (vault OIDC login
+# included) = scripts/sync-branch-roles.ts add.
+#
+# NOT the cdktf keycloak-configuration-staging stack, whatever this comment used
+# to say. That is `pnpm run devops:deploy:keycloak-conf:staging`, a much heavier
+# thing you almost never want; this only creates roles master does not have yet.
+#
+# Two things it will NOT do, both of which look like success:
+#   * a role that ALREADY EXISTS is skipped whole — including its group
+#     assignments. So it can never repair a role with wrong or missing groups;
+#     you just get `created=0 ... skipped=N` and a still-403 endpoint. Check the
+#     group mappings by hand before believing it.
+#   * it reads config.ts as written, so it happily creates a role on the WRONG
+#     Keycloak client. An API permission must sit under the service block that
+#     owns the endpoint (e.g. `ontology`), because the FastAPI check reads
+#     resource_access[<that service's client>] from the JWT. Declared instead
+#     under roles["django-admin"] — which reads naturally, since the
+#     app_label.modelname entries there look just like a permission name — the
+#     role is created and mapped to the right groups and STILL 403s every
+#     request, with no re-login or re-deploy able to help. Cost an afternoon on
+#     DEV-6046; see the comment on "subscription.llmusage" in config.ts.
+#
+# Undo: `pnpm run destroy:branch-roles:with-login` (removes every role tagged
+# managed-by=<branch slug>).
+# Usage: keycloak <slot> [extra args]  e.g. keycloak 0
 keycloak() {
   local slot="$1"; shift
   ( cd "$(_legartis_dir "$slot")/deployments/cdktf" \
@@ -480,15 +513,16 @@ _claw() {
 (( $+functions[compdef] )) && compdef _claw claw
 
 # fable [home] [claude args...] — claw on Fable 5.1 at low effort. Same account
-# picking, same tmux naming; any later --model/--effort on the line wins because
-# claude takes the last occurrence.
+# picking, same tmux naming. The defaults go BEFORE "$@" on purpose: claude takes
+# the LAST occurrence of --model/--effort, so this is what lets your own
+# --model/--effort on the fable line win. claw finds a home name at any position.
 fable() {
   if [[ "$1" == (--help|-h) ]]; then
     print -r -- "fable — claw with --model claude-fable-5-1 --effort low"
     print -r -- "usage: fable [home|main] [claude args...]   (see claw --help)"
     return 0
   fi
-  claw "$@" --model claude-fable-5-1 --effort low
+  claw --model claude-fable-5-1 --effort low "$@"
 }
 (( $+functions[compdef] )) && compdef _claw fable
 
