@@ -1,0 +1,193 @@
+[global]
+    ### Geometry — dunst 1.13 syntax. The old `geometry = "0x4-25+25"` line was
+    ### v1.3 syntax; dunst has been silently ignoring half of it for years.
+    origin = top-right
+    offset = "24x40"
+    width = (300, 460)
+    height = 320
+    notification_limit = 5
+    gap_size = 10
+
+    ### Frame and corners — 10px matches picom's window corner-radius, so a
+    ### notification looks like it belongs to the same desktop as the windows.
+    corner_radius = 10
+    frame_width = 2
+    frame_color = "#98971a"
+    separator_height = 2
+    separator_color = #504945
+    padding = 12
+    horizontal_padding = 14
+    text_icon_padding = 10
+    line_height = 2
+
+    ### Text
+    font = Noto Sans 10
+    markup = full
+    format = "<b>%s</b>%p\n%b"
+    alignment = left
+    vertical_alignment = center
+    word_wrap = yes
+    ellipsize = end
+    ignore_newline = no
+
+    ### Behaviour
+    sort = yes
+    indicate_hidden = yes
+    show_age_threshold = 60
+    idle_threshold = 120
+    monitor = 0
+    follow = mouse
+    sticky_history = yes
+    history_length = 20
+    show_indicators = yes
+    transparency = 12
+
+    ### Progress bar (volume, brightness, anything that sends a value hint)
+    progress_bar = true
+    progress_bar_height = 8
+    progress_bar_frame_width = 1
+    progress_bar_min_width = 150
+    progress_bar_max_width = 400
+    progress_bar_corner_radius = 4
+
+    ### Icons
+    icon_position = left
+    min_icon_size = 32
+    max_icon_size = 64
+    icon_path = /usr/share/icons/Adwaita/16x16/status/:/usr/share/icons/Adwaita/16x16/devices/
+
+    ### Mouse
+    mouse_left_click = do_action, close_current
+    mouse_middle_click = close_all
+    mouse_right_click = close_current
+
+    dmenu = /usr/bin/dmenu -p dunst:
+    browser = google-chrome-stable
+
+### The [shortcuts] section was removed from dunst in 1.7. The same four key
+### combos now live in ~/.config/i3/config and call dunstctl.
+
+[urgency_low]
+    # IMPORTANT: colors have to be defined in quotation marks.
+    # Otherwise the "#" and following would be interpreted as a comment.
+    background = "#282828"
+    foreground = "#7c6f64"
+    timeout = 10
+
+[urgency_normal]
+    background = "#282828"
+    foreground = "#a89984"
+    frame_color = "#98971a"
+    timeout = 10
+
+[urgency_critical]
+    background = "#d3869b"
+    foreground = "#282828"
+    frame_color = "#cc241d"
+    timeout = 0
+
+
+# Every section that isn't one of the above is interpreted as a rules to
+# override settings for certain messages.
+# Messages can be matched by "appname", "summary", "body", "icon", "category",
+# "msg_urgency" and you can override the "timeout", "urgency", "foreground",
+# "background", "new_icon" and "format".
+# Shell-like globbing will get expanded.
+#
+# SCRIPTING
+# You can specify a script that gets run when the rule matches by
+# setting the "script" option.
+# The script will be called as follows:
+#   script appname summary body icon urgency
+# where urgency can be "LOW", "NORMAL" or "CRITICAL".
+# 
+# NOTE: if you don't want a notification to be displayed, set the format
+# to "".
+# NOTE: It might be helpful to run dunst -print in a terminal in order
+# to find fitting options for rules.
+
+#[espeak]
+#    summary = "*"
+#    script = dunst_espeak.sh
+
+#[script-test]
+#    summary = "*script*"
+#    script = dunst_test.sh
+
+#[ignore]
+#    # This notification will not be displayed
+#    summary = "foobar"
+#    format = ""
+
+#[signed_on]
+#    appname = Pidgin
+#    summary = "*signed on*"
+#    urgency = low
+#
+#[signed_off]
+#    appname = Pidgin
+#    summary = *signed off*
+#    urgency = low
+#
+#[says]
+#    appname = Pidgin
+#    summary = *says*
+#    urgency = critical
+#
+#[twitter]
+#    appname = Pidgin
+#    summary = *twitter.com*
+#    urgency = normal
+#
+#[Claws Mail]
+#    appname = claws-mail
+#    category = email.arrived
+#    urgency = normal
+#    background = "#2F899E"
+#    foreground = "#FFA247"
+#
+#[mute.sh]
+#     appname = mute
+#     category = mute.sound
+#     script = mute.sh
+#
+#[JDownloader]
+#    appname = JDownloader
+#    category = JD
+#    background = "#FFA247"
+#    foreground = "#FFFFFF"
+#
+#[newsbeuter]
+#    summary = *Feeds*
+#    background = "#A8EB41"
+#    foreground = "#FFFFFF"
+#
+[irc]
+        appname = weechat
+        timeout = 0
+        background = "#0033bb"
+        foreground = "#dddddd"
+#
+[weechat hl]
+     appname = weechat
+     category = weechat.HL
+     background = "#FF5C47"
+     foreground = "#FFFFFF"
+#
+[weechat pn]
+     appname = weechat
+     category = weechat.PM
+     background = "#D53B84"
+     foreground = "#FFFFFF"
+#
+#[CMUS]
+#    appname = CMUS
+#    category = cmus
+#    background = "#6C4AB7"
+#    foreground = "#FFE756"
+#
+#
+#     background = "#30AB70"
+#     foreground = "#F67245"
+#
+# vim: ft=cfg
