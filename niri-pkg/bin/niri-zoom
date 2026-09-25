@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""niri-zoom — Mod+A: fullscreen as a zoom, the column split survives.
+
+niri cannot keep a fullscreen window in a normal column with other windows:
+fullscreen-window EXPELS it into a new column of its own, and leaving
+fullscreen does NOT put it back. A 2-window stack becomes two columns, and
+the heights are gone.
+
+This script toggles fullscreen and records the column first:
+
+  zoom in   save the column (window ids top to bottom, window heights),
+            then fullscreen-window.
+  zoom out  fullscreen-window again, then move the window back into the
+            column of its old neighbours, at its old place, and set the
+            old heights again (to the pixel; see the note in zoom_out).
+
+The state is one JSON file per window in $XDG_RUNTIME_DIR, so it does not
+survive a niri restart (window ids restart too). A window alone in its
+column needs no state: plain fullscreen already restores it.
+
+If the window left fullscreen some other way (F11, the app itself), Mod+A
+still finds the state and puts the window back into its column.
+
+The IPC has no "is fullscreen" field. A fullscreen window's window_size is
+the output size, and a tiled one has a border, so it is always smaller.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def msg(*args: str):
+    return json.loads(subprocess.run(["niri", "msg", "-j", *args], check=True, capture_output=True, text=True).stdout)
+
+
+def act(*args: str) -> None:
+    subprocess.run(["niri", "msg", "action", *args], check=True, capture_output=True)
+
+
+def state_dir() -> Path:
+    # Keyed by the niri socket: a new niri instance reuses window ids.
+    sock = Path(os.environ.get("NIRI_SOCKET", "niri")).name
+    return Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp")) / "niri-zoom" / sock
+
+
+def by_id(windows: list[dict], wid: int) -> dict | None:
+    return next((w for w in windows if w["id"] == wid), None)
+
+
+def column_of(win: dict, windows: list[dict]) -> list[dict]:
+    """The tiles of win's column, top to bottom."""
+    pos = win["layout"]["pos_in_scrolling_layout"]
+    if not pos:
+        return []
+    tiles = [
+        w for w in windows
+        if w["workspace_id"] == win["workspace_id"]
+        and w["layout"]["pos_in_scrolling_layout"]
+        and w["layout"]["pos_in_scrolling_layout"][0] == pos[0]
+    ]
+    return sorted(tiles, key=lambda w: w["layout"]["pos_in_scrolling_layout"][1])
+
+
+def output_size(win: dict) -> tuple[int, int]:
+    ws = next(w for w in msg("workspaces") if w["id"] == win["workspace_id"])
+    logical = msg("outputs")[ws["output"]]["logical"]
+    return logical["width"], logical["height"]
+
+
+def is_fullscreen(win: dict) -> bool:
+    return tuple(win["layout"]["window_size"]) == output_size(win)
+
+
+def is_tabbed(tiles: list[dict], height: int) -> bool:
+    # Same test as niri-focus-lr: tabs each have the full column height.
+    return len(tiles) > 1 and sum(t["layout"]["tile_size"][1] for t in tiles) > 1.1 * height
+
+
+def wait_until(wid: int, test, timeout: float = 1.5) -> list[dict]:
+    """Poll the IPC until test(window) holds; the client resizes async."""
+    end = time.monotonic() + timeout
+    while True:
+        windows = msg("windows")
+        win = by_id(windows, wid)
+        if win is None or test(win) or time.monotonic() > end:
+            return windows
+        time.sleep(0.03)
+
+
+def zoom_in(win: dict, windows: list[dict], state: Path) -> None:
+    tiles = column_of(win, windows)
+    if len(tiles) > 1:
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text(json.dumps({
+            "workspace_id": win["workspace_id"],
+            "order": [t["id"] for t in tiles],
+            "heights": {str(t["id"]): t["layout"]["window_size"][1] for t in tiles},
+            "tabbed": is_tabbed(tiles, output_size(win)[1]),
+        }))
+    act("fullscreen-window", "--id", str(win["id"]))
+
+
+def zoom_out(win: dict, state: Path) -> None:
+    wid = win["id"]
+    if is_fullscreen(win):
+        act("fullscreen-window", "--id", str(wid))
+        windows = wait_until(wid, lambda w: not is_fullscreen(w))
+    else:
+        windows = msg("windows")
+    saved = json.loads(state.read_text())
+    state.unlink()
+
+    win = by_id(windows, wid)
+    if win is None or win["is_floating"] or win["workspace_id"] != saved["workspace_id"]:
+        return  # moved away while zoomed: leave it where the user put it
+    order = saved["order"]
+    me = order.index(wid)
+    # The neighbours still here, nearest first: above me, then below me.
+    near = [i for i in reversed(order[:me])] + order[me + 1:]
+    anchor = next(
+        (w for i in near if (w := by_id(windows, i))
+         and not w["is_floating"] and w["workspace_id"] == win["workspace_id"]),
+        None,
+    )
+    if anchor is None:
+        return  # every neighbour closed or left: nothing to go back to
+
+    if anchor["layout"]["pos_in_scrolling_layout"][0] != win["layout"]["pos_in_scrolling_layout"][0]:
+        # Put my column just right of the anchor's, then consume it left.
+        act("focus-window", "--id", str(wid))
+        a = anchor["layout"]["pos_in_scrolling_layout"][0]
+        mine = win["layout"]["pos_in_scrolling_layout"][0]
+        target = a if mine < a else a + 1
+        if target != mine:
+            act("move-column-to-index", str(target))
+        act("consume-or-expel-window-left", "--id", str(wid))
+        windows = msg("windows")
+
+    # consume puts the window at the bottom: walk it up to its old place.
+    tiles = column_of(by_id(windows, wid), windows)
+    ids = [t["id"] for t in tiles]
+    want = sum(1 for i in order[:me] if i in ids)
+    act("focus-window", "--id", str(wid))
+    for _ in range(ids.index(wid) - want):
+        act("move-window-up")
+
+    if saved["tabbed"]:
+        return  # tabs have no heights to put back
+    windows = msg("windows")
+    tiles = column_of(by_id(windows, wid), windows)
+    if [t["id"] for t in tiles] != [i for i in order if i in ids]:
+        return  # the column changed shape while zoomed: keep niri's heights
+    heights = [saved["heights"][str(t["id"])] for t in tiles]
+    if len(tiles) == len(order) and max(heights) - min(heights) <= 2:
+        # An even split: keep it automatic, not fixed pixels.
+        for t in tiles:
+            act("reset-window-height", "--id", str(t["id"]))
+        return
+    # niri keeps ONE fixed height per column: setting a window's height turns
+    # the others into weights of their current heights. So one pass is off by
+    # a few percent; repeated passes converge on the exact pixels (measured:
+    # 4 passes of 389/500 in a 3-stack land on 389/500/437, the saved split).
+    # The last window takes the rest, so rounding cannot overflow the column.
+    for _ in range(4):
+        for t, h in zip(tiles[:-1], heights):
+            act("set-window-height", "--id", str(t["id"]), str(h))
+
+
+def main() -> int:
+    windows = msg("windows")
+    win = next((w for w in windows if w["is_focused"]), None)
+    if win is None:
+        return 0
+    live = {str(w["id"]) for w in windows}
+    for old in state_dir().glob("*.json") if state_dir().is_dir() else []:
+        if old.stem not in live:
+            old.unlink(missing_ok=True)  # closed while zoomed
+
+    state = state_dir() / f"{win['id']}.json"
+    if state.exists():
+        zoom_out(win, state)
+    elif win["is_floating"] or not win["layout"]["pos_in_scrolling_layout"] or is_fullscreen(win):
+        act("fullscreen-window")  # nothing of ours to restore
+    else:
+        zoom_in(win, windows, state)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

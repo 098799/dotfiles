@@ -61,7 +61,7 @@ The keys that act differently from plain niri:
 | `Mod+C` / `Mod+V` | Pull the column on the right into this column, as a stack / push the bottom window out to its own column (i3 split v / split h). |
 | `Mod+W` | Tabbed column on/off. |
 | `Mod+E` / `Mod+Shift+E` | Step through column widths 1/3, 1/2, 2/3, full. |
-| `Mod+F` / `Mod+A` | Maximize column / real fullscreen. |
+| `Mod+F` / `Mod+A` | Maximize column / real fullscreen. `Mod+A` keeps the column: a window from a stack goes back to its place and height. |
 | `Mod+Shift+Z` | Terminal **below** the focused window, not in a new column. |
 | `Mod+Ctrl+1/2/3` | Resize the window to 50/75/90% and center it. |
 | `Mod+Tab` | Overview of all workspaces. |
@@ -78,6 +78,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | Script | Started by | Does | Why a script |
 |---|---|---|---|
 | `niri-focus-lr` | `Mod+J`, `Mod+;`, arrows | Left/right that walks tabs only in a tabbed column. | niri has no "if tabbed" action. The script infers tabbed from tile heights, because the IPC does not report it. |
+| `niri-zoom` | `Mod+A` | Fullscreen on/off. On the way out, the window goes back into its old column, at its old place, with the old heights. | niri's fullscreen expels a window from a stacked column and does not put it back. The script saves the column first. The IPC has no fullscreen flag: a fullscreen window's size is the output size. niri keeps one fixed height per column, so the heights are set in 4 passes to land on the exact pixels. |
 | `niri-preset-size` | `Mod+Ctrl+1/2/3` | Set width, set height, center. | Three actions. |
 | `niri-spawn-below` | `Mod+Shift+Z` | Open a program under the focused window. | niri always opens a new column; the script moves the window into place after it opens. |
 | `niri-gaps` | `Mod+Alt+G`, `Mod+Alt+Shift+G` | Set gaps to 0 or back. `niri-gaps get` prints the current gap. | niri has no gap action at runtime. The script rewrites the `gaps` line in `layout.kdl`, and niri reloads it. |

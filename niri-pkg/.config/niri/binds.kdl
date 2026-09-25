@@ -71,7 +71,9 @@ binds {
     Mod+Shift+BracketRight { consume-or-expel-window-right; }
 
     // i3 layouts
-    Mod+A       { fullscreen-window; }             // i3: fullscreen toggle
+    // i3: fullscreen toggle. niri-zoom, not fullscreen-window: plain fullscreen
+    // expels the window from a stacked column and never puts it back.
+    Mod+A       { spawn "niri-zoom"; }
     Mod+W       { toggle-column-tabbed-display; }  // i3: layout tabbed
     Mod+Shift+F { toggle-column-tabbed-display; }  // i3: layout stacked (same thing here)
     Mod+F       { maximize-column; }               // i3: split v; layout tabbed — nearest: fill the screen
