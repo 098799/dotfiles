@@ -49,9 +49,10 @@ input {
 //     mode "2560x1440@144"
 // }
 
-// i3 workspace names, in the order they were declared. Named workspaces are
-// pinned to the top of every output; the `open-on-output` lines are commented
-// until the Wayland connector names are known (`niri msg outputs`).
+// i3 workspace names, in the order Tomek cycles through them (Mod+Page_Down
+// walks this list). 9 and 10 are outside the cycle, so they go last. Named
+// workspaces are pinned to the top of every output; the `open-on-output` lines
+// are commented until the Wayland connector names are known (`niri msg outputs`).
 workspace "cmon"
 workspace "0"
 workspace "1"
@@ -59,14 +60,14 @@ workspace "2"
 workspace "3"
 workspace "4"
 workspace "5"
+workspace "work"  // { open-on-output "DP-1"; }
+workspace "slack" // { open-on-output "DP-1"; }
 workspace "6"
 workspace "7"
 workspace "8"
+workspace "priv"  // { open-on-output "DP-1"; }
 workspace "9"
 workspace "10"
-workspace "work"  // { open-on-output "DP-1"; }
-workspace "slack" // { open-on-output "DP-1"; }
-workspace "priv"  // { open-on-output "DP-1"; }
 
 prefer-no-csd
 screenshot-path "~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png"
