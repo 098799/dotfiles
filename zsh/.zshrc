@@ -469,7 +469,8 @@ claw() {
     name="${base}-$((n++))"
   done
 
-  local cmd="claude --dangerously-skip-permissions"
+  # --dangerously-skip-permissions does not skip the folder-trust dialog; this does.
+  local cmd="CLAUDE_CODE_SANDBOXED=1 claude --dangerously-skip-permissions"
   # Join first, then quote each word: inside "…" a bare ${(q)@} flattens all args
   # into ONE escaped word, so claude saw "-c --model x" as a single option.
   (( $# )) && cmd+=" ${(j: :)${(q)@}}"
