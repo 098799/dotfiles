@@ -26,6 +26,9 @@ window-rule {
     // niri twin at all: niri has no sticky windows, so the drop-down panel
     // lives on one workspace instead of following you across them.
     border { off; }
+    // GTK's move() is a no-op on Wayland, so the panel cannot put itself at
+    // the top edge; niri centres a floating window unless told otherwise.
+    default-floating-position x=0 y=0 relative-to="top"
 }
 window-rule {
     match app-id=r#"^copyq$"#

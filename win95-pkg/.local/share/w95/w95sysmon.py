@@ -41,6 +41,7 @@ Four things worth knowing before reading on:
   and actually disagree.
 """
 
+import json
 import math
 import os
 import subprocess
@@ -1416,6 +1417,9 @@ class Monitor(Gtk.Window):
 
         self.connect("delete-event", self._on_delete)
         self.connect("key-press-event", self._on_key)
+        display = Gdk.Display.get_default()
+        display.connect("monitor-added", self._on_monitors_changed)
+        display.connect("monitor-removed", self._on_monitors_changed)
 
         # The second press of the keybinding arrives here as a datagram.
         GLib.unix_fd_add_full(GLib.PRIORITY_DEFAULT, sock.fileno(),
@@ -1819,17 +1823,42 @@ class Monitor(Gtk.Window):
     # ── showing and hiding ──────────────────────────────────────────────
     def _workarea(self):
         """The monitor's usable rectangle — struts excluded, so the drop panel
-        stops where the taskbar starts instead of hiding behind it."""
+        stops where the taskbar starts instead of hiding behind it.
+
+        Under niri, ask niri. GDK is wrong there twice over: Wayland has no
+        primary monitor, so it falls to monitor 0, which is not the output
+        niri will map the window on; and a process that has been resident
+        across a dock/undock keeps the old output's size — the panel came up
+        2560 wide on the 1536-wide laptop and ran off two edges.
+        """
+        area = _niri_output_area()
+        if area is not None:
+            return area
         display = Gdk.Display.get_default()
         monitor = display.get_primary_monitor() or display.get_monitor(0)
         return monitor.get_workarea()
 
+    def _fit_drop(self):
+        """Size the drop panel to the screen it is about to appear on.
+
+        The size request is a floor, not a size, so it has to be set every
+        time: left at the last screen's width it would stop the panel from
+        ever shrinking onto a smaller one.
+        """
+        area = self._workarea()
+        height = int(area.height * w95conf.SYSMON_SIZE)
+        self.set_size_request(area.width, height)
+        self.resize(area.width, height)
+        return area, height
+
+    def _on_monitors_changed(self, *_args):
+        if self.visible and self.mode == "drop":
+            area, _height = self._fit_drop()
+            self.move(area.x, area.y)
+
     def show_panel(self):
         if self.mode == "drop":
-            area = self._workarea()
-            height = int(area.height * w95conf.SYSMON_SIZE)
-            self.set_size_request(area.width, height)
-            self.resize(area.width, height)
+            area, height = self._fit_drop()
             self.move(area.x, area.y - height)
             self.show_all()
             self.present()
@@ -1940,6 +1969,29 @@ class Monitor(Gtk.Window):
             self.refresh_all()
             return True
         return False
+
+
+def _niri_output_area():
+    """The focused niri output's logical rectangle, or None off niri.
+
+    Focused, because that is where niri opens a window that is being mapped.
+    Logical, because that is the unit GTK sizes in: the laptop panel is
+    1920x1200 at scale 1.25, so 1536x960.
+    """
+    if not os.environ.get("NIRI_SOCKET"):
+        return None
+    try:
+        out = subprocess.run(["niri", "msg", "--json", "focused-output"],
+                             capture_output=True, text=True, timeout=2).stdout
+        logical = json.loads(out)["logical"]
+        # Field by field: Gdk.Rectangle(x=..., ...) accepts the keywords and
+        # silently ignores them, which sized the panel to 0x0.
+        area = Gdk.Rectangle()
+        area.x, area.y = int(logical["x"]), int(logical["y"])
+        area.width, area.height = int(logical["width"]), int(logical["height"])
+        return area
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return None
 
 
 def _i3_version():
