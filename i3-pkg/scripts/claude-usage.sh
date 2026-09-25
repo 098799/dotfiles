@@ -252,7 +252,10 @@ fetch_usage() {
 
     local usage resets
     usage=$(echo "$response" | grep -oP '"five_hour":\s*\{\s*"utilization":\s*\K[0-9.]+' | head -1)
-    resets=$(echo "$response" | grep -oP '"resets_at":\s*"\K[^"]+' | head -1)
+    # The FIVE-HOUR reset, not the first resets_at in the document: an account whose
+    # window has not started has `"resets_at": null` there, and the first match was
+    # then the weekly one — builder read "0%(25h17m)".
+    resets=$(echo "$response" | grep -oP '"five_hour":\s*\{[^}]*?"resets_at":\s*"\K[^"]+' | head -1)
 
     if [[ -z "$usage" ]]; then
         echo "? #657b83"

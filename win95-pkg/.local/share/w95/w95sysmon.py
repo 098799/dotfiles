@@ -1073,6 +1073,20 @@ class PowerPanel(Panel):
             self._boost_guard = False
 
 
+# The two legacy account names say nothing about which login they are, and the
+# tooling around them (burn, slotq, the account picker) calls them by their other
+# name: "work" is the ~/claude-prim login, "private" is the Max account in ~/.claude
+# that everything else calls "main". Showing only W/work had "work resets in 13h"
+# read as "main resets in 13h" on 25 Sep 2026.
+CLAUDE_ALIASES = {"work": "prim", "private": "main, Max"}
+
+
+def claude_name(account):
+    """"work (prim)", "private (main, Max)", or just the name when it is unambiguous."""
+    alias = CLAUDE_ALIASES.get(account["account"])
+    return "%s (%s)" % (account["account"], alias) if alias else account["account"]
+
+
 class ClaudePanel(Panel):
     """Every limit an account is under, and how it got there.
 
@@ -1188,9 +1202,10 @@ class ClaudePanel(Panel):
                 row = self.rows[(account["account"], key, tag)]
                 # The account is named once, against its first limit; the rows
                 # under it are that same account continued.
+                name = GLib.markup_escape_text("%s  %s" % (account["label"], claude_name(account)))
                 row["name"].set_markup(
-                    ("<b>%s</b>" % account["label"]) if account["active"] and first
-                    else (account["label"] if first else ""))
+                    ("<b>%s</b>" % name) if account["active"] and first
+                    else (name if first else ""))
                 window = self._window(account, key, tag)
                 percent = (window or {}).get("percent")
                 row["gauge"].set_fraction((percent or 0) / 100.0)
@@ -1358,7 +1373,7 @@ class ClaudeCharts(Gtk.Box):
                 end = time.time() + left
                 pace = (end - 7 * 86400, end)
             chart.update(series, pace=pace, span=self.span,
-                         title="%s%s" % (account["account"],
+                         title="%s%s" % (claude_name(account),
                                          " ←" if account.get("active") else ""))
 
     @staticmethod
