@@ -58,7 +58,7 @@ The keys that act differently from plain niri:
 | Key | Does |
 |---|---|
 | `Mod+J` / `Mod+;` | Left/right. In a **tabbed** column: walk the tabs first, then go to the next column. In a **stacked** column: go straight to the next column. |
-| `Mod+C` / `Mod+V` | Pull the column on the right into this column, as a stack / push the bottom window out to its own column (i3 split v / split h). On the **rightmost** column, `Mod+C` arms a hot bottom instead (as in i3): the next window you open while that window has focus goes below it, in the same column. The new window is armed too, so the column stays hot. A short popup says so. `Mod+V` disarms the focused window. |
+| `Mod+C` / `Mod+V` | Pull the column on the right into this column, as a stack / push the bottom window out to its own column (i3 split v / split h). On the **rightmost** column, `Mod+C` arms a hot bottom instead (as in i3): the next window you open while that window has focus goes below it, in the same column. The new window is armed too, so the column stays hot. While the focused window is armed, a 4 px line in i3's split indicator colour (`#b16286`) shows under its bottom border. `Mod+V` disarms the focused window. |
 | `Mod+W` | Tabbed column on/off. |
 | `Mod+E` / `Mod+Shift+E` | Step through column widths 1/3, 1/2, 2/3, full. |
 | `Mod+F` / `Mod+A` | Maximize column / real fullscreen. `Mod+A` keeps the column: a window from a stack goes back to its place and height. |
@@ -81,7 +81,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `niri-zoom` | `Mod+A` | Fullscreen on/off. On the way out, the window goes back into its old column, at its old place, with the old heights. | niri's fullscreen expels a window from a stacked column and does not put it back. The script saves the column first. The IPC has no fullscreen flag: a fullscreen window's size is the output size. niri keeps one fixed height per column, so the heights are set in 4 passes to land on the exact pixels. |
 | `niri-preset-size` | `Mod+Ctrl+1/2/3` | Set width, set height, center. | Three actions. |
 | `niri-spawn-below` | `Mod+Shift+Z` | Open a program under the focused window. | niri always opens a new column; the script moves the window into place after it opens. |
-| `niri-hot-bottom` | `Mod+C`, `Mod+V`, startup (`daemon`) | `split-v`: consume, or on the rightmost column mark the window. `split-h`: expel and unmark. `daemon`: when a window opens while a marked window has focus, move it to the bottom of that window's column, mark it, and put the column width back. Marks are window ids in `$XDG_RUNTIME_DIR/niri-hot-bottom`. | niri has no "open the next window below" state. The check needs the column count, and the move must wait for the window to open. `niri-spawn-below` skips a marked window, so the two scripts do not both move the same window. |
+| `niri-hot-bottom` | `Mod+C`, `Mod+V`, startup (`daemon`) | `split-v`: consume, or on the rightmost column mark the window. `split-h`: expel and unmark. `daemon`: when a window opens while a marked window has focus, move it to the bottom of that window's column, mark it, and put the column width back. Marks are window ids in `$XDG_RUNTIME_DIR/niri-hot-bottom`. The indicator: it writes a window rule to `/run/user/1000/niri-hot-bottom.kdl` (empty when off), which `config.kdl` includes, and niri reloads it. | niri has no "open the next window below" state. The check needs the column count, and the move must wait for the window to open. `niri-spawn-below` skips a marked window, so the two scripts do not both move the same window. |
 | `niri-gaps` | `Mod+Alt+G`, `Mod+Alt+Shift+G` | Set gaps to 0 or back. `niri-gaps get` prints the current gap. | niri has no gap action at runtime. The script rewrites the `gaps` line in `layout.kdl`, and niri reloads it. |
 | `niri-auto-width` | startup | One terminal alone gets 2/3 of the width; two terminals get 1/2 each. | niri has one fixed default width. The script listens to niri events and resizes. |
 | `niri-minimap` | startup | When you switch workspace, it shows that workspace's whole row of columns for about 4 s, scaled down in the bottom-right corner (at most 40% of the screen width): windows at their true widths with icon and title, a frame for the part on screen (the rest dimmed), `◀ 2   1 ▶` for the columns off screen. Nothing else brings it up; while it is up, a scroll slides the frame. Clicks go through it. `niri-minimap --show` shows it now; `--png FILE [WORKSPACE]` draws it to a file. | niri has no minimap. The IPC gives no view position, so the script replays niri's `center-focused-column "never"` rule to place the frame. After a touchpad swipe or a mouse drag of the view, the frame can be off until niri next scrolls to a column. |
@@ -152,6 +152,12 @@ display. `kill -USR1` unlocks it.
   error. That is how the split of `config.kdl` lost the focus border. To check
   the border on the live session: `niri msg focused-window` must show
   `window_offset_in_tile` = `[4.0, 4.0]`; `[0.0, 0.0]` means no border.
+- A border has one colour on all four sides. So the hot-bottom indicator is
+  a hard shadow (softness 0, 4 px down), which shows as a line under the
+  bottom border, not in its place. A window rule cannot match one window
+  id either, so the rule matches `is-focused` and the file exists only
+  while the focused window is armed. That costs one config reload per
+  change, and a `loaded config` line in the log for each.
 - Wayland app-ids are not X11 classes. A rule that matches nothing gives no
   error.
 - niri runs under `systemd --user` and inherits its environment. This is why

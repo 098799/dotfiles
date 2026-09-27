@@ -108,3 +108,9 @@ include "rules.kdl"
 include "binds.kdl"
 include "startup.kdl"
 include "environment.kdl"
+// Mod+C's hot-bottom indicator (i3's split v colour on the bottom edge).
+// niri-hot-bottom writes this file at runtime, so it is not in the repo:
+// ~/dotfiles is a Syncthing folder and the other host would get the state
+// too. niri cannot expand $XDG_RUNTIME_DIR here, hence the fixed uid 1000.
+// optional=true: the file does not exist until the daemon starts.
+include optional=true "/run/user/1000/niri-hot-bottom.kdl"

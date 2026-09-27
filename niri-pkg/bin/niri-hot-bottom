@@ -17,6 +17,14 @@ Like an i3 split v container, the column stays hot: the new window is marked
 too, so the next window you open from either of them also goes below. Mod+V
 takes the mark off the focused window.
 
+While the focused window is marked, its bottom edge shows i3's split
+indicator colour. niri draws one border colour for all four sides, so the
+line is a hard shadow instead: softness 0, moved 4 px down, so only a 4 px
+strip shows under the window. The rule for it goes into
+$XDG_RUNTIME_DIR/niri-hot-bottom.kdl, which config.kdl includes, and niri
+reloads it on every write. It is not in ~/.config/niri because that is the
+dotfiles repo, which Syncthing copies to the other host.
+
 The marks live in $XDG_RUNTIME_DIR/niri-hot-bottom, one window id per line.
 The daemon empties the file when it starts, because window ids restart at 1
 with each niri session and the runtime dir outlives a logout.
@@ -29,8 +37,23 @@ import sys
 import time
 from contextlib import contextmanager
 
-STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-hot-bottom")
-NOTIFY_ID = "7143"  # dunstify replace-id, so repeated presses show one popup
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
+STATE = os.path.join(RUNTIME, "niri-hot-bottom")
+INDICATOR = os.path.join(RUNTIME, "niri-hot-bottom.kdl")
+# i3's $indicator (active-palette.conf), and i3's 4 px border.
+INDICATOR_RULE = """\
+// Written by niri-hot-bottom: the focused window is armed (Mod+C).
+window-rule {
+    match is-focused=true
+    shadow {
+        on
+        softness 0
+        spread 0
+        offset x=0 y=4
+        color "#b16286"
+    }
+}
+"""
 
 
 def niri(*args: str) -> str:
@@ -46,12 +69,17 @@ def niri_json(*args: str):
         return None
 
 
-def notify(text: str) -> None:
-    subprocess.run(
-        ["dunstify", "-a", "niri", "-r", NOTIFY_ID, "-t", "1200", text],
-        capture_output=True,
-        check=False,
-    )
+def paint(armed: bool) -> None:
+    """Show or hide the indicator. Writes only on a change: each write is a
+    full niri config reload."""
+    text = INDICATOR_RULE if armed else ""
+    with open(INDICATOR, "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        if f.read() != text:
+            f.seek(0)
+            f.truncate()
+            f.write(text)
 
 
 @contextmanager
@@ -80,7 +108,7 @@ def split_v() -> int:
         if columns and focused["layout"]["pos_in_scrolling_layout"][0] >= max(columns):
             with marks() as ids:
                 ids.add(focused["id"])
-            notify("split v: the next window opens below")
+            paint(True)
             return 0
     niri("action", "consume-window-into-column")
     return 0
@@ -90,10 +118,8 @@ def split_h() -> int:
     focused = niri_json("focused-window")
     if focused:
         with marks() as ids:
-            was_marked = focused["id"] in ids
             ids.discard(focused["id"])
-        if was_marked:
-            notify("split v off")
+        paint(False)
     niri("action", "expel-window-from-column")
     return 0
 
@@ -154,6 +180,7 @@ def attach(new_id: int, marked_id: int, marked_width: float | None) -> bool:
 def daemon() -> int:
     with open(STATE, "w"):
         pass
+    paint(False)
     proc = subprocess.Popen(
         ["niri", "msg", "-j", "event-stream"],
         stdout=subprocess.PIPE,
@@ -183,6 +210,9 @@ def daemon() -> int:
             elif kind == "WindowFocusChanged":
                 if data["id"] in known:
                     focus = data["id"]
+                with marks() as ids:
+                    armed = data["id"] in ids
+                paint(armed)
             elif kind == "WindowLayoutsChanged":
                 for window_id, layout in data["changes"]:
                     width[window_id] = layout["tile_size"][0]
@@ -202,6 +232,7 @@ def daemon() -> int:
                 if hot and attach(w["id"], opener, width.get(opener)):
                     with marks() as ids:
                         ids.add(w["id"])
+                    paint(True)
                 width[w["id"]] = w["layout"]["tile_size"][0]
             elif kind == "WindowClosed":
                 known.discard(data["id"])
