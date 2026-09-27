@@ -62,8 +62,12 @@ binds {
     Mod+Ctrl+Shift+Right { move-column-to-monitor-right; }
 
     // i3 split v / split h → stack into a column / pull out of it
-    Mod+C { consume-window-into-column; }    // i3: split v
-    Mod+V { expel-window-from-column; }      // i3: split h
+    // Mod+C pulls the column on the right into this one. On the RIGHTMOST
+    // column there is none, so it arms a "hot bottom" instead, like i3's
+    // split v: the next window you open from this window goes below it.
+    // niri-hot-bottom's daemon (startup.kdl) does the move; Mod+V disarms.
+    Mod+C hotkey-overlay-title="split v (hot bottom on the last column)" { spawn "niri-hot-bottom" "split-v"; }
+    Mod+V hotkey-overlay-title="split h (expel, disarm hot bottom)" { spawn "niri-hot-bottom" "split-h"; }
     // niri's own default puts these on Mod+[ / Mod+]. i3 had volume -10%/+10%
     // there, and that muscle memory wins, so consume-or-expel moves to +Shift
     // and the volume binds go back to the bare brackets (see the audio section).

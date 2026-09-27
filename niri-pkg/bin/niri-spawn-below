@@ -12,6 +12,7 @@ The column keeps the width it had before. Without that, niri-auto-width sees
 two terminal columns for a moment and halves them both.
 """
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -24,6 +25,16 @@ def niri(*args: str) -> str:
     ).stdout
 
 
+def is_hot_bottom(window_id: int) -> bool:
+    """True if Mod+C marked this window (see niri-hot-bottom)."""
+    path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-hot-bottom")
+    try:
+        with open(path) as f:
+            return str(window_id) in f.read().split()
+    except OSError:
+        return False
+
+
 def main() -> int:
     command = sys.argv[1:] or ["alacritty"]
 
@@ -31,8 +42,10 @@ def main() -> int:
         before = json.loads(niri("-j", "focused-window"))
     except json.JSONDecodeError:
         before = None
-    if not before or before["is_floating"]:
-        # Nothing tiled to go under: just open it the normal way.
+    if not before or before["is_floating"] or is_hot_bottom(before["id"]):
+        # Nothing tiled to go under: just open it the normal way. A window
+        # that Mod+C marked gets it below anyway, from niri-hot-bottom; if
+        # this script moved it too, the second move would expel it again.
         niri("action", "spawn", "--", *command)
         return 0
 

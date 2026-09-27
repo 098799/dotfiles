@@ -7,6 +7,7 @@ spawn-at-startup "niri-wallpaper"           // feh --bg-scale → swaybg, reads 
 spawn-at-startup "dunst"
 spawn-at-startup "niri-idle"                // xss-lock → swayidle
 spawn-at-startup "niri-auto-width"          // lone terminal 2/3, two terminals 1/2 each
+spawn-at-startup "niri-hot-bottom" "daemon"  // Mod+C on the last column: next window opens below
 spawn-at-startup "niri-minimap"             // overlay map of the scroll strip on workspace switch
 spawn-sh-at-startup "command -v copyq >/dev/null && copyq --start-server"
 spawn-at-startup "nm-applet"

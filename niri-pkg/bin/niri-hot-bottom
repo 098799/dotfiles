@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""i3's split v on niri: Mod+C on the rightmost column arms a "hot bottom".
+
+  niri-hot-bottom split-v   Mod+C: consume the column on the right, or, when
+                            there is none, arm the focused window
+  niri-hot-bottom split-h   Mod+V: expel the window, and disarm it
+  niri-hot-bottom daemon    startup: puts new windows under an armed one
+
+niri's consume-window-into-column pulls the column on the RIGHT into this one.
+On the rightmost column there is nothing to pull, so the key did nothing. i3
+instead remembers the split and puts the NEXT window below. This script does
+the same: Mod+C on the rightmost column marks the window, and when a window
+opens while a marked window has focus, the daemon moves it into the marked
+window's column (at the bottom), as if you had pressed Mod+C on it by hand.
+
+Like an i3 split v container, the column stays hot: the new window is marked
+too, so the next window you open from either of them also goes below. Mod+V
+takes the mark off the focused window.
+
+The marks live in $XDG_RUNTIME_DIR/niri-hot-bottom, one window id per line.
+The daemon empties the file when it starts, because window ids restart at 1
+with each niri session and the runtime dir outlives a logout.
+"""
+import fcntl
+import json
+import os
+import subprocess
+import sys
+import time
+from contextlib import contextmanager
+
+STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "niri-hot-bottom")
+NOTIFY_ID = "7143"  # dunstify replace-id, so repeated presses show one popup
+
+
+def niri(*args: str) -> str:
+    return subprocess.run(
+        ["niri", "msg", *args], capture_output=True, text=True, check=False
+    ).stdout
+
+
+def niri_json(*args: str):
+    try:
+        return json.loads(niri("-j", *args))
+    except json.JSONDecodeError:
+        return None
+
+
+def notify(text: str) -> None:
+    subprocess.run(
+        ["dunstify", "-a", "niri", "-r", NOTIFY_ID, "-t", "1200", text],
+        capture_output=True,
+        check=False,
+    )
+
+
+@contextmanager
+def marks():
+    """The marked window ids, locked for read-modify-write; saved on exit."""
+    with open(STATE, "a+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        ids = {int(line) for line in f.read().split() if line.isdigit()}
+        before = set(ids)
+        yield ids
+        if ids != before:
+            f.seek(0)
+            f.truncate()
+            f.write("".join(f"{i}\n" for i in sorted(ids)))
+
+
+def split_v() -> int:
+    focused = niri_json("focused-window")
+    if focused and not focused["is_floating"]:
+        columns = [
+            w["layout"]["pos_in_scrolling_layout"][0]
+            for w in niri_json("windows") or []
+            if w["workspace_id"] == focused["workspace_id"] and not w["is_floating"]
+        ]
+        if columns and focused["layout"]["pos_in_scrolling_layout"][0] >= max(columns):
+            with marks() as ids:
+                ids.add(focused["id"])
+            notify("split v: the next window opens below")
+            return 0
+    niri("action", "consume-window-into-column")
+    return 0
+
+
+def split_h() -> int:
+    focused = niri_json("focused-window")
+    if focused:
+        with marks() as ids:
+            was_marked = focused["id"] in ids
+            ids.discard(focused["id"])
+        if was_marked:
+            notify("split v off")
+    niri("action", "expel-window-from-column")
+    return 0
+
+
+def width_proportion(tile_width: float) -> float:
+    """The column-width percentage that gives this tile width back."""
+    output = niri_json("focused-output")["logical"]
+    # The live gap, not a constant: Mod+Alt+G sets it to 0.
+    try:
+        gaps = float(
+            subprocess.run(
+                ["niri-gaps", "get"], capture_output=True, text=True, check=True
+            ).stdout
+        )
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        gaps = 10
+    # Invert niri's proportion formula, width = (output - gaps) * p - gaps.
+    return (tile_width + gaps) / (output["width"] - gaps) * 100
+
+
+def attach(new_id: int, marked_id: int, marked_width: float | None) -> bool:
+    """Move the new window under the marked one, if it opened next to it."""
+    windows = {w["id"]: w for w in niri_json("windows") or []}
+    new, marked = windows.get(new_id), windows.get(marked_id)
+    if not new or not marked or new["is_floating"] or marked["is_floating"]:
+        return False
+    if new["workspace_id"] != marked["workspace_id"]:
+        return False
+    col = new["layout"]["pos_in_scrolling_layout"][0]
+    if col != marked["layout"]["pos_in_scrolling_layout"][0] + 1:
+        return False
+    # Alone in its column, or consume-or-expel would EXPEL it instead (for
+    # example if niri-spawn-below got there first).
+    if any(
+        w["id"] != new_id
+        and w["workspace_id"] == new["workspace_id"]
+        and not w["is_floating"]
+        and w["layout"]["pos_in_scrolling_layout"][0] == col
+        for w in windows.values()
+    ):
+        return False
+
+    niri("action", "consume-or-expel-window-left", "--id", str(new_id))
+    if marked_width:
+        # niri-auto-width reacts to the same open event (two terminal
+        # columns -> 1/2 each). Let it finish, then put the width back.
+        time.sleep(0.3)
+        niri(
+            "action",
+            "set-window-width",
+            "--id",
+            str(new_id),
+            f"{width_proportion(marked_width):.3f}%",
+        )
+    return True
+
+
+def daemon() -> int:
+    with open(STATE, "w"):
+        pass
+    proc = subprocess.Popen(
+        ["niri", "msg", "-j", "event-stream"],
+        stdout=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    known: set[int] = set()
+    width: dict[int, float] = {}  # id -> tile width, from before the latest open
+    # The last focused window that already existed. A new window's own focus
+    # event may come before or after its open event; this ignores it either way.
+    focus: int | None = None
+    seeded = False
+    for line in proc.stdout:
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        for kind, data in ev.items():
+            if kind == "WindowsChanged":
+                known = {w["id"] for w in data["windows"]}
+                width = {w["id"]: w["layout"]["tile_size"][0] for w in data["windows"]}
+                focus = next((w["id"] for w in data["windows"] if w["is_focused"]), None)
+                with marks() as ids:
+                    ids &= known
+                seeded = True
+            elif kind == "WindowFocusChanged":
+                if data["id"] in known:
+                    focus = data["id"]
+            elif kind == "WindowLayoutsChanged":
+                for window_id, layout in data["changes"]:
+                    width[window_id] = layout["tile_size"][0]
+            elif kind == "WindowOpenedOrChanged" and seeded:
+                w = data["window"]
+                if w["id"] in known:
+                    width[w["id"]] = w["layout"]["tile_size"][0]
+                    if w["is_focused"]:
+                        focus = w["id"]
+                    continue
+                known.add(w["id"])
+                opener = focus
+                if w["is_focused"]:
+                    focus = w["id"]
+                with marks() as ids:
+                    hot = opener in ids
+                if hot and attach(w["id"], opener, width.get(opener)):
+                    with marks() as ids:
+                        ids.add(w["id"])
+                width[w["id"]] = w["layout"]["tile_size"][0]
+            elif kind == "WindowClosed":
+                known.discard(data["id"])
+                width.pop(data["id"], None)
+                with marks() as ids:
+                    ids.discard(data["id"])
+    return proc.wait()
+
+
+def main() -> int:
+    commands = {"split-v": split_v, "split-h": split_h, "daemon": daemon}
+    if len(sys.argv) != 2 or sys.argv[1] not in commands:
+        print(__doc__, file=sys.stderr)
+        return 2
+    return commands[sys.argv[1]]()
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(0)
