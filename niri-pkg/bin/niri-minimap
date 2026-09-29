@@ -15,8 +15,8 @@ scaled down, in the bottom-right corner for a few seconds:
 Only a workspace switch brings it up. While it is up it follows the workspace:
 a scroll slides the frame, a new or closed column redraws the row.
 
-It is an overlay layer surface with an empty input region: clicks and keys go
-through it.
+It is an overlay layer surface. Keys go through it, and so do clicks
+everywhere but on the card: a click on the card dismisses it at once.
 
 The widths are exact, because niri reports every tile's size. The frame is an
 estimate: niri's IPC does not say where the view is (`tile_pos_in_workspace_view`
@@ -52,6 +52,7 @@ SHOW_MS = 4000  # fully visible for this long after it comes up
 FADE_IN_MS = 110
 FADE_OUT_MS = 260
 SLIDE_MS = 180  # the frame's glide when the view scrolls while it is up
+DISMISS_MS = 90  # the fade after a click on the card
 MAX_SCALE = 0.12  # one screen of strip is never drawn bigger than this
 MAX_W_FRAC = 0.40  # the card never takes more than this share of the screen width
 DEFAULT_GAP = 10.0
@@ -430,6 +431,13 @@ def window_height(out: dict) -> int:
     return body + header_h() + HEADER_GAP + 2 * PAD + 2 * SHADOW
 
 
+def card_rect(width: int, height: int, g: dict) -> tuple[int, int, int, int]:
+    """The card's x, y, w, h: bottom-right, the shadow's room between it and the screen edges."""
+    card_w = g["strip_w"] + 2 * (FRAME_OUT + PAD)
+    card_h = header_h() + HEADER_GAP + g["strip_h"] + 2 * FRAME_OUT + 2 * PAD
+    return width - SHADOW - card_w, height - SHADOW - card_h, card_w, card_h
+
+
 def draw(cr, width: int, height: int, snap: dict, alpha: float, view_x: float | None = None) -> None:
     cr.set_operator(cairo.OPERATOR_SOURCE)
     cr.set_source_rgba(0, 0, 0, 0)
@@ -447,11 +455,7 @@ def draw(cr, width: int, height: int, snap: dict, alpha: float, view_x: float | 
 
     # Box model, outside in: card | PAD | outermost ink (the frame's outer
     # line edge, FRAME_OUT beyond the strip) | the strip the row is drawn in.
-    card_w = strip_w + 2 * (FRAME_OUT + PAD)
-    card_h = header_h() + HEADER_GAP + strip_h + 2 * FRAME_OUT + 2 * PAD
-    # bottom-right, the shadow's room between the card and the screen edges
-    cx = width - SHADOW - card_w
-    cy = height - SHADOW - card_h
+    cx, cy, card_w, card_h = card_rect(width, height, g)
     content_l, content_r = cx + PAD, cx + card_w - PAD
     ox = content_l + FRAME_OUT  # strip left
     oy = cy + PAD + header_h() + HEADER_GAP + FRAME_OUT  # strip top
@@ -590,6 +594,8 @@ class Minimap:
         self.t_a, self.dur_a = 0.0, 1.0
         self.x0 = self.x1 = 0.0
         self.t_x = 0.0
+        # The part of the surface that takes clicks (the card), None for none, () before the first set.
+        self.input_rect: tuple | None = ()
 
         self.win = Gtk.Window()
         self.win.set_app_paintable(True)
@@ -605,8 +611,11 @@ class Minimap:
         GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.RIGHT, True)
         GtkLayerShell.set_anchor(self.win, GtkLayerShell.Edge.BOTTOM, True)
         self.win.connect("draw", self.on_draw)
-        # An empty input region: the pointer goes straight through to the windows.
-        self.win.connect("realize", lambda w: w.input_shape_combine_region(cairo.Region()))
+        # The input region is the card while it is up, else empty: everywhere
+        # else the pointer goes straight through to the windows.
+        self.win.connect("realize", lambda w: self.set_input(None))
+        self.win.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.win.connect("button-press-event", self.on_click)
         # The compositor closes the surface with its output; map it afresh next time.
         Gdk.Display.get_default().connect("monitor-removed", self.on_monitor_removed)
 
@@ -644,9 +653,31 @@ class Minimap:
         return False
 
     def on_draw(self, widget, cr) -> bool:
+        rect = None
         if self.snap:
             alloc = widget.get_allocation()
-            draw(cr, alloc.width, alloc.height, self.snap, self.alpha(), self.frame_x())
+            view_x = self.frame_x()
+            draw(cr, alloc.width, alloc.height, self.snap, self.alpha(), view_x)
+            if self.a1 > 0:  # not while it fades out: a click there is for the window below
+                g = geometry(alloc.width, self.snap, view_x)
+                rect = card_rect(alloc.width, alloc.height, g)
+        self.set_input(rect)
+        return True
+
+    def set_input(self, rect) -> None:
+        if rect == self.input_rect:
+            return
+        self.input_rect = rect
+        region = cairo.Region(cairo.RectangleInt(*rect)) if rect else cairo.Region()
+        self.win.input_shape_combine_region(region)
+
+    def on_click(self, widget, event) -> bool:
+        """A click on the card: it goes away now, not in SHOW_MS."""
+        if self.hide_id:
+            GLib.source_remove(self.hide_id)
+            self.hide_id = 0
+        self.set_input(None)
+        self.fade_to(0.0, DISMISS_MS)
         return True
 
     # -- showing
