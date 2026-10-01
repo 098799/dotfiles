@@ -10,6 +10,10 @@
 # Whichever way it is called it appends to the usage history CSV (see "history"
 # below), so the sampling cadence is just "how often somebody asks".
 
+# The REAL home, not $HOME: agents run with HOME=~/claude-<account> and may call this
+# script; read through their $HOME it found no accounts and saved their own team
+# credentials as ~/claude-prim/.claude/.credentials-private.json (seen 30 Sep 2026).
+HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
 CONFIG_DIR="$HOME/.config"
 ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
 CLAUDE_CREDS="$HOME/.claude/.credentials.json"
@@ -60,7 +64,10 @@ done
 # `sales` and `success` are pinned rather than auto-labelled: the auto rule
 # below would give them Sa/Su, and CS (customer success) is what those two are
 # actually called, so S/CS reads right even though it isn't a prefix.
-declare -A LABELS=([work]=W [private]=P [builder]=B [sales]=S [success]=CS)
+# main2 is the second Max account (~/claude-main2, 1 Oct 2026): P2 pairs it with
+# private's P. The same pins live in claw's CLAW_TAGS (.zshrc), cmon's SESSION_TAGS
+# and qtop's LETTER — keep all four in step.
+declare -A LABELS=([work]=W [private]=P [main2]=P2 [builder]=B [sales]=S [success]=CS)
 
 # Auto-label the remaining discovered accounts by initial, lengthening the prefix
 # until no two of them collide: `sales` and `success` both wanted "S", and the bar
@@ -110,8 +117,18 @@ else
     ACCOUNT="${ACCOUNTS[0]}"
 fi
 
-# Keep active account's backup in sync (tokens get refreshed by Claude Code)
-if [[ -f "$CLAUDE_CREDS" ]]; then
+# Only an account with a backup in ~/.claude can be switched into the real home
+# (private always can: the live file is its own). An account that lives in its own
+# ~/claude-<name> home and has no backup — main2, success — is used there, by name
+# (`claw main2`). A copy of its login in ~/.claude would be a second holder of one
+# refresh chain, and the first to refresh logs the other out.
+switchable() { [[ "$1" == private || -f "$HOME/.claude/.credentials-$1.json" ]]; }
+
+# Keep active account's backup in sync (tokens get refreshed by Claude Code).
+# Never for an account that was not switched in: the live file then still holds
+# another account's login, and saving it under this name would hand that login to
+# every reader of the backup (creds_for, rcmon).
+if [[ -f "$CLAUDE_CREDS" ]] && switchable "$ACCOUNT"; then
     BACKUP="$HOME/.claude/.credentials-$ACCOUNT.json"
     if ! cmp -s "$CLAUDE_CREDS" "$BACKUP" 2>/dev/null; then
         cp "$CLAUDE_CREDS" "$BACKUP"
@@ -122,17 +139,16 @@ fi
 case $BLOCK_BUTTON in
     3)
         eval $(xdotool getmouselocation --shell)
-        # Pre-select current account (find its index in ACCOUNTS)
+        # Only switchable accounts, current one pre-selected.
+        MENU_ACCOUNTS=()
+        for _a in "${ACCOUNTS[@]}"; do switchable "$_a" && MENU_ACCOUNTS+=("$_a"); done
         SELECTED=0
-        for i in "${!ACCOUNTS[@]}"; do
-            if [[ "${ACCOUNTS[$i]}" == "$ACCOUNT" ]]; then
-                SELECTED=$i
-                break
-            fi
+        for i in "${!MENU_ACCOUNTS[@]}"; do
+            [[ "${MENU_ACCOUNTS[$i]}" == "$ACCOUNT" ]] && SELECTED=$i && break
         done
-        MENU=$(printf '%s\n' "${ACCOUNTS[@]}")
-        CHOICE=$(echo "$MENU" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: ${#ACCOUNTS[@]};}")
-        if [[ -n "$CHOICE" && "$CHOICE" != "$ACCOUNT" ]]; then
+        MENU=$(printf '%s\n' "${MENU_ACCOUNTS[@]}")
+        CHOICE=$(echo "$MENU" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: ${#MENU_ACCOUNTS[@]};}")
+        if [[ -n "$CHOICE" && "$CHOICE" != "$ACCOUNT" ]] && switchable "$CHOICE"; then
             echo "$CHOICE" > "$ACCOUNT_FILE"
             # Clear cache to force refresh
             rm -f /tmp/.claude_usage_cache_* 2>/dev/null || true

@@ -337,7 +337,8 @@ klif() {
 # truth is the LABELS map in ~/dotfiles/i3-pkg/scripts/claude-usage.sh — keep
 # these in step with it. There, "work" is ~/claude-prim under its legacy name
 # and "private" is the real HOME, so claw translates prim → work.
-typeset -gA CLAW_TAGS=([work]=W [private]=P [builder]=B [sales]=S [success]=CS)
+# main2 is the second Max account (~/claude-main2, 1 Oct 2026): P2, next to private's P.
+typeset -gA CLAW_TAGS=([work]=W [private]=P [main2]=P2 [builder]=B [sales]=S [success]=CS)
 
 # From the passwd entry, not $HOME: a nested claw (inside a session that already
 # overrode HOME) must still find the homes next to the real one.
@@ -384,9 +385,9 @@ _claw_help() {
   print -r -- ""
   print -r -- "With NO home named, the account is chosen by usage — the same selector"
   print -r -- "cmon/cherd's \"C\" spawns use (\`claude-account explain\` shows why). That"
-  print -r -- "selector never chooses MAIN: it is not spent on work. \`claw main\` is the"
-  print -r -- "only way onto it, and with no other account free claw refuses rather than"
-  print -r -- "falling back to \$HOME."
+  print -r -- "selector never chooses a Max account (main, main2): they are not spent on"
+  print -r -- "work. \`claw main\` / \`claw main2\` is the only way onto them, and with no"
+  print -r -- "other account free claw refuses rather than falling back to \$HOME."
   print -r -- ""
   print -r -- "Only the FIRST word can name the account. When it is not an account, the"
   print -r -- "whole line goes to claude unchanged, so a prompt that happens to contain an"
@@ -452,7 +453,7 @@ claw() {
       # ledger, and stderr was dropped there so a tmux-less shell stays quiet.
       why="$("$LEGARTIS_REPO"/tools/claude-account pick --home 2>&1 >/dev/null)"
       print -u2 -r -- "claw: no account to spawn on${why:+ — $why}"
-      print -u2 -r -- "claw: the personal account is not spent on work. \`claw main\` to use it anyway, or name an account: $(_claw_homes | paste -sd' ' -)"
+      print -u2 -r -- "claw: the Max accounts are not spent on work. \`claw main\` or \`claw main2\` to use one anyway, or name an account: $(_claw_homes | paste -sd' ' -)"
       return 1
     fi
   fi

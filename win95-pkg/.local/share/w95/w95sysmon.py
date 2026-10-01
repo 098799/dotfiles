@@ -1078,7 +1078,8 @@ class PowerPanel(Panel):
 # name: "work" is the ~/claude-prim login, "private" is the Max account in ~/.claude
 # that everything else calls "main". Showing only W/work had "work resets in 13h"
 # read as "main resets in 13h" on 25 Sep 2026.
-CLAUDE_ALIASES = {"work": "prim", "private": "main, Max"}
+# main2 is the second Max account (~/claude-main2, 1 Oct 2026).
+CLAUDE_ALIASES = {"work": "prim", "private": "main, Max", "main2": "Max #2"}
 
 
 def claude_name(account):
