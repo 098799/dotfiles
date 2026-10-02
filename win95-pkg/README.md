@@ -264,19 +264,17 @@ drawn rather than decided. Traces break where sampling stopped for more than 15
 minutes — a laptop that was shut all night did not use anything all night, and
 a line joined across the gap would say it did.
 
-The history is a CSV that `claude-usage.sh` appends to, one row per account per
-sample:
+The history is a CSV that rcmon's usage federation appends to, one row per
+account per new reading:
 
     ~/.local/state/w95/claude-usage.csv
 
-Whoever asks for usage writes a row, at most one per account every 100 seconds:
-the i3blocks block in a normal session, the System Monitor in a Win95 one. The
-monitor keeps sampling while hidden — `claude_sample = 120` seconds in
-`~/.config/w95/settings`, `0` to only sample while the window is on screen —
-because the chart is only as good as the samples behind it. Cost is one cached
-HTTP call per account per two minutes, a cadence the endpoint is known to
-tolerate. The file is trimmed to the last 14 days
-when it passes 4 MB; nothing else has to run.
+The federation (`rcmon/usage_federation.py` in the Legartis repo, DEV-6940) is
+the one thing on each box that checks quota: it reads Claude Code's own copy
+first, trades readings with the other box, and probes each account at most once
+per 5 minutes across both boxes. `claude-usage.sh` and the System Monitor only
+read its snapshot (`claude-usage.json` beside the CSV), so a hidden monitor
+costs no requests. The file is trimmed to the last 14 days when it passes 4 MB.
 
 This is one row per *account*, not one row per *sample* with two
 positional columns per account and a "never reorder this list" warning on it —

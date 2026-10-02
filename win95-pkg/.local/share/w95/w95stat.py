@@ -771,12 +771,12 @@ _CLAUDE_ROW = re.compile(
 )
 
 
-# Where claude-usage.sh appends its samples. Same env override as the script,
+# Where rcmon's usage federation appends its readings. Same env override,
 # so a throwaway history can be pointed at a sandbox instance.
 CLAUDE_HISTORY = (os.environ.get("CLAUDE_USAGE_HISTORY")
                   or os.path.join(HOME, ".local", "state", "w95", "claude-usage.csv"))
 
-# Every field of a history row, in the order claude-usage.sh writes them.
+# Every field of a history row, in the order the usage federation writes them.
 _HISTORY_COLUMNS = ("timestamp", "account", "five_h_util", "five_h_resets_in",
                     "seven_d_util", "seven_d_resets_in", "scoped_util",
                     "scoped_name")
@@ -785,10 +785,10 @@ _HISTORY_COLUMNS = ("timestamp", "account", "five_h_util", "five_h_resets_in",
 def claude_usage(timeout=25):
     """Every Claude limit, per account, from claude-usage.sh --json.
 
-    Not reimplemented: that script owns account discovery, the cookie/OAuth
-    fallback, the credential shuffling and — importantly — a rate-limit rule
-    about never refreshing an expired token on a timer. Re-deriving any of it
-    here would be a second thing to keep right.
+    Not reimplemented: that script owns account discovery and the labels, and
+    reads rcmon's usage federation (DEV-6940) — the one quota checker on the
+    box, with its own rate-limit rules. Re-deriving any of it here would be a
+    second thing to keep right.
 
     Each account comes back as
 
@@ -800,8 +800,7 @@ def claude_usage(timeout=25):
     with `percent`/`resets` also lifted to the top level, because the five-hour
     window is what a caller that asks for "usage" means.
 
-    Running it is also what samples the history the charts read, so this is on
-    the poller's keep-alive list — see Poller.add(keep_alive=True).
+    It samples nothing: the federation writes the history the charts read.
     """
     path = script_path("claude-usage")
     if not path:
@@ -850,7 +849,7 @@ def _claude_from_bar_line(line):
 def claude_history(hours=24, path=CLAUDE_HISTORY):
     """The last `hours` of samples, as {account: [row, ...]} oldest first.
 
-    Rows are whatever claude-usage.sh appended: a timestamp (epoch seconds,
+    Rows are whatever the usage federation appended: a timestamp (epoch seconds,
     converted here) plus the percentages. Timestamps are written ISO-8601 and
     the file is in time order, so the cutoff is a string comparison and only
     the rows that survive it are ever parsed — at one sample per account every

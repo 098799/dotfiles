@@ -15,7 +15,7 @@ This document describes the i3/i3blocks configuration managed by Claude Code. Ru
 │       └── config.rasi     # rofi menu styling (solarized dark)
 ├── scripts/                # i3blocks scripts
 │   ├── service-*.sh        # Dev service monitoring (backend, consumer, frontend, user)
-│   ├── claude-usage.sh     # Claude API usage monitor
+│   ├── claude-usage.sh     # Claude usage bar (reads rcmon's usage federation)
 │   ├── vpn.sh              # WireGuard VPN status/menu
 │   ├── bluetooth.sh        # Bluetooth status/menu
 │   ├── volume.sh, mic.sh   # Audio controls
