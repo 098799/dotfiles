@@ -586,3 +586,57 @@ export AWS_PROFILE=legartis
 # >>> railway initialize >>>
 [ -f "$HOME/.railway/env" ] && source "$HOME/.railway/env"
 # <<< railway initialize <<<
+
+#---------------------------------------------------------------------------
+# cherd <app> — cherd in a p340 tailnet app repo (~/apps/REGISTRY.md)
+#---------------------------------------------------------------------------
+# `cherd tower` = ssh -t p340, cd ~/tower, `cherd .`. On p340 itself it runs
+# here. A known app name always means p340, even where a same-named dir exists
+# locally (~/apps, ~/health on p14s): write `cherd ./health` for the local one.
+# `cherd p340:<dir>` opens any other dir under p340's $HOME the same way.
+# Anything else (no arg, a path, `doctor`, flags) goes to plain cherd.
+typeset -gA CHERD_P340_APPS=(
+  apps apps  kit apps/kit
+  weekends weekends  health health  pac health  cabinet cabinet  jobs jobs
+  chess chess  pens pens  fidelive fidelive  fide fidelive  pokedex pokedex
+  pod pod  igarchive igarchive  twitter twitter  imagine imagine
+  tetrafit tetrafit  sandbox sandbox  burnlog burnlog  tower tower
+  games gamr  gamr gamr  clips paperclips  paperclips paperclips
+  dino dinosaurs  dinozaury dinosaurs  dinosaurs dinosaurs
+  paint drawing  pixelpaint drawing  drawing drawing
+  genesis generation/genesis  museum museum  insphero apps-landing-mocks
+  pypen pypen  sudoku kids-sudoku
+)
+
+cherd() {
+  local dir=
+  if (( $# == 1 )); then
+    if [[ "$1" == p340:?* ]]; then
+      dir="${1#p340:}"
+    else
+      dir="${CHERD_P340_APPS[$1]}"
+    fi
+  fi
+  if [[ -z "$dir" ]]; then
+    command cherd "$@"
+    return
+  fi
+  if [[ ! "$dir" =~ '^[A-Za-z0-9._/-]+$' || "$dir" == *..* ]]; then
+    print -u2 -r -- "cherd: bad p340 dir: $dir"
+    return 2
+  fi
+  if [[ "${HOST%%.*}" == p340 ]]; then
+    (cd "$(_claw_root)/$dir" && command cherd .)
+  else
+    # -t: cherd is a TUI. Login+interactive zsh so ~/bin, env and the account
+    # setup are the same as when you ssh in by hand.
+    ssh -t p340 "cd ~/$dir && exec zsh -lic 'cherd .'"
+  fi
+}
+
+_cherd() {
+  _alternative \
+    "apps:p340 app:(${(k)CHERD_P340_APPS})" \
+    'dirs:local directory:_files -/'
+}
+compdef _cherd cherd
