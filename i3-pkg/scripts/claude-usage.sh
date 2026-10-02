@@ -237,16 +237,19 @@ fetch_response() {
         org_id=$(grep -oP '^# ORG_ID=\K.*' "$cookie_file")
     fi
 
+    # OAuth first, the cookie only as a fallback. Since 2 Oct 2026 ~10:45 claude.ai
+    # answers a curl with this cookie with a Cloudflare 403 "Just a moment..."
+    # challenge, whatever cf_clearance holds: work, private and builder read "?"
+    # and dropped out of the history, while the OAuth endpoint still gave 200.
     local response
-    if [[ -n "$org_id" ]]; then
+    response=$(fetch_usage_oauth "$acct")
+    if [[ -n "$org_id" ]] && ! grep -q "five_hour" <<< "$response"; then
         response=$(curl -s "https://claude.ai/api/organizations/$org_id/usage" \
             -H 'accept: application/json' \
             -H 'content-type: application/json' \
             -H 'user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36' \
             -b "$cookie_file" \
             2>/dev/null)
-    else
-        response=$(fetch_usage_oauth "$acct")
     fi
 
     if [[ -n "$response" ]] && echo "$response" | grep -q "five_hour"; then
