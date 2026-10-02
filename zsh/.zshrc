@@ -626,11 +626,16 @@ cherd() {
     return 2
   fi
   if [[ "${HOST%%.*}" == p340 ]]; then
-    (cd "$(_claw_root)/$dir" && command cherd .)
+    # python3 is found BEFORE the cd: oh-my-zsh turns on a repo's .venv on cd
+    # (~/pod and most app repos have one), and cherd's `env python3` would then
+    # run in the app's venv, where `requests` is missing.
+    local py="$(whence -p python3)" bin="$(whence -p cherd)"
+    (cd "$(_claw_root)/$dir" && "$py" "$bin" .)
   else
     # -t: cherd is a TUI. Login+interactive zsh so ~/bin, env and the account
-    # setup are the same as when you ssh in by hand.
-    ssh -t p340 "cd ~/$dir && exec zsh -lic 'cherd .'"
+    # setup are the same as when you ssh in by hand; it calls this function
+    # again on p340, which takes the branch above (no ssh loop).
+    ssh -t p340 "exec zsh -lic 'cherd $1'"
   fi
 }
 
