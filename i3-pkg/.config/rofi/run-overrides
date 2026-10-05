@@ -1,0 +1,6 @@
+# rofi-run overrides: fix a wrong guess about whether a command needs a terminal.
+# One per line: "term NAME" or "gui NAME". NAME is the command's basename.
+# Check a guess with:  rofi-run --why NAME [ARGS]
+#
+# term mytool
+# gui  myscript

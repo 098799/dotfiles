@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# rofi-run — rofi's run-command: start a command in a terminal when it needs one.
+#
+# rofi calls this for every entry of the `run` mode (config.rasi: run-command,
+# run-shell-command). drun entries with Terminal=true come here as --term.
+#
+#   rofi-run CMD [ARGS]          decide, then launch
+#   rofi-run --term CMD [ARGS]   always in a terminal (Shift+Enter in rofi)
+#   rofi-run --why CMD [ARGS]    print the decision and its reason, launch nothing
+#
+# The first rule that matches decides:
+#   1. ~/.config/rofi/run-overrides: lines "term NAME" or "gui NAME"
+#   2. sudo that asks for a password -> terminal; else judge the command after sudo
+#   3. a built-in list of terminal programs (static TUIs, shells, REPLs, pagers)
+#   4. a .desktop file whose Exec runs the command: its Terminal= key
+#   5. ELF: links a GUI toolkit -> no terminal; links ncurses/slang/readline -> terminal
+#   6. Python script that imports curses/textual/urwid/prompt_toolkit/... -> terminal
+#   7. anything else -> no terminal (the old behaviour)
+#
+# No terminal: output goes to ~/.cache/rofi-run/NAME.log. When the command fails
+# within 3 s, a notification shows the end of that log and offers "Run in terminal".
+# Terminal: the window stays open after the command ends if it failed or ran
+# under 10 s, so a report stays readable. Any key closes it.
+
+TERMINAL=${ROFI_RUN_TERMINAL:-alacritty}
+OVERRIDES=${XDG_CONFIG_HOME:-$HOME/.config}/rofi/run-overrides
+LOGDIR=${XDG_CACHE_HOME:-$HOME/.cache}/rofi-run
+
+TERMINAL_PROGRAMS=" top htop btop bpytop atop nvtop iotop iftop nethogs bmon bandwhich glances btm
+  vi vim nvim nano micro hx helix kak less more most man info
+  mc ranger lf nnn yazi vifm broot lazygit lazydocker gitui tig k9s ncdu gdu dua
+  nmtui alsamixer pulsemixer ncpamixer wiremix cmus ncmpcpp newsboat neomutt mutt aerc
+  weechat irssi ssh mosh python python3 ipython bpython node irb ghci psql mysql
+  sqlite3 redis-cli bash zsh fish sh dash tmux screen watch journalctl claude pacman yay paru "
+
+GUI_LIBS='lib(X11|xcb|wayland-client|gtk-|gdk-|Qt[0-9]|SDL|glfw|EGL|GL\.|vulkan)'
+TUI_LIBS='lib(ncurses|tinfo|slang|newt|readline)'
+TUI_PY_MODULES='curses|textual|urwid|prompt_toolkit|blessed|npyscreen|asciimatics|pytermgui|questionary|InquirerPy|readchar'
+
+# Print the .desktop Terminal= value (true/false) of the first entry whose Exec runs $1.
+desktop_terminal() {
+    local dirs=() d
+    IFS=: read -ra d <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    for d in "${d[@]}" /var/lib/flatpak/exports/share; do
+        [[ -d $d/applications ]] && dirs+=("$d/applications")
+    done
+    ((${#dirs[@]})) || return
+    find "${dirs[@]}" -name '*.desktop' -print0 2>/dev/null | xargs -0r awk -v want="$1" '
+        function flush() { if (exe == want) { print (term == "true" ? "true" : "false"); found = 1; exit } }
+        FNR == 1 { if (NR > 1) flush(); sec = ""; exe = ""; term = "" }
+        /^\[/ { sec = $0; next }
+        sec != "[Desktop Entry]" { next }
+        /^Exec=/ {
+            n = split(substr($0, 6), a, " ")
+            for (i = 1; i <= n && (a[i] == "env" || a[i] ~ /=/); i++) ;
+            exe = a[i]; gsub(/"/, "", exe); sub(/.*\//, "", exe)
+        }
+        /^Terminal=/ { term = tolower(substr($0, 10)) }
+        END { if (!found) flush() }' | head -1
+}
+
+# Print "term REASON" or "gui REASON" for the command line "$@".
+classify() {
+    local name=${1##*/} path real kind n val needed
+
+    if [[ -r $OVERRIDES ]]; then
+        while read -r kind n _; do
+            [[ $n == "$name" ]] || continue
+            case $kind in
+                term|gui) echo "$kind override in $OVERRIDES"; return ;;
+            esac
+        done <"$OVERRIDES"
+    fi
+
+    if [[ $name == sudo ]]; then
+        shift
+        while [[ $1 == -* ]]; do shift; done
+        if ! sudo -n -l "$@" >/dev/null 2>&1; then
+            echo "term sudo asks for a password"
+            return
+        fi
+        [[ -n $1 ]] && { classify "$@"; return; }
+    fi
+
+    if [[ $TERMINAL_PROGRAMS == *" $name "* ]]; then
+        echo "term $name is on the built-in list of terminal programs"
+        return
+    fi
+
+    val=$(desktop_terminal "$name")
+    case $val in
+        true) echo "term its .desktop file says Terminal=true"; return ;;
+        false) echo "gui its .desktop file says Terminal=false"; return ;;
+    esac
+
+    path=$(command -v -- "$1") || { echo "gui not found on PATH, rofi's old behaviour"; return; }
+    real=$(readlink -f -- "$path")
+    [[ -f $real ]] || { echo "gui not a file (alias or builtin)"; return; }
+
+    if [[ $(head -c 4 -- "$real") == $'\x7fELF' ]]; then
+        needed=$(readelf -d -- "$real" 2>/dev/null | grep -F NEEDED)
+        if grep -qE "$GUI_LIBS" <<<"$needed"; then
+            echo "gui the binary links a GUI library"
+        elif grep -qE "$TUI_LIBS" <<<"$needed"; then
+            echo "term the binary links a terminal UI library"
+        else
+            echo "gui ELF with neither GUI nor terminal UI libraries"
+        fi
+        return
+    fi
+
+    if head -1 -- "$real" | grep -q '^#!.*python' &&
+        grep -qE "^\s*(import|from)\s+($TUI_PY_MODULES)\b" -- "$real"; then
+        echo "term Python script with a terminal UI module"
+        return
+    fi
+
+    echo "gui no sign of a terminal UI"
+}
+
+run_in_terminal() {
+    exec "$TERMINAL" --title "$*" -e bash -c '
+        start=$SECONDS
+        "$@"
+        rc=$?
+        if ((rc != 0 || SECONDS - start < 10)); then
+            printf "\n\e[2m── %s ended, exit %d. Press any key to close. ──\e[0m" "$1" "$rc"
+            read -rsn1
+        fi' rofi-run "$@"
+}
+
+notify_failure() {
+    local rc=$1 log=$2 name=${3##*/} body action
+    shift 2
+    body=$(tail -n +2 -- "$log" | tail -n 8 | cut -c1-160)
+    body=${body//&/&amp;}; body=${body//</&lt;}; body=${body//>/&gt;}
+    (
+        if command -v dunstify >/dev/null; then
+            action=$(dunstify -u critical -a rofi-run -A "term,Run in terminal" \
+                "$name failed (exit $rc)" "${body:-no output}")
+            [[ $action == term ]] && run_in_terminal "$@"
+        else
+            notify-send -u critical -a rofi-run "$name failed (exit $rc)" "${body:-no output}"
+        fi
+    ) &
+}
+
+run_detached() {
+    local log pid rc i
+    mkdir -p -- "$LOGDIR"
+    log=$LOGDIR/$(tr -c 'A-Za-z0-9._\n-' _ <<<"${1##*/}").log
+    printf '=== %(%F %T)T  %s\n' -1 "$*" >"$log"
+    setsid -- "$@" </dev/null >>"$log" 2>&1 &
+    pid=$!
+    for ((i = 0; i < 30; i++)); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    kill -0 "$pid" 2>/dev/null && exit 0
+    wait "$pid"
+    rc=$?
+    ((rc == 0)) || notify_failure "$rc" "$log" "$@"
+}
+
+case $1 in
+    --term) shift; run_in_terminal "$@" ;;
+    --why) shift; classify "$@"; exit ;;
+esac
+[[ -n $1 ]] || exit 0
+
+read -r verdict _ <<<"$(classify "$@")"
+if [[ $verdict == term ]]; then
+    run_in_terminal "$@"
+else
+    run_detached "$@"
+fi

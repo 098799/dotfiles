@@ -4,6 +4,12 @@
 configuration {
     me-select-entry: "";
     me-accept-entry: "MousePrimary";
+
+    /* ~/bin/rofi-run opens a terminal for programs that need one (qtop, htop,
+       vim, ...). Shift+Enter always uses a terminal. Its header has the rules;
+       run-overrides in this folder fixes a wrong guess. */
+    run-command: "rofi-run {cmd}";
+    run-shell-command: "rofi-run --term {cmd}";
 }
 
 * {
