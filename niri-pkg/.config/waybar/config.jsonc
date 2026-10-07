@@ -29,15 +29,14 @@
     // No window title: i3bar had none, and with every i3 block on the right there
     // is no room left for one. The focused window has the accent border, and the
     // custom/cols tooltip lists every window on the workspace.
-    "modules-left": ["niri/workspaces", "custom/cols"],
+    "modules-left": ["niri/workspaces", "custom/cols", "custom/quota-daemon"],
     "modules-center": [],
     "modules-right": [
-        "custom/claude", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
+        "image#quota", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
         "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
         "custom/bt-headphones", "custom/bt-keyboard",
         "pulseaudio", "pulseaudio#mic",
-        "custom/cpu-boost", "custom/cpu-cap", "custom/power-profile",
-        "custom/battery", "custom/screenshot", "custom/uptime", "tray", "clock"
+        "group/knobs", "custom/battery", "tray", "clock"
     ]
 },
 {
@@ -49,19 +48,18 @@
     // Same as the main bar, so ~/bin/barmenu needs one number only.
     "height": 22,
     "spacing": 0,
-    "modules-left": ["niri/workspaces", "custom/cols"],
+    "modules-left": ["niri/workspaces", "custom/cols", "custom/quota-daemon"],
     "modules-center": [],
     "modules-right": [
-        "custom/claude", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
+        "image#quota-compact", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
         "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
         "custom/bt-headphones", "custom/bt-keyboard",
         "pulseaudio", "pulseaudio#mic",
-        "custom/cpu-boost", "custom/cpu-cap", "custom/power-profile",
-        "custom/battery", "custom/screenshot", "custom/uptime", "tray", "clock"
+        "group/knobs", "custom/battery", "tray", "clock"
     ],
-    // short_text. Claude drops the reset timers; the device and network blocks
-    // drop their names and keep the icon, whose colour still says on / off.
-    "custom/claude":        { "format": "{alt}" },
+    // image#quota-compact: the quota strip without the percentages, drawn at 2x.
+    // short_text: the device and network blocks drop their names and keep the
+    // icon, whose colour still says on / off.
     "custom/disk":          { "format": "{alt}" },
     "custom/network":       { "format": "{alt}" },
     "custom/vpn":           { "format": "{alt}" },

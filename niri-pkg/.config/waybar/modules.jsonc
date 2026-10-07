@@ -45,6 +45,39 @@
         "return-type": "json", "interval": 60, "signal": 15,
         "on-click-right": "~/bin/i3blocks-waybar --signal 15 ~/scripts/claude-usage.sh 3"
     },
+    // The Claude quotas as pictures: per account a thumbnail of qtop's week chart, the
+    // 5h window as a tank beside it, the weekly % (see ~/bin/quota-deck). They replace
+    // custom/claude, which showed the 5h windows only. quota-daemon renders the images
+    // off waybar's main thread and prints nothing, so it takes no space; the image
+    // modules only `cat` what it wrote. Both bars start a daemon; the second waits on a
+    // lock. full = 1x (DP-1 and other scale-1 screens), compact = 2x for the laptop.
+    // "size" must equal the strip width in quota-deck (STRIP), or waybar rescales it.
+    "custom/quota-daemon": {
+        "exec": "~/bin/quota-deck daemon",
+        "tooltip": false
+    },
+    "image#quota": {
+        "exec": "cat $XDG_RUNTIME_DIR/quota-deck/full.out",
+        "size": 560, "signal": 16, "interval": 60,
+        "on-click": "~/bin/quota-deck deck",
+        "on-click-middle": "alacritty -e qtop",
+        "on-click-right": "~/bin/i3blocks-waybar --signal 16 ~/scripts/claude-usage.sh 3"
+    },
+    "image#quota-compact": {
+        "exec": "cat $XDG_RUNTIME_DIR/quota-deck/compact.out",
+        "size": 330, "signal": 16, "interval": 60,
+        "on-click": "~/bin/quota-deck deck",
+        "on-click-middle": "alacritty -e qtop",
+        "on-click-right": "~/bin/i3blocks-waybar --signal 16 ~/scripts/claude-usage.sh 3"
+    },
+    // Toggles you set once a day: only the power profile shows; hover it and the
+    // CPU boost / cap, the screenshot button and the uptime slide out to its left.
+    // Frees ~200 px, which the quota strip needs on the laptop.
+    "group/knobs": {
+        "orientation": "horizontal",
+        "drawer": { "transition-duration": 250, "children-class": "knob", "transition-left-to-right": false },
+        "modules": ["custom/power-profile", "custom/cpu-boost", "custom/cpu-cap", "custom/screenshot", "custom/uptime"]
+    },
     "custom/disk": {
         "exec": "~/bin/i3blocks-waybar --hint 'left: biggest dirs (sudo du) · right: df -h' ~/scripts/disk.sh",
         "return-type": "json", "interval": 60,
