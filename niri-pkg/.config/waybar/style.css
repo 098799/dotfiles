@@ -1,114 +1,47 @@
-/* gruvbox-dark, the bar{} colors block of colors.d/gruvbox-dark.conf */
-@define-color bg_main   #282828;
-@define-color bg_alt    #3c3836;
-@define-color fg_main   #a89984;
-@define-color fg_dim    #7c6f64;
-@define-color title_fg  #ebdbb2;
-@define-color accent    #98971a;
-@define-color accent_fg #fbf1c7;
-@define-color info      #458588;
-@define-color info_fg   #fbf1c7;
-@define-color urgent    #d3869b;
-@define-color urgent_fg #282828;
-@define-color warn      #d65d0e;
-@define-color sep       #504945;
-/* the colours the i3blocks scripts print on their third line */
-@define-color block_red   #dc322f;
-@define-color block_green #859900;
-@define-color block_yellow #b58900;
-@define-color block_orange #cb4b16;
+/* The niri bar: a transparent bar, every group a pill.
+ *
+ * Most pills are bardeck strips: pictures (the cffi modules, see config.jsonc),
+ * which draw their own pill in bardeck/core.py (pill(): the theme's background at
+ * 0.94, a 1 px rim of its second background, radius 7). This file gives the native
+ * modules (audio, tray) the same pill, so keep the two in step.
+ *
+ * The colours follow the desktop theme (~/bin/theme): theme.css, next to this
+ * file, is written by bardeck from the same palette its strips use, and bardeck
+ * reloads waybar when the theme changes. niri's startup runs `bardeck css` before
+ * waybar, because a missing import stops waybar. theme.css is not in git. */
+@import url("theme.css");
 
 * {
-    /* The terminal font, at the terminal size (alacritty: "UbuntuMono" 12, which
-     * fontconfig resolves to Ubuntu Mono), so the bar looks like the rest of the
-     * screen. i3bar had Terminess Nerd Font 14: wider and heavier, and on the
-     * laptop it did not fit.
-     * Ubuntu Mono has no icons, so pango takes them from the next family.
-     * "Propo" has the Nerd icons at their real width; the plain "UbuntuMono
-     * Nerd Font" squeezes an icon into one cell, and it runs over the text next
-     * to it. */
+    /* The terminal font, at the terminal size (alacritty: "UbuntuMono" 12), so the
+     * bar looks like the rest of the screen. Ubuntu Mono has no icons, so pango
+     * takes them from the next family; "Propo" has the Nerd icons at their real
+     * width (the plain Nerd Font squeezes them into one cell). */
     font-family: "Ubuntu Mono", "UbuntuMono Nerd Font Propo", monospace;
     font-size: 12pt;
     min-height: 0;
     border: none;
     border-radius: 0;
 }
-window#waybar { background: @bg_main; color: @fg_main; }
-tooltip { background: @bg_alt; border: 1px solid @sep; }
-tooltip label { color: @title_fg; }
 
-/* i3's bar colors{} block, mapped onto waybar's niri/workspaces classes.
- * The niri module exposes .focused / .active / .urgent / .empty — there is no
- * .visible (that belongs to the sway module). */
-/* min-width 0 and font-weight normal: the GTK theme (Adapta) gives every
- * button a minimum width and a bold label, so a one-letter workspace ("1") was
- * as wide as "work", and the names were heavier than the terminal text. */
-#workspaces button, #workspaces button label {
-    font-weight: normal;
-}
-#workspaces button {                                                    /* inactive_workspace */
-    padding: 0 4px;
-    min-width: 0;
-    color: @fg_dim;
-    background: @bg_main;
-}
-#workspaces button.active   { color: @info_fg;   background: @info; }   /* active_workspace */
-#workspaces button.focused  { color: @accent_fg; background: @accent; } /* focused_workspace */
-#workspaces button.urgent   { color: @urgent_fg; background: @urgent; } /* urgent_workspace  */
-#workspaces button:hover    { background: @bg_alt; color: @title_fg; }
+/* The bar itself is see-through: the wallpaper shows between the pills. */
+window#waybar { background: transparent; color: @fg_main; }
 
-/* i3 destroyed a workspace the moment its last window closed, so the bar only
- * ever showed workspaces that had content. niri keeps all 15 named workspaces
- * alive forever, plus one trailing empty slot. Collapse every empty one to get
- * i3's behaviour back -- the bar then marks exactly the desktops with content.
- * The focused workspace is exempt, so switching to an empty one still shows you
- * where you are.
- * GTK CSS has no display:none, so shrink the box instead. Shrinking only the
- * button is not enough: the label inside keeps the width of its text, so the
- * hidden buttons still left a ~100px hole. The label rule takes that away. */
-#workspaces button.empty:not(.focused) {
-    padding: 0;
-    margin: 0;
-    min-width: 0;
-    font-size: 0;
-    opacity: 0;
-}
-#workspaces button.empty:not(.focused) label {
-    font-size: 0;
-    min-width: 0;
-    padding: 0;
-    margin: 0;
-}
+tooltip { background: @pill_bg; border: 1px solid @pill_rim; border-radius: 7px; }
+tooltip label { color: @title_fg; padding: 2px 4px; }
 
-/* scroll-strip position indicator (see custom/cols in config.jsonc) */
-#custom-cols {
-    padding: 0 8px;
-    color: @accent;
+/* The native pills. */
+#audio, #tray {
+    background: alpha(@pill_bg, 0.94);
+    border: 1px solid @pill_rim;
+    border-radius: 7px;
+    box-shadow: 0 0 0 1px @pill_shadow;
+    margin: 1px;
+    padding: 0 10px;
 }
+#tray { padding: 0 9px; }
+#tray > .needs-attention { background: alpha(@red, 0.3); border-radius: 4px; }
 
-/* One block = i3blocks' separator_block_width=15 (7+7 padding and a 1px rule),
- * so the right side takes the same width it took on i3. With 8+8 padding plus
- * 6px module spacing it came out ~170px wider and pushed the clock off-screen. */
-#custom-claude, #cpu, #temperature, #memory, #custom-disk,
-#custom-updates, #custom-network, #custom-vpn, #custom-bluetooth,
-#custom-bt-headphones, #custom-bt-keyboard, #pulseaudio, #custom-cpu-boost,
-#custom-cpu-cap, #custom-power-profile, #custom-battery, #custom-screenshot,
-#custom-uptime, #tray, #clock {
-    padding: 0 7px;
-    border-left: 1px solid @sep;
-}
-#pulseaudio.muted                   { color: @block_red; }
-#pulseaudio.mic                     { color: @block_green; }
-#pulseaudio.mic.source-muted        { color: @block_red; }
-#clock { color: @title_fg; }
-/* temp.sh / memory.sh colour thresholds (config.jsonc). The temperature module
- * has no states, only warning/critical, so temp keeps 70 and 85 and drops
- * temp.sh's 60 °C yellow — this CPU sits at 59-73 °C, so it was on all day. */
-#memory.m60 { color: @block_yellow; }
-#temperature.warning, #memory.m75 { color: @block_orange; }
-#temperature.critical, #memory.m90 { color: @block_red; }
-
-/* The quota strip (cffi/quota, ~/bin/quota-deck) is a C widget this CSS does not
- * reach: the image draws its own left rule and margins. */
-/* The drawer of group/knobs: its children share one rule on their left only. */
-#custom-cpu-boost.knob, #custom-cpu-cap.knob, #custom-screenshot.knob, #custom-uptime.knob { border-left: 1px solid @sep; }
+#pulseaudio { color: @title_fg; padding: 0 6px 0 0; }
+#pulseaudio.muted { color: @red; }
+#pulseaudio.mic { color: @green; padding: 0; }
+#pulseaudio.mic.source-muted { color: @red; }

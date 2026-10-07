@@ -29,8 +29,8 @@ import os
 import sys
 
 REAL_ROFI = "/usr/bin/rofi"
-# waybar's height (config.jsonc); the menu opens just under it.
-BAR_HEIGHT = int(os.environ.get("BARMENU_BAR_HEIGHT", "22"))
+# waybar's height plus its margin-top (config.jsonc); the menu opens just under it.
+BAR_HEIGHT = int(os.environ.get("BARMENU_BAR_HEIGHT", "30"))
 EDGE = 4
 # If the overlay has not seen the pointer by then, open at the top-right.
 POINTER_WAIT_MS = 200

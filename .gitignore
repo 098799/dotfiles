@@ -20,4 +20,6 @@ webkit/snippets/mr-reviewer-keys/
 # Syncthing folder marker, per host
 .stfolder/
 # built by install.sh
-niri-pkg/.config/waybar/quota-hover.so
+niri-pkg/.config/waybar/bar-strip.so
+# written by bardeck for the current theme
+niri-pkg/.config/waybar/theme.css

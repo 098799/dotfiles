@@ -19,9 +19,9 @@ Everything is in `~/dotfiles/niri-pkg/` and GNU Stow links it into `~`.
 | `~/.config/niri/layout.kdl` | Gaps, column widths, borders, tab strip, shadow. |
 | `~/.config/niri/rules.kdl` | Per-app rules: which windows float, which have no border. |
 | `~/.config/niri/binds.kdl` | All key bindings, grouped by topic. |
-| `~/.config/niri/startup.kdl` | Programs started at login (waybar, dunst, syncthing, …). |
+| `~/.config/niri/startup.kdl` | Programs started at login (waybar after `bardeck css`, dunst, syncthing, …). |
 | `~/.config/niri/environment.kdl` | Env vars for started programs. Mostly a list of vars to remove. |
-| `~/.config/waybar/` | The bar. It runs the same `~/scripts/*.sh` blocks as i3blocks. Font = the terminal font (UbuntuMono 12). Two bars: the laptop screen (eDP-1) shows the blocks' short texts, because the full bar is wider than 1536 logical px and waybar cuts off the right end, clock included. `config.jsonc` has the bars, `modules.jsonc` the blocks. The Claude quotas are a picture, not text, and hover opens a deck (`quota-deck`, below). The toggles you set once a day (power profile, CPU boost and cap, screenshot, uptime) are a drawer: hover the power profile and they slide out. |
+| `~/.config/waybar/` | The bar: floating pills on a transparent bar, almost all drawn by **bardeck** (see [The bar](#the-bar-bardeck)). `config.jsonc` has the two bars (the laptop's eDP-1 takes the compact pills), `modules.jsonc` the modules, `style.css` the native pills (audio, tray), `bardeck/` the engine, `bar-strip.c` its waybar module. Font = the terminal font (UbuntuMono 12). |
 | `~/.config/hypr/hyprlock.conf` | Lock screen: look, and the fingerprint + password setup. |
 | `pam.d/hyprlock-password` | The lock screen's password-only PAM file. It is **not** stowed: install it with `sudo cp pam.d/hyprlock-password /etc/pam.d/`. `install.sh` warns when the copy in `/etc` differs. |
 | `~/.config/swaylock/config` | Colours for swaylock, the old locker. Only a fallback now. |
@@ -86,9 +86,9 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `niri-auto-width` | startup | One terminal alone gets 2/3 of the width; two terminals get 1/2 each. | niri has one fixed default width. The script listens to niri events and resizes. |
 | `niri-minimap` | startup | When you switch workspace, it shows that workspace's whole row of columns for about 4 s, scaled down in the bottom-right corner (at most 40% of the screen width): windows at their true widths with icon and title, a frame for the part on screen (the rest dimmed), `◀ 2   1 ▶` for the columns off screen. Nothing else brings it up; while it is up, a scroll slides the frame. A click on the card dismisses it at once; clicks elsewhere, and on the card while it fades out, go through. `niri-minimap --show` shows it now; `--png FILE [WORKSPACE]` draws it to a file. | niri has no minimap. The IPC gives no view position, so the script replays niri's `center-focused-column "never"` rule to place the frame. After a touchpad swipe or a mouse drag of the view, the frame can be off until niri next scrolls to a column. |
 | `niri-keys` | `Mod+Shift+C` | Shows every bind of `binds.kdl` in a fullscreen rofi: 3 columns (4 on a screen 2000+ px wide), the `// ---- name ----` comments as headers, keys with the same action on one row, and the touchpad/mouse gestures at the end. The label is the bind's `hotkey-overlay-title`, or the action when there is none. | niri's overlay is one column and cannot scroll, so on the laptop screen the bottom is cut off. |
-| `niri-colcount` | waybar | Shows `◀2 3/7 4▶`: which column you are in, and how many are off screen. | Custom waybar module. |
-| `quota-deck` + `quota-hover.so` | waybar (`custom/quota-daemon`, `cffi/quota`) | The Claude quota strip: per account a thumbnail of qtop's **week** chart (usage, the even pace to 95%, the projection, now), the 5h window as a thin tank (blue; yellow over burn's ceiling, red at 100%), and the weekly %. Colour = qtop's verdict: green lands well, yellow wastes points, red hits 100% early. The active account is underlined. **Hover**: the deck, every account's week full size with its 5h peaks, under the strip; it closes when the pointer leaves the strip and the deck. **Click**: pin it (Esc, a click outside or a second click closes; `u`/`p` earlier/later week; a click on a card opens `qtop <account>`). Middle: `qtop`. Right: switch account (`claude-usage.sh`). `quota-deck strip FILE` / `deck-png FILE` draw to a PNG. | waybar has no hover action and a GTK3 tooltip waits ~500 ms, so the strip is a CFFI module, `~/.config/waybar/quota-hover.c` (built by `install.sh`; rebuild it after an edit, then restart waybar). It shows the PNG and sends "enter"/"leave"/"click" to the daemon's socket. The daemon draws the PNGs off waybar's main thread and holds the deck hidden and drawn ahead: an opening is ~20 ms, plus a 60 ms rest on the strip before a hover counts. `QUOTA_DECK_TRACE=1` prints the time. All numbers come from `~/bin/qtop`, imported. |
-| `i3blocks-waybar` | waybar | Runs an i3blocks script and converts its output for waybar. One run serves both bars (2 s shared answer, a lock per script), at `nice 10`; a timeout kills the script's whole process group and shows the last answer. The bt blocks share one `bluetoothctl` query too (`~/scripts/bt-state.sh`, 3 s). | So that the two bars share one set of scripts. The sharing and the nice exist because the blocks cost ~70% of a core on a loaded box (7 Oct 2026); now ~15%. |
+| `niri-colcount` | nothing (since bardeck) | Shows `◀2 3/7 4▶`: which column you are in, and how many are off screen. | Was a custom waybar module; the workspace strip's column marks took its place. |
+| `bardeck` | waybar (`custom/bardeck`) | The bar's engine: draws every strip, holds every panel. See [The bar](#the-bar-bardeck). | waybar has no hover action and a script per block cost a core's share; one daemon does it all. |
+| `i3blocks-waybar` | right clicks on the bar | Runs an i3blocks script and converts its output for waybar. One run serves both bars (2 s shared answer, a lock per script), at `nice 10`; a timeout kills the script's whole process group and shows the last answer. The bt blocks share one `bluetoothctl` query too (`~/scripts/bt-state.sh`, 3 s). | So that the two bars share one set of scripts. The sharing and the nice exist because the blocks cost ~70% of a core on a loaded box (7 Oct 2026); now ~15%. |
 | `barmenu` | `i3blocks-waybar` | Bar menus that open under the block you clicked and close on a click outside. | Wayland rofi cannot do either. |
 | `niri-screen-switch` | `Mod+BackSpace` | The i3 `screen_switch` menu. It uses `niri msg output` in place of xrandr. | Menu. |
 | `niri-record` (+ `-desktop`, `-window`, `-region`) | `Mod+Alt+Shift+L`, `;`, `R` | Start/stop screen recording with gpu-screen-recorder. Add `Ctrl` to record without audio. | ffmpeg x11grab records nothing on Wayland. |
@@ -97,6 +97,73 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `niri-lock` | `Ctrl+Alt+L`, idle | hyprlock with the current wallpaper. A finger **or** the password unlocks. Returns only when the screen is locked. | Reads the wallpaper path, and waits for the lock so that `before-sleep` does not suspend an open desktop. |
 | `niri-idle` | startup | Lock after 10 min, turn the screens off 30 s later, lock before sleep. | swayidle command line. |
 | `niri-wallpaper` | startup, `wallpaper-pick` | Show the wallpaper from `~/.fehbg` with swaybg. | feh cannot draw on Wayland. |
+
+## The bar (bardeck)
+
+```
+[workspaces + what is open]      [claude quota]      [system][network][devices][audio][power][tray][clock]
+```
+
+Each pill but audio and the tray is a **strip**: a picture drawn by `bardeck`
+(`~/bin/bardeck`, code in `~/.config/waybar/bardeck/`) and shown by
+`bar-strip.so`, a waybar CFFI module (`bar-strip.c`). **Hover** a strip and its
+**panel** opens under it; it closes when the pointer leaves the strip and the
+panel. **Click** pins it (Esc, a click outside or a second click closes it).
+Right and middle clicks are waybar's own (`modules.jsonc`); the right ones keep the
+i3blocks scripts' menus.
+
+| Strip | On the bar | Panel |
+|---|---|---|
+| workspaces | Each workspace with windows: its name and a mark per column, in column order: the app's icon, or for a terminal the first letters of its title. The focused column is underlined. Click a name: that workspace; click a mark: that window; scroll: the next one. | none |
+| quota | Per Claude account a thumbnail of qtop's week chart, the 5h window as a tank, the weekly % (see `bardeck/quota.py`). | Every account's week at full size, its 5h peaks, the pool totals. Pinned: `u`/`p` earlier/later week, `i`/`o` select, Enter: `qtop <account>`. |
+| system | A CPU graph of the last 40 s and %, memory (with swap under it), CPU temperature (k10temp). A disk badge at 85% full, an update count when there are updates. | 5 min of CPU, memory, swap, temperature; every core; the busiest processes by CPU and by memory; disks; updates (check / upgrade); htop, biggest dirs, boot blame. |
+| network | Signal, SSID, traffic, the VPN, tailscale. | The link (signal, band, link rates, addresses), 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (rescan, reconnect, reset adapter, speedtest, …). |
+| devices | Bluetooth, and the headphones, keyboard and mouse lit when connected. | Connect / disconnect each, Bluetooth on / off, where sound goes (click to switch output or input), mixer, bluetoothctl, restart logid, nuke bt. |
+| power | Battery, the power profile, turbo boost when on. | The battery's last 24 h (upower's history), draw, health, the charge limit; power profile and turbo boost switches. |
+| clock | Date, time, ISO week. | Time to the second, UTC, day of the year, two months with week numbers. Pinned: `u`/`p` month, `t` today. |
+
+**The buttons reuse the scripts.** A panel button runs the i3blocks script's own
+menu entry (`core.menu_action`): a `rofi` shim on PATH answers the menu with the
+button's choice. So `vpn.sh` still owns the wg-quick lines, `network.sh` the
+adapter reset and the speedtest, `bt-*.sh` the devices (their `MAC=`/`NAME=` are
+the device list).
+
+**One process for the whole bar.** The old bar ran a script per block per bar
+every few seconds (~15% of a core after the 7 Oct sharing fix, ~70% before).
+bardeck reads `/proc`, `/sys` and niri's socket itself, writes a picture only
+when it changed, and draws only the variant a screen shows: **~1.4% of a core**
+and ~45 MB, measured 7 Oct 2026. Slow reads (`iw`, `bt-state.sh`, `pactl`,
+`checkupdates` hourly) run on a worker thread, so they never stall the bar.
+
+**Fast panels.** The panels live in the daemon on one hidden layer-shell
+overlay. A panel opens in ~20 ms (one map and one blit); the quota panel, which
+takes ~0.15 s to draw, is drawn ahead whenever its data changes.
+`BARDECK_TRACE=1` prints the times.
+
+**Theme.** The colours follow `~/bin/theme` (`~/.config/theme/state`): the
+palette comes from the same `~/.config/i3/colors.d/<palette>-<mode>.conf` i3
+uses, with status colours tuned per theme in `core.STATUS`. On a switch bardeck
+writes `waybar/theme.css` (imported by `style.css`, not in git) and reloads
+waybar. Each pill has a faint dark ring outside its rim, so it keeps its shape on
+the cream light wallpapers. Checked on every gruvbox-dark, gruvbox-light and
+selenized-dark wallpaper.
+
+**Working on it.**
+
+- `bardeck render FILE STRIP [compact]` and `bardeck panel FILE PANEL` draw one
+  to a PNG; `BARDECK_THEME="light gruvbox"` draws another theme.
+- After a Python edit: `pkill -USR2 -x waybar` (it restarts the daemon too).
+  Never `pkill -f bardeck`: it matches your own shell.
+- After an edit to `bar-strip.c`: run its build line (in the file, and in
+  `install.sh`), then restart waybar.
+- **waybar exits on a CSS error**, a `/*` inside a comment included. Check
+  `/run/user/1000/waybar.log` after a `style.css` edit; restart it with
+  `niri msg action spawn -- sh -c 'waybar > /run/user/1000/waybar.log 2>&1'`.
+- The bar is 26 px plus a 4 px top margin; `barmenu` opens under the 30.
+- A strip may change width freely (`bar-strip.so` sizes itself to the
+  picture). The quota strip is in the centre on the main bar because waybar
+  pushes a centre module off centre when the right side runs into it; on the
+  laptop it follows the workspaces.
 
 ## How to change things
 
@@ -112,9 +179,9 @@ anything. When a key needs two actions, or a check first, it runs a script.
   next login, not on save.
 - **A new terminal has a stale variable** (a wrong venv, `TMUX`, kube
   context). Add `NAME null` to `environment.kdl`.
-- **Colours.** They are fixed hex values in `layout.kdl`, `hypr/hyprlock.conf`
-  and `waybar/style.css`. The theme scripts (`dark-gruv` etc.) do not change
-  them.
+- **Colours.** They are fixed hex values in `layout.kdl` and
+  `hypr/hyprlock.conf`; the theme scripts (`dark-gruv` etc.) do not change them.
+  The bar follows the theme (see [The bar](#the-bar-bardeck)).
 - **See the live state:** `niri msg windows`, `niri msg workspaces`,
   `niri msg outputs`, `niri msg -j event-stream`.
 - **The niri log:** `journalctl --user -t niri`. Each reload writes a

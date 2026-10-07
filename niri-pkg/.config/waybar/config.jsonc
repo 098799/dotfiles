@@ -1,20 +1,23 @@
-// Two bars: one for the laptop screen, one for every other screen. They show
-// the same blocks in the same order. The module definitions are in
-// modules.jsonc, which both bars include; a bar overrides single keys only.
+// The niri bar: floating pills on a transparent bar, drawn by bardeck.
 //
-// Why the laptop gets its own bar: eDP-1 is 1920x1200 at scale 1.25, so the bar
-// has 1536 logical px. The full blocks need ~2070, and waybar does not shorten
-// anything: it cuts off the right end, so the clock, battery, tray and six
-// more blocks were simply not there. i3bar solved this by itself: when the bar
-// overflowed it showed every block's short_text (the second line an i3blocks
-// script prints). The laptop bar does the same by choice: "{alt}" is that short
-// text (see ~/bin/i3blocks-waybar), and the native modules get shorter formats.
-// The full text is in every block's tooltip.
+//   [workspaces + what is open]      [claude quota]      [system][network][devices][audio][power][tray][clock]
+//
+// The quota strip is in the middle: it is the widest pill, and waybar pushes a centre
+// module off centre when the right side runs into it.
+//
+// Every pill but audio and the tray is a bardeck strip (~/bin/bardeck, code in
+// ./bardeck/): a picture bardeck draws, shown by bar-strip.so (./bar-strip.c).
+// Hover a strip and its panel opens under it; click to pin the panel. Right and
+// middle clicks are in modules.jsonc. One daemon reads /proc, /sys and niri's
+// socket for all of them, instead of a script per block per bar.
+//
+// Two bars, the same pills: the laptop screen (eDP-1, 1536 logical px at scale 1.25)
+// takes the "compact" strips, drawn at 2x; every other screen the "full" ones at 1x.
 //
 // Nerd Font icons here are raw private-use characters (U+F0000 and up). Some
 // editors and tools drop them silently and leave a plain space. After an edit,
 // check they survived:
-//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 3
+//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 1
 [
 {
     "name": "main",
@@ -22,22 +25,16 @@
     "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
-    // One terminal line of UbuntuMono 12 plus a little air. ~/bin/barmenu
-    // opens menus just under it (BAR_HEIGHT there).
-    "height": 22,
-    "spacing": 0,
-    // No window title: i3bar had none, and with every i3 block on the right there
-    // is no room left for one. The focused window has the accent border, and the
-    // custom/cols tooltip lists every window on the workspace.
-    "modules-left": ["niri/workspaces", "custom/cols", "custom/quota-daemon"],
-    "modules-center": [],
-    "modules-right": [
-        "cffi/quota", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
-        "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
-        "custom/bt-headphones", "custom/bt-keyboard",
-        "pulseaudio", "pulseaudio#mic",
-        "group/knobs", "custom/battery", "tray", "clock"
-    ]
+    // 26 px pills, 4 px of wallpaper above them. ~/bin/barmenu opens its menus under
+    // the whole 30 (BAR_HEIGHT there).
+    "height": 26,
+    "margin-top": 4,
+    "margin-left": 6,
+    "margin-right": 6,
+    "spacing": 6,
+    "modules-left": ["cffi/ws", "custom/bardeck"],
+    "modules-center": ["cffi/quota"],
+    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"]
 },
 {
     "name": "laptop",
@@ -45,31 +42,24 @@
     "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
-    // Same as the main bar, so ~/bin/barmenu needs one number only.
-    "height": 22,
-    "spacing": 0,
-    "modules-left": ["niri/workspaces", "custom/cols", "custom/quota-daemon"],
+    "height": 26,
+    "margin-top": 4,
+    "margin-left": 6,
+    "margin-right": 6,
+    "spacing": 6,
+    // No centre: at 1536 px the right side would run into a centred quota strip
+    // (~1350 px of pills in all), so quota follows the workspaces.
+    "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],
     "modules-center": [],
-    "modules-right": [
-        "cffi/quota-compact", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
-        "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
-        "custom/bt-headphones", "custom/bt-keyboard",
-        "pulseaudio", "pulseaudio#mic",
-        "group/knobs", "custom/battery", "tray", "clock"
-    ],
-    // cffi/quota-compact: the quota strip without the percentages, drawn at 2x.
-    // short_text: the device and network blocks drop their names and keep the
-    // icon, whose colour still says on / off.
-    "custom/disk":          { "format": "{alt}" },
-    "custom/network":       { "format": "{alt}" },
-    "custom/vpn":           { "format": "{alt}" },
-    "custom/bluetooth":     { "format": "{alt}" },
-    "custom/bt-headphones": { "format": "{alt}" },
-    "custom/bt-keyboard":   { "format": "{alt}" },
-    // Percentages, not "40.1G/86.1G". The tooltip has the other number.
-    "memory":      { "format": "󰘚 {percentage}%", "tooltip-format": "{used:0.1f}G of {total:0.1f}G used\nleft: htop by memory · right: free -h" },
-    "memory#swap": { "format": "󰓡 {swapPercentage}%", "tooltip-format": "swap {swapUsed:0.1f}G of {swapTotal:0.1f}G used\nleft: htop by memory · right: swapon --show" },
-    // The red icon says muted; the word is not needed.
-    "pulseaudio":  { "format-muted": "󰖁" }
+    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"],
+    // The compact strips: fewer words, the same signals (colour, icons, graphs).
+    "cffi/ws":    { "variant": "compact", "scale": 2 },
+    "cffi/clock": { "variant": "compact", "scale": 2 },
+    "cffi/quota": { "variant": "compact", "scale": 2 },
+    "cffi/sys":   { "variant": "compact", "scale": 2 },
+    "cffi/net":   { "variant": "compact", "scale": 2 },
+    "cffi/dev":   { "variant": "compact", "scale": 2 },
+    "cffi/power": { "variant": "compact", "scale": 2 },
+    "pulseaudio": { "format-muted": "󰖁" }
 }
 ]

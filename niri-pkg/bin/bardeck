@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""bardeck — the niri bar's engine. The code is in ~/.config/waybar/bardeck/ (main.py
+says what it does); this only starts it."""
+import os
+import pwd
+import sys
+
+sys.path.insert(0, os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".config", "waybar"))
+
+from bardeck.main import main  # noqa: E402
+
+sys.exit(main(sys.argv))

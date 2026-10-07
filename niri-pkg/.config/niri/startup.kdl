@@ -1,7 +1,9 @@
 // Programs niri starts at login (i3's `exec` block). Included from config.kdl.
 // These run once per session; a save does NOT re-run them.
 
-spawn-at-startup "waybar"
+// bardeck css first: style.css imports the theme.css it writes, and waybar stops on a
+// missing import (see ~/.config/waybar/style.css).
+spawn-sh-at-startup "~/bin/bardeck css; exec waybar"
 spawn-at-startup "theme-restore"            // i3's `exec theme-restore`: re-apply the saved theme
 spawn-at-startup "niri-wallpaper"           // feh --bg-scale → swaybg, reads ~/.fehbg
 spawn-at-startup "dunst"

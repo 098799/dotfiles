@@ -48,12 +48,13 @@ stow -v -t ~ zsh git alacritty-pkg i3-pkg bin-pkg gtk-pkg
 # ~/bin. Packages: niri xwayland-satellite waybar swaybg hyprlock swayidle
 # wl-clipboard grim slurp brightnessctl xdg-desktop-portal-gnome
 stow -v -t ~ niri-pkg
-# The quota strip's waybar module (C, loaded by waybar; see quota-hover.c).
+# The bar's strip module (C, loaded by waybar; see bar-strip.c). Without it the bar
+# shows only audio and the tray.
 if command -v cc &>/dev/null && pkg-config --exists gtk+-3.0; then
-    cc -shared -fPIC -O2 -o niri-pkg/.config/waybar/quota-hover.so \
-        niri-pkg/.config/waybar/quota-hover.c $(pkg-config --cflags --libs gtk+-3.0)
+    cc -shared -fPIC -O2 -o niri-pkg/.config/waybar/bar-strip.so \
+        niri-pkg/.config/waybar/bar-strip.c $(pkg-config --cflags --libs gtk+-3.0)
 else
-    echo "WARNING: no cc or gtk3 headers: the waybar quota strip will not load"
+    echo "WARNING: no cc or gtk3 headers: the waybar strips will not load"
 fi
 # The lock screen's PAM file lives in /etc, so stow cannot place it. Without it
 # hyprlock's password path fails, and only the fingerprint unlocks. Needs root,
