@@ -19,3 +19,5 @@ webkit/snippets/mr-reviewer-keys/
 
 # Syncthing folder marker, per host
 .stfolder/
+# built by install.sh
+niri-pkg/.config/waybar/quota-hover.so

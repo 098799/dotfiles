@@ -32,7 +32,7 @@
     "modules-left": ["niri/workspaces", "custom/cols", "custom/quota-daemon"],
     "modules-center": [],
     "modules-right": [
-        "image#quota", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
+        "cffi/quota", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
         "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
         "custom/bt-headphones", "custom/bt-keyboard",
         "pulseaudio", "pulseaudio#mic",
@@ -51,13 +51,13 @@
     "modules-left": ["niri/workspaces", "custom/cols", "custom/quota-daemon"],
     "modules-center": [],
     "modules-right": [
-        "image#quota-compact", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
+        "cffi/quota-compact", "cpu", "temperature", "memory", "memory#swap", "custom/disk",
         "custom/updates", "custom/network", "custom/vpn", "custom/bluetooth",
         "custom/bt-headphones", "custom/bt-keyboard",
         "pulseaudio", "pulseaudio#mic",
         "group/knobs", "custom/battery", "tray", "clock"
     ],
-    // image#quota-compact: the quota strip without the percentages, drawn at 2x.
+    // cffi/quota-compact: the quota strip without the percentages, drawn at 2x.
     // short_text: the device and network blocks drop their names and keep the
     // icon, whose colour still says on / off.
     "custom/disk":          { "format": "{alt}" },

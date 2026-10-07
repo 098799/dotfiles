@@ -93,7 +93,7 @@ tooltip label { color: @title_fg; }
 #custom-updates, #custom-network, #custom-vpn, #custom-bluetooth,
 #custom-bt-headphones, #custom-bt-keyboard, #pulseaudio, #custom-cpu-boost,
 #custom-cpu-cap, #custom-power-profile, #custom-battery, #custom-screenshot,
-#custom-uptime, #tray, #clock, #image.quota, #image.quota-compact {
+#custom-uptime, #tray, #clock {
     padding: 0 7px;
     border-left: 1px solid @sep;
 }
@@ -108,8 +108,7 @@ tooltip label { color: @title_fg; }
 #temperature.warning, #memory.m75 { color: @block_orange; }
 #temperature.critical, #memory.m90 { color: @block_red; }
 
-/* The quota strip (image#quota, ~/bin/quota-deck) is drawn edge to edge at the
- * bar's height; the image already has its own margins. */
-#image.quota, #image.quota-compact { padding: 0 2px; }
+/* The quota strip (cffi/quota, ~/bin/quota-deck) is a C widget this CSS does not
+ * reach: the image draws its own left rule and margins. */
 /* The drawer of group/knobs: its children share one rule on their left only. */
 #custom-cpu-boost.knob, #custom-cpu-cap.knob, #custom-screenshot.knob, #custom-uptime.knob { border-left: 1px solid @sep; }

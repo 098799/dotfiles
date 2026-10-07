@@ -46,29 +46,28 @@
         "on-click-right": "~/bin/i3blocks-waybar --signal 15 ~/scripts/claude-usage.sh 3"
     },
     // The Claude quotas as pictures: per account a thumbnail of qtop's week chart, the
-    // 5h window as a tank beside it, the weekly % (see ~/bin/quota-deck). They replace
-    // custom/claude, which showed the 5h windows only. quota-daemon renders the images
-    // off waybar's main thread and prints nothing, so it takes no space; the image
-    // modules only `cat` what it wrote. Both bars start a daemon; the second waits on a
-    // lock. full = 1x (DP-1 and other scale-1 screens), compact = 2x for the laptop.
-    // "size" must equal the strip width in quota-deck (STRIP), or waybar rescales it.
+    // 5h window as a tank beside it, the weekly % (see ~/bin/quota-deck). Hover: the
+    // deck, every account's week full size; a click pins it. They replace custom/claude,
+    // which showed the 5h windows only.
+    // quota-daemon draws the strips off waybar's main thread and holds the deck; it
+    // prints nothing, so it takes no space. Both bars start one; the second waits on a
+    // lock. cffi/quota* (quota-hover.c, built by install.sh) show the PNG and tell the
+    // daemon about hover and left clicks: waybar has no hover action, and a GTK3
+    // tooltip waits ~500 ms. "image" is the daemon's file: full = 1x (DP-1 and other
+    // scale-1 screens), compact = 2x for the laptop. module_path cannot take a ~.
     "custom/quota-daemon": {
         "exec": "~/bin/quota-deck daemon",
         "tooltip": false
     },
-    "image#quota": {
-        "exec": "cat $XDG_RUNTIME_DIR/quota-deck/full.out",
-        "size": 560, "signal": 16, "interval": 60,
-        // The daemon holds the deck ready; the slow standalone one only when it is not running.
-        "on-click": "pkill -USR1 -x quota-deck || ~/bin/quota-deck deck",
+    "cffi/quota": {
+        "module_path": "/home/tgrining/.config/waybar/quota-hover.so",
+        "image": "full.png", "scale": 1,
         "on-click-middle": "alacritty -e qtop",
         "on-click-right": "~/bin/i3blocks-waybar --signal 16 ~/scripts/claude-usage.sh 3"
     },
-    "image#quota-compact": {
-        "exec": "cat $XDG_RUNTIME_DIR/quota-deck/compact.out",
-        "size": 330, "signal": 16, "interval": 60,
-        // The daemon holds the deck ready; the slow standalone one only when it is not running.
-        "on-click": "pkill -USR1 -x quota-deck || ~/bin/quota-deck deck",
+    "cffi/quota-compact": {
+        "module_path": "/home/tgrining/.config/waybar/quota-hover.so",
+        "image": "compact.png", "scale": 2,
         "on-click-middle": "alacritty -e qtop",
         "on-click-right": "~/bin/i3blocks-waybar --signal 16 ~/scripts/claude-usage.sh 3"
     },
