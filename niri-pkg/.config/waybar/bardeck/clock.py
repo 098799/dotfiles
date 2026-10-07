@@ -23,10 +23,7 @@ class ClockStrip:
         if variant == "full":
             c.text(now.strftime("%a %d %b"), "fg")
             c.gap(10)
-        c.text(now.strftime("%H:%M"), "bright", size=15, bold=True)
-        if variant == "full":
-            c.gap(8)
-            c.text(f"w{now.isocalendar().week}", "dim", size=12)
+        c.text(now.strftime("%H:%M"), "bright", size=15, bold=True)  # the week: in the panel
         return c.finish()
 
 

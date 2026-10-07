@@ -240,7 +240,7 @@ def peaks_chart(cr, x: float, y: float, w: float, h: float, row: Row) -> None:
 
 # Cell sizes; the strip's width follows the number of accounts.
 STRIP = {
-    "full": {"chart": 36, "pct": True},
+    "full": {"chart": 31, "pct": True},
     "compact": {"chart": 28, "pct": False},
 }
 

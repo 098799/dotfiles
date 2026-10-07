@@ -101,7 +101,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 ## The bar (bardeck)
 
 ```
-[workspaces + what is open]      [claude quota]      [system][network][devices][audio][power][tray][clock]
+[workspaces + what is open][claude quota]        [system][network][devices][audio][power][tray][clock]
 ```
 
 Each pill but audio and the tray is a **strip**: a picture drawn by `bardeck`
@@ -114,13 +114,13 @@ i3blocks scripts' menus.
 
 | Strip | On the bar | Panel |
 |---|---|---|
-| workspaces | Each workspace with windows: its name and a mark per column, in column order: the app's icon, or for a terminal the first letters of its title. The focused column is underlined. Click a name: that workspace; click a mark: that window; scroll: the next one. | none |
+| workspaces | Each workspace with windows: its name, and for the visible one a mark per column, in column order: the app's icon, or for a terminal the first letters of its title. The focused column is underlined. Other workspaces show marks too while the pill stays under its width budget (`ws.BUDGET`). Click a name: that workspace; click a mark: that window; scroll: the next one. | none |
 | quota | Per Claude account a thumbnail of qtop's week chart, the 5h window as a tank, the weekly % (see `bardeck/quota.py`). | Every account's week at full size, its 5h peaks, the pool totals. Pinned: `u`/`p` earlier/later week, `i`/`o` select, Enter: `qtop <account>`. |
 | system | A CPU graph of the last 40 s and %, memory (with swap under it), CPU temperature (k10temp). A disk badge at 85% full, an update count when there are updates. | 5 min of CPU, memory, swap, temperature; every core; the busiest processes by CPU and by memory; disks; updates (check / upgrade); htop, biggest dirs, boot blame. |
-| network | Signal, SSID, traffic, the VPN, tailscale. | The link (signal, band, link rates, addresses), 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (rescan, reconnect, reset adapter, speedtest, …). |
+| network | Signal (the icon's colour), traffic, the VPN, tailscale. The SSID is in the panel. | The link (signal, band, link rates, addresses), 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (rescan, reconnect, reset adapter, speedtest, …). |
 | devices | Bluetooth, and the headphones, keyboard and mouse lit when connected. | Connect / disconnect each, Bluetooth on / off, where sound goes (click to switch output or input), mixer, bluetoothctl, restart logid, nuke bt. |
 | power | Battery, the power profile, turbo boost when on. | The battery's last 24 h (upower's history), draw, health, the charge limit; power profile and turbo boost switches. |
-| clock | Date, time, ISO week. | Time to the second, UTC, day of the year, two months with week numbers. **Right click: the whole year.** Pinned: `y` year ⇄ two months, `u`/`p` a month (a year in the year view), `t` today. |
+| clock | Date and time. | Time to the second, UTC, day of the year, two months with week numbers. **Right click: the whole year.** Pinned: `y` year ⇄ two months, `u`/`p` a month (a year in the year view), `t` today. |
 
 **The buttons reuse the scripts.** A panel button runs the i3blocks script's own
 menu entry (`core.menu_action`): a `rofi` shim on PATH answers the menu with the
@@ -185,9 +185,10 @@ and selenized-dark wallpaper.
 - No `restart-interval` on `custom/bardeck`: with it, every waybar reload left a
   zombie `[waybar]` process.
 - A strip may change width freely (`bar-strip.so` sizes itself to the
-  picture). The quota strip is in the centre on the main bar because waybar
-  pushes a centre module off centre when the right side runs into it; on the
-  laptop it follows the workspaces.
+  picture), but the bar must fit: waybar cuts off what runs past the screen's
+  edge. At 36 px the main bar's pills come to ~2,250 of 2,548 px (7 Oct 2026).
+  No pill is in the centre: when room runs short, waybar pushes a centre module
+  about.
 
 ## How to change things
 

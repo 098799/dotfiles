@@ -51,10 +51,8 @@ class NetStrip:
         elif wifi.get("ssid"):
             pct = signal_pct(wifi)
             tone = "ok" if (pct or 0) >= 70 else ("warn" if (pct or 0) >= 40 else "orange")
-            c.icon(wifi_glyph(pct), tone, 15)
-            if variant == "full":
-                ssid = wifi["ssid"]
-                c.text(ssid if len(ssid) <= 11 else ssid[:10] + "…", "title")
+            # No SSID on the bar (the panel has it): the icon's colour says the link.
+            c.icon(wifi_glyph(pct), tone, 15, after=0)
         else:
             name, kind, ip = links[0]
             c.icon("󰈀", "ok", 15)

@@ -1,9 +1,6 @@
 // The niri bar: floating pills on a transparent bar, drawn by bardeck.
 //
-//   [workspaces + what is open]      [claude quota]      [system][network][devices][audio][power][tray][clock]
-//
-// The quota strip is in the middle: it is the widest pill, and waybar pushes a centre
-// module off centre when the right side runs into it.
+//   [workspaces + what is open][claude quota]        [system][network][devices][audio][power][tray][clock]
 //
 // Every pill but audio and the tray is a bardeck strip (~/bin/bardeck, code in
 // ./bardeck/): a picture bardeck draws, shown by bar-strip.so (./bar-strip.c).
@@ -34,8 +31,10 @@
     "margin-left": 6,
     "margin-right": 6,
     "spacing": 2,
-    "modules-left": ["cffi/ws", "custom/bardeck"],
-    "modules-center": ["cffi/quota"],
+    // No centre module: when the pills run short of room, waybar pushes a centre
+    // module about. Quota follows the workspaces, as on the laptop.
+    "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],
+    "modules-center": [],
     "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"],
     "tray": { "spacing": 10, "icon-size": 20 }
 },

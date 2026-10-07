@@ -31,6 +31,10 @@ from .core import MID, PILL_H, PILL_Y, SH, rgba, text  # noqa: E402
 
 TERMINALS = {"alacritty", "kitty", "foot", "org.wezfurlong.wezterm", "com.mitchellh.ghostty"}
 MAX_MARKS = {"full": 7, "compact": 4}
+# The full strip's width budget (px as drawn, before core.ZOOM). It grows with every
+# workspace; past this the workspaces you are not on show fewer marks (2, then none)
+# so the bar does not run off the screen. The visible ones always keep theirs.
+BUDGET = {"full": 470, "compact": 10_000}
 ICON = 16
 
 
@@ -157,7 +161,15 @@ class WsStrip:
         return [(name, o["logical"], "compact" if name.startswith("eDP") else "full")
                 for name, o in self.outputs.items()]
 
-    def draw(self, output: str, variant: str, scale: int):
+    def draw(self, output: str, variant: str, scale: float):
+        hidden_steps = (MAX_MARKS[variant], 2, 0) if variant == "full" else (0,)
+        for hidden in hidden_steps:
+            surf, hits = self._draw(output, variant, scale, hidden)
+            if surf.get_width() / scale <= BUDGET[variant]:
+                break
+        return surf, hits
+
+    def _draw(self, output: str, variant: str, scale: float, hidden: int):
         c = core.StripCanvas(scale)
         cr = c.cr
         wins_by_ws: dict[int, list[dict]] = {}
@@ -184,11 +196,11 @@ class WsStrip:
             focused, active, urgent = ws.get("is_focused"), ws.get("is_active"), ws.get("is_urgent")
             # Measure first: the chip's background goes under its content.
             lw = core.text_w(cr, label, 13, bold=bool(focused))
-            # Compact (the laptop): marks only where you are; elsewhere the name says enough.
-            show = variant == "full" or active or focused
-            marks = columns[:MAX_MARKS[variant]] if show else []
+            # Compact (the laptop), or past BUDGET: fewer marks where you are not.
+            n_marks = MAX_MARKS[variant] if (active or focused) else hidden
+            marks = columns[:n_marks]
             mw = sum(self._mark_w(cr, col[0]) + 3 for col in marks)
-            more = len(columns) - len(marks) if show else 0
+            more = len(columns) - len(marks) if marks else 0
             more_w = core.text_w(cr, f"+{more}", 11) + 3 if more > 0 else 0
             cw = 8 + lw + (6 + mw + more_w if marks else 0) + 6
             bg = "urgent" if urgent else ("accent" if focused else ("bg2" if active else None))
