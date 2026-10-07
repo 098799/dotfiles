@@ -25,17 +25,19 @@
     "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
-    // 28 px: a 24 px pill and 3 px of room for its shadow (bardeck/core.py SH), under
-    // 3 px of wallpaper. The pills' own margins make the gap between them; spacing
-    // only adds 2. ~/bin/barmenu opens its menus under the whole 31 (BAR_HEIGHT there).
-    "height": 28,
+    // bardeck draws a 28 px bar (a 24 px pill, 3 px for its shadow: core.py SH) and
+    // the big screen's 36/28 bigger (core.ZOOM): 36 px, under 3 px of wallpaper. The
+    // pills' own margins make the gap between them; spacing only adds 2.
+    // ~/bin/barmenu opens its menus under the whole 39 (BAR_HEIGHT there).
+    "height": 36,
     "margin-top": 3,
     "margin-left": 6,
     "margin-right": 6,
     "spacing": 2,
     "modules-left": ["cffi/ws", "custom/bardeck"],
     "modules-center": ["cffi/quota"],
-    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"]
+    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"],
+    "tray": { "spacing": 10, "icon-size": 20 }
 },
 {
     "name": "laptop",
@@ -43,6 +45,8 @@
     "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
+    // As drawn (core.ZOOM compact = 1): the laptop screen is already at scale 1.25,
+    // and a bigger bar would not fit its 1536 px.
     "height": 28,
     "margin-top": 3,
     "margin-left": 6,

@@ -82,6 +82,7 @@ class Deck:
         self.asked = 0.0
         self.inside = False  # the pointer is on the panel: nothing may close it but a click or Esc
         self.monitor = None
+        self.zoom = 1.0  # the strip's variant's core.ZOOM: the panel is drawn that much bigger
 
         win = self.win = Gtk.Window()
         GtkLayerShell.init_for_window(win)
@@ -114,14 +115,14 @@ class Deck:
         display = Gdk.Display.get_default()
         return {display.get_monitor(i).get_scale_factor() for i in range(display.get_n_monitors())} or {1}
 
-    def picture(self, panel: Panel, scale: int):
-        """A drawn-ahead panel's picture, and its hits."""
+    def picture(self, panel: Panel, scale: float):
+        """A drawn-ahead panel's picture (scale = output scale × zoom), and its hits."""
         key = (panel.name, panel.state(), scale)
         if key not in self.cache:
             if core.TRACE and self.shown:
                 core.log(f"drawing {key} now (not drawn ahead)")
             w, h = panel.size()
-            surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * scale, h * scale)
+            surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, core.px(w, scale), core.px(h, scale))
             surf.set_device_scale(scale, scale)
             hits = core.Hits()
             panel.draw(cairo.Context(surf), hits)
@@ -141,7 +142,8 @@ class Deck:
         elif panel.drawn_ahead and not (self.shown and self.panel is panel):
             panel.opened()
             for scale in self.scales():
-                self.picture(panel, scale)
+                for zoom in set(core.ZOOM.values()):
+                    self.picture(panel, scale * zoom)
 
     def on_draw(self, _w, cr) -> bool:
         cr.set_source_rgba(0, 0, 0, 0)
@@ -151,15 +153,17 @@ class Deck:
         if not self.shown or self.panel is None:
             return False
         p = self.panel
-        pw, _ = p.size()
+        z = self.zoom
+        pw = p.size()[0] * z
         width = self.win.get_allocated_width()
         # The strip's centre comes in the bar window's coordinates, which start
         # core.BAR_MARGIN_X into the output.
         x = (width - pw - 8) if self.center is None else self.center + core.BAR_MARGIN_X - pw / 2
         self.origin = (int(min(max(x, 8), max(8, width - pw - 8))), 6)
         cr.translate(*self.origin)
+        cr.scale(z, z)
         if p.drawn_ahead:
-            surf, self.hits = self.picture(p, self.win.get_scale_factor())
+            surf, self.hits = self.picture(p, self.win.get_scale_factor() * z)
             cr.set_source_surface(surf, 0, 0)
             cr.paint()
         else:
@@ -183,8 +187,11 @@ class Deck:
                 return mon
         return None
 
-    def show(self, panel: Panel, center: float | None, monitor, pinned: bool) -> None:
+    def show(self, panel: Panel, center: float | None, monitor, pinned: bool, zoom: float | None = None) -> None:
         self.cancel_hide()
+        if zoom is not None and zoom != self.zoom:
+            self.zoom = zoom
+            self.area.queue_draw()
         if pinned and not self.pinned:
             self.pinned = True
             GtkLayerShell.set_keyboard_mode(self.win, GtkLayerShell.KeyboardMode.EXCLUSIVE)
@@ -255,7 +262,7 @@ class Deck:
             GLib.source_remove(self.hide_timer)
             self.hide_timer = 0
 
-    def message(self, verb: str, strip: str, center: float | None, monitor) -> bool:
+    def message(self, verb: str, strip: str, center: float | None, monitor, zoom: float = 1.0) -> bool:
         """A strip's enter / leave / click. False when the strip has no panel."""
         panel = self.panels.get(strip)
         if verb == "leave":
@@ -264,14 +271,14 @@ class Deck:
         if panel is None:
             return False
         if verb == "enter":
-            self.show(panel, center, monitor, pinned=False)
+            self.show(panel, center, monitor, pinned=False, zoom=zoom)
         elif verb == "click":
             if self.shown and self.pinned and self.panel is panel:
                 self.hide()
             else:
-                self.show(panel, center, monitor, pinned=True)
+                self.show(panel, center, monitor, pinned=True, zoom=zoom)
         elif verb == "right":  # the panel's other view, pinned (the clock: the year)
-            self.show(panel, center, monitor, pinned=True)
+            self.show(panel, center, monitor, pinned=True, zoom=zoom)
             if panel.alternate():
                 self.area.queue_draw()
         return True
@@ -282,7 +289,7 @@ class Deck:
         if self.origin is None or self.panel is None:
             return False
         ox, oy = self.origin
-        pw, ph = self.panel.size()
+        pw, ph = (v * self.zoom for v in self.panel.size())
         return ox <= ex < ox + pw and oy <= ey < oy + ph
 
     def track(self, ex: float, ey: float) -> None:
@@ -314,7 +321,7 @@ class Deck:
             self.hide()
             return True
         ox, oy = self.origin
-        action = self.hits.at(event.x - ox, event.y - oy)
+        action = self.hits.at((event.x - ox) / self.zoom, (event.y - oy) / self.zoom)
         if action is None:
             self.show(self.panel, None, None, pinned=True)
             return True

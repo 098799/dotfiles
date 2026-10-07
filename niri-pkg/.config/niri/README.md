@@ -96,7 +96,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `niri-autoclick` | `Mod+Alt+Shift+C` | Start/stop an autoclicker (ydotool). | xdotool cannot click on Wayland. |
 | `niri-lock` | `Ctrl+Alt+L`, idle | hyprlock with the current wallpaper. A finger **or** the password unlocks. Returns only when the screen is locked. | Reads the wallpaper path, and waits for the lock so that `before-sleep` does not suspend an open desktop. |
 | `niri-idle` | startup | Lock after 10 min, turn the screens off 30 s later, lock before sleep. | swayidle command line. |
-| `niri-wallpaper` | startup, `wallpaper-pick` | Show the wallpaper from `~/.fehbg` with swaybg. | feh cannot draw on Wayland. |
+| `niri-wallpaper` | startup, `wallpaper-pick`, bardeck (a screen came) | Show the wallpaper from `~/.fehbg` with swaybg, with a **frosted band** behind the bar: the top ~40 px blurred and tinted toward the theme background, fading into the image. One picture per output at its exact size, cached in `~/.cache/niri-wallpaper`; `--plain` without the band. | feh cannot draw on Wayland, and niri 26.04 cannot blur behind a layer surface; the bar never moves, so the blur is baked in. The theme comes from the file name: `theme` writes its state only after the wallpaper. |
 
 ## The bar (bardeck)
 
@@ -153,7 +153,10 @@ writes `waybar/theme.css` (imported by `style.css`, not in git) and reloads
 waybar.
 
 **Standing out on the wallpapers.** The bar has no background: the wallpaper
-shows between the pills. Each pill is nearly opaque (0.96), has a soft shadow
+shows between the pills, and behind them is a frosted band that `niri-wallpaper`
+bakes into the wallpaper (blurred and tinted; niri cannot blur behind a layer
+surface). On a busy wallpaper (gruvbox-dark-20's fractal) the gaps between the
+pills showed sharp detail before, and the bar looked broken into pieces. Each pill is nearly opaque (0.96), has a soft shadow
 under it (stronger on dark themes), a rim, and a faint highlight along its top,
 so it reads as a raised object where its colour matches the wallpaper (the light
 themes' pills are the cream of their wallpapers). On the darkest wallpapers no
@@ -172,8 +175,13 @@ and selenized-dark wallpaper.
 - **waybar exits on a CSS error**, a `/*` inside a comment included. Check
   `/run/user/1000/waybar.log` after a `style.css` edit; restart it with
   `niri msg action spawn -- sh -c 'waybar > /run/user/1000/waybar.log 2>&1'`.
-- The bar is 28 px (a 24 px pill and 3 px for its shadow, `core.SH`) under a
-  3 px top margin; `barmenu` opens under the 31.
+- **Size.** The code draws a 28 px bar (a 24 px pill and 3 px for its shadow,
+  `core.SH`), and each variant `core.ZOOM` bigger: the big screen's bar 36/28
+  (36 px, text ~17 px), the laptop's as drawn (its screen is at scale 1.25
+  already, and a bigger bar would not fit its 1536 px). Panels take their strip's
+  zoom. To change it: `core.ZOOM`, the bar's `height` in `config.jsonc`, the
+  `window#waybar.main` rules in `style.css`, `BAND` in `niri-wallpaper` and
+  `BAR_HEIGHT` in `barmenu` (39: 3 px margin + 36).
 - No `restart-interval` on `custom/bardeck`: with it, every waybar reload left a
   zombie `[waybar]` process.
 - A strip may change width freely (`bar-strip.so` sizes itself to the

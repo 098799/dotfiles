@@ -31,7 +31,8 @@ tooltip label { color: @title_fg; padding: 2px 4px; }
 
 /* The native pills. */
 /* The same geometry as bardeck's pill: 24 px tall from y=1, 3 px of room for the
- * shadow on the sides and below (core.py PILL_Y, PILL_H, SH). */
+ * shadow on the sides and below (core.py PILL_Y, PILL_H, SH). That is the laptop
+ * bar; the main bar is all of it 36/28 bigger (core.ZOOM), below. */
 #audio, #tray {
     background: alpha(@pill_bg, 0.96);
     border: 1px solid @pill_rim;
@@ -41,6 +42,14 @@ tooltip label { color: @title_fg; padding: 2px 4px; }
     padding: 0 10px;
 }
 #tray { padding: 0 9px; }
+window#waybar.main * { font-size: 15.4pt; }
+window#waybar.main #audio, window#waybar.main #tray {
+    border-radius: 9px;
+    box-shadow: 0 1px 4px 0 @pill_shadow, inset 0 1px 0 0 @pill_highlight;
+    margin: 1px 4px 4px 4px;
+    padding: 0 13px;
+}
+window#waybar.main #pulseaudio { padding: 0 8px 0 0; }
 #tray > .needs-attention { background: alpha(@red, 0.3); border-radius: 4px; }
 
 #pulseaudio { color: @title_fg; padding: 0 6px 0 0; }

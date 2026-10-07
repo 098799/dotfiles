@@ -11,7 +11,9 @@ STRIP / PANEL: quota sys net dev power clock (ws: strip only, one per output).
 Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
 $XDG_RUNTIME_DIR/bardeck (raw ARGB, core.write_strip) and sends hover / click / scroll to this daemon's socket
 there (ctl). "full" strips are drawn at 1x (DP-1), "compact" ones at 2x (the
-laptop's eDP-1 at scale 1.25); bar-strip.so's "scale" says the same.
+laptop's eDP-1 at scale 1.25); bar-strip.so's "scale" says the same. On top, each
+variant is drawn core.ZOOM bigger: the full bar 36/28, so bar-strip.so (which sizes
+itself to the picture) shows a 36 px bar.
 
 Theme: the palette follows ~/.config/theme/state (core.load_theme). When it changes
 the daemon writes theme.css and reloads waybar (SIGUSR2), which also restarts the
@@ -100,6 +102,7 @@ class Daemon:
         self.tick_n = 0
         self.dirty = False
         self.last_variants = None
+        self.last_outputs = None
         self.keys: dict[tuple, object] = {}  # (strip, variant) -> the inputs it was drawn from
         # The raw state, compared raw: a theme that falls back to gruvbox (no colors.d
         # file) must not look like a change on every tick, or waybar reloads for ever.
@@ -131,7 +134,7 @@ class Daemon:
         if key is not None and self.keys.get((name, variant)) == key:
             return
         self.keys[(name, variant)] = key
-        self.write(f"{name}-{variant}", strip.draw(variant, scale))
+        self.write(f"{name}-{variant}", strip.draw(variant, scale * core.ZOOM[variant]))
 
     def tick(self) -> bool:
         t0 = time.perf_counter()
@@ -147,6 +150,13 @@ class Daemon:
         variants = self.variants()
         fresh = variants != self.last_variants  # a screen came or went: draw its bar now
         self.last_variants = variants
+        outputs = tuple(sorted(self.ws.outputs))
+        if outputs != self.last_outputs:
+            if self.last_outputs is not None and outputs:
+                # Each output's wallpaper has the frosted band behind the bar baked in
+                # at its own size (~/bin/niri-wallpaper): a new screen needs its own.
+                core.spawn([f"{core.REAL_HOME}/bin/niri-wallpaper"])
+            self.last_outputs = outputs
         if fresh and self.quota is not None:
             self.quota.seen = None
         try:
@@ -157,7 +167,7 @@ class Daemon:
                         self.draw_strip(name, strip, variant, scale)
             if self.quota is not None and (n % 2 == 0 or fresh) and self.quota.changed():
                 for variant, scale in variants:
-                    self.write(f"quota-{variant}", self.quota.strips(variant, scale))
+                    self.write(f"quota-{variant}", self.quota.strips(variant, scale * core.ZOOM[variant]))
                 self.deck.invalidate("quota")
         except Exception as err:  # keep the bar alive across one bad reading
             core.log(f"tick: {err!r}")
@@ -172,7 +182,7 @@ class Daemon:
     def draw_ws(self) -> None:
         for output, rect, variant in self.ws.files():
             scale = dict(VARIANTS)[variant]
-            surf, hits = self.ws.draw(output, variant, scale)
+            surf, hits = self.ws.draw(output, variant, scale * core.ZOOM[variant])
             key = (rect["x"], rect["y"], variant)
             self.ws.hits[key] = hits
             self.ws.widths[key] = surf.get_width() / scale
@@ -193,13 +203,14 @@ class Daemon:
         variant = parts[6]
         if strip == "ws":
             key = (mx, my, variant)
-            local = px - (cx - self.ws.widths.get(key, 0) / 2)
+            # The click is in bar (zoomed) px; the click map in the code's own px.
+            local = (px - (cx - self.ws.widths.get(key, 0) / 2)) / core.ZOOM.get(variant, 1.0)
             if verb == "click":
                 self.ws.click(key, local)
             elif verb in ("scroll-up", "scroll-down"):
                 self.ws.scroll(verb == "scroll-up")
             return
-        self.deck.message(verb, strip, float(cx), self.deck.monitor_at(mx, my))
+        self.deck.message(verb, strip, float(cx), self.deck.monitor_at(mx, my), core.ZOOM.get(variant, 1.0))
         if verb == "click":
             self.s.poke()
 
@@ -260,6 +271,7 @@ def render(argv: list[str]) -> int:
     out, what = argv[2], argv[3]
     if argv[1] == "render":
         variant = "compact" if "compact" in argv[4:] else "full"
+        scale = scale * core.ZOOM[variant]
         if what == "quota":
             quota.changed()
             surf = quota.strips(variant, scale)

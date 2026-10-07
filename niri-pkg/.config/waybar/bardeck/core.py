@@ -31,6 +31,11 @@ SIGNAL = 16
 # and around it SH px for its shadow (left, right, below). MID is the pill's middle,
 # where a strip's content is centred.
 BAR_H = 28
+# Each variant is drawn this much bigger than the sizes in the code: the full bar
+# (the big screen) at 36/28, so text is ~17 px and the bar 36 px (config.jsonc
+# "height"); the compact one (the laptop, already at scale 1.25) as drawn. The panels
+# opened from a strip take its variant's zoom too.
+ZOOM = {"full": 36 / 28, "compact": 1.0}
 SH = 3
 PILL_Y = 1
 PILL_H = BAR_H - PILL_Y - SH
@@ -300,8 +305,13 @@ def dur(sec: float) -> str:
 # ── surfaces and files ───────────────────────────────────────────────────────
 
 
-def surface(w: float, h: float, scale: int):
-    s = cairo.ImageSurface(cairo.FORMAT_ARGB32, int(math.ceil(w * scale)), int(math.ceil(h * scale)))
+def px(v: float, scale: float) -> int:
+    """Logical size to pixels: round what is whole up to float noise, ceil the rest."""
+    return int(math.ceil(v * scale - 1e-6))
+
+
+def surface(w: float, h: float, scale: float):
+    s = cairo.ImageSurface(cairo.FORMAT_ARGB32, px(w, scale), px(h, scale))
     cr = cairo.Context(s)
     cr.scale(scale, scale)
     return s, cr
@@ -517,9 +527,9 @@ class StripCanvas:
     PAD = SH + 7
     GAP = 10
 
-    def __init__(self, scale: int, max_w: int = 1400):
+    def __init__(self, scale: float, max_w: int = 1400):
         self.scale = scale
-        self.surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, max_w * scale, BAR_H * scale)
+        self.surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, px(max_w, scale), px(BAR_H, scale))
         self.surf.set_device_scale(scale, scale)
         self.cr = cairo.Context(self.surf)
         self.x = float(self.PAD)
@@ -540,7 +550,7 @@ class StripCanvas:
 
     def finish(self):
         w = int(math.ceil(self.x + self.PAD))
-        final = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * self.scale, BAR_H * self.scale)
+        final = cairo.ImageSurface(cairo.FORMAT_ARGB32, px(w, self.scale), px(BAR_H, self.scale))
         final.set_device_scale(self.scale, self.scale)
         cr = cairo.Context(final)
         pill(cr, w)

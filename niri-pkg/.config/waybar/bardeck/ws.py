@@ -65,7 +65,8 @@ def action(name: str, **args) -> None:
 _ICONS: dict[tuple, cairo.ImageSurface | None] = {}
 
 
-def app_icon(app_id: str, scale: int):
+def app_icon(app_id: str, scale: float):
+    scale = max(1, math.ceil(scale - 1e-6))  # icon themes come in whole scales
     key = (app_id, scale)
     if key in _ICONS:
         return _ICONS[key]
@@ -260,6 +261,3 @@ class WsStrip:
     def scroll(self, up: bool) -> None:
         action("FocusWorkspaceUp" if up else "FocusWorkspaceDown")
 
-
-def ceil_scale(o: dict) -> int:
-    return max(1, math.ceil(float((o.get("logical") or {}).get("scale") or 1)))
