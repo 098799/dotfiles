@@ -26,6 +26,10 @@ class DevStrip:
     def __init__(self, s: Sampler):
         self.s = s
 
+    def key(self, variant: str):
+        s = self.s
+        return (s.bt_powered, tuple(sorted(s.bt_connected)), tuple(sorted(s.bt_battery.items())))
+
     def draw(self, variant: str, scale: int):
         s = self.s
         c = core.StripCanvas(scale)
@@ -34,12 +38,10 @@ class DevStrip:
         for d in s.devices:
             on = d.mac in s.bt_connected
             c.icon(d.glyph, "title" if on else "bg3", 15, after=5)
-            if on and d.kind == "mouse" and s.mouse_level and variant == "full":
-                level = s.mouse_level
-                tone = "hit" if level in ("Critical", "Low") else ("ok" if level in ("Full", "High") else "fg")
-                if level.isdigit():
-                    tone = core.level(100 - int(level), 70, 85)
-                c.cr.arc(c.x - 2, core.BAR_H / 2 + 7, 1.8, 0, 6.3)
+            pct = s.bt_battery.get(d.mac)
+            if on and pct is not None and variant == "full":
+                tone = core.level(100 - pct, 70, 85)  # yellow under 30%, red under 15%
+                c.cr.arc(c.x - 2, core.MID + 7, 1.8, 0, 6.3)
                 c.cr.set_source_rgba(*rgba(tone))
                 c.cr.fill()
         c.gap(-5)
@@ -92,8 +94,9 @@ class DevPanel(Panel):
             text(cr, P + 36, y + 6, d.name, 13, "title" if on else "fg", bold=on)
             name_w = core.text_w(cr, d.name, 13, bold=on)
             text(cr, P + 44 + name_w, y + 7, d.mac, 11, "dim")
-            if on and d.kind == "mouse" and s.mouse_level:
-                text(cr, W - P - 120, y + 7, f"battery {s.mouse_level.lower()}", 11, "fg", align=1)
+            pct = s.bt_battery.get(d.mac)
+            if on and pct is not None:
+                text(cr, W - P - 120, y + 7, f"battery {pct}%", 11, core.level(100 - pct, 70, 85), align=1)
             label = "disconnect" if on else "connect"
             button(cr, hits, W - P - 104, y + 3, label,
                    lambda d=d, label=label: core.menu_action(d.script, 1, label) or self.s.poke(),

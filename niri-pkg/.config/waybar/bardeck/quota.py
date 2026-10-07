@@ -33,7 +33,7 @@ from datetime import datetime, timedelta
 import cairo
 
 from . import core
-from .core import BAR_H, PALETTE, rgba, rrect, text
+from .core import BAR_H, MID, PALETTE, PILL_H, PILL_Y, SH, rgba, rrect, text
 from .core import text_w as text_width
 from .deck import Panel
 
@@ -248,7 +248,7 @@ STRIP = {
 def strip_layout(cr, rs: list[Row], variant: str) -> tuple[list[tuple[Row, float, float]], float]:
     """(row, x, width) per cell, and the strip's width."""
     spec = STRIP[variant]
-    gap, edge = 8.0, 9.0
+    gap, edge = 8.0, SH + 7.0
     out, x = [], edge
     for r in rs:
         w = text_width(cr, r.label, 13, bold=True) + 3 + spec["chart"] + 2 + 3
@@ -265,15 +265,15 @@ def draw_strip(rs: list[Row], now: float, variant: str, scale: int):
     surf, cr = core.surface(width, BAR_H, scale)
     core.pill(cr, width)
     chart = STRIP[variant]["chart"]
-    top, ch = 5.0, BAR_H - 10.0
+    top, ch = PILL_Y + 4.0, PILL_H - 8.0
     for r, x, w in cells:
         dim = r.over or r.stale
-        lw = text(cr, x, BAR_H / 2, r.label, 13, "title" if r.active else ("dim" if dim else "fg"),
+        lw = text(cr, x, MID, r.label, 13, "title" if r.active else ("dim" if dim else "fg"),
                   bold=r.active, valign=0.5)
         cx = x + lw + 3
         week_chart(cr, cx, top, chart, ch, r, now, detail=False)
         if dim:
-            text(cr, cx + chart / 2, BAR_H / 2, "?", 13, "dim", align=0.5, valign=0.5)
+            text(cr, cx + chart / 2, MID, "?", 13, "dim", align=0.5, valign=0.5)
         # 5h tank: blue under the ceiling, so it never reads as a weekly verdict colour.
         tx = cx + chart + 2
         cr.rectangle(tx, top, 3, ch)
@@ -286,9 +286,9 @@ def draw_strip(rs: list[Row], now: float, variant: str, scale: int):
             cr.fill()
         if STRIP[variant]["pct"]:
             pct = "?" if dim else f"{r.week.used:.0f}"
-            text(cr, tx + 6, BAR_H / 2, pct, 13, "dim" if dim else r.colour, bold=r.active, valign=0.5)
+            text(cr, tx + 6, MID, pct, 13, "dim" if dim else r.colour, bold=r.active, valign=0.5)
         if r.active:
-            rrect(cr, x - 2, BAR_H - 4, w + 4, 2, 1)
+            rrect(cr, x - 2, PILL_Y + PILL_H - 4, w + 4, 2, 1)
             cr.set_source_rgba(*rgba("accent"))
             cr.fill()
     return surf
@@ -484,8 +484,19 @@ class Quota:
         if key == self.seen:
             return False
         self.seen = key
-        self.m.store.load()
+        if self.m.store.load():
+            self.trim(time.time())
         return True
+
+    KEEP_S = 36 * 86400  # five quota weeks: the panel's u/p history, and no more
+
+    def trim(self, now: float) -> None:
+        """Drop readings older than KEEP_S. qtop's Store keeps every row of a log that
+        grows ~2,300 rows a day; the daemon lives for weeks."""
+        cutoff = now - self.KEEP_S
+        for rows in self.m.store.rows.values():
+            if rows and rows[0].t < cutoff:
+                rows[:] = [r for r in rows if r.t >= cutoff]
 
     def strips(self, variant: str, scale: int):
         now = time.time()

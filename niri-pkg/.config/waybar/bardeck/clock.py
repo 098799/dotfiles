@@ -14,6 +14,9 @@ from .deck import Panel
 class ClockStrip:
     name = "clock"
 
+    def key(self, variant: str):
+        return datetime.now().strftime("%Y%m%d%H%M")
+
     def draw(self, variant: str, scale: int):
         now = datetime.now()
         c = core.StripCanvas(scale)
@@ -32,20 +35,31 @@ class ClockPanel(Panel):
     live = 1.0
     W = 400
 
+    YEAR_W = 780
+
     def __init__(self):
         self.shift = 0
+        self.year = False  # y: the whole year
 
     def size(self):
-        return self.W, 430
+        return (self.YEAR_W, 556) if self.year else (self.W, 430)
 
     def opened(self) -> None:
-        self.shift = 0
+        self.shift, self.year = 0, False
+
+    def alternate(self) -> bool:
+        self.year, self.shift = not self.year, 0
+        return True
 
     def key(self, key: str, ctrl: bool) -> bool:
-        if key in ("u", "Left") or (ctrl and key == "b"):
-            self.shift -= 1
+        step = 12 if self.year else 1
+        if key == "y":
+            self.year = not self.year
+            self.shift = 0
+        elif key in ("u", "Left") or (ctrl and key == "b"):
+            self.shift -= step
         elif key in ("p", "Right") or (ctrl and key == "f"):
-            self.shift += 1
+            self.shift += step
         elif key in ("Home", "t"):
             self.shift = 0
         else:
@@ -53,6 +67,9 @@ class ClockPanel(Panel):
         return True
 
     def draw(self, cr, hits: Hits) -> None:
+        if self.year:
+            self.draw_year(cr)
+            return
         W, P = self.W, 16
         core.panel_frame(cr, W, self.size()[1])
         now = datetime.now()
@@ -81,7 +98,50 @@ class ClockPanel(Panel):
             mm += 1
             y = self.month(cr, P, y, W - 2 * P, yy, mm, now.date())
             y += 6
-        text(cr, W / 2, self.size()[1] - 22, "click to pin · u/p month · t today", 11, "dim", align=0.5)
+        text(cr, W / 2, self.size()[1] - 22, "click to pin · u/p month · y year · t today", 11, "dim", align=0.5)
+
+    def draw_year(self, cr) -> None:
+        """Twelve months, four across, with week numbers; u/p a year."""
+        W, H = self.size()
+        P = 16
+        core.panel_frame(cr, W, H)
+        now = datetime.now()
+        year = now.year + self.shift // 12
+        text(cr, P, 10, str(year), 24, "bright", bold=True)
+        iso = now.isocalendar()
+        text(cr, W - P, 16, f"today {now:%a %-d %b} · week {iso.week}", 12, "fg", align=1)
+        cols, gap = 4, 14
+        mw = (W - 2 * P - gap * (cols - 1)) / cols
+        for m in range(12):
+            mx = P + (m % cols) * (mw + gap)
+            my = 50 + (m // cols) * 160
+            self.mini(cr, mx, my, mw, year, m + 1, now.date())
+        text(cr, W / 2, H - 22, "u/p year · y two months · t this year", 11, "dim", align=0.5)
+
+    def mini(self, cr, x: float, y: float, w: float, year: int, month: int, today: date) -> None:
+        cur = (year, month) == (today.year, today.month)
+        text(cr, x, y, calendar.month_name[month], 13, "accent" if cur else "title", bold=True)
+        y += 19
+        cw = w / 8
+        for i, name in enumerate(("wk", "M", "T", "W", "T", "F", "S", "S")):
+            text(cr, x + cw * i + cw / 2, y, name, 10, "bg3" if i == 0 else ("purple" if i >= 6 else "dim"),
+                 align=0.5)
+        y += 14
+        for week in calendar.Calendar(0).monthdatescalendar(year, month):
+            text(cr, x + cw / 2, y, str(week[0].isocalendar().week), 10, "bg3", align=0.5)
+            for i, d in enumerate(week, start=1):
+                if d.month != month:
+                    continue
+                cx = x + cw * i + cw / 2
+                if d == today:
+                    core.rrect(cr, cx - 10, y - 1, 20, 15, 5)
+                    cr.set_source_rgba(*rgba("accent"))
+                    cr.fill()
+                    text(cr, cx, y, str(d.day), 11, "bg", bold=True, align=0.5)
+                else:
+                    tone = "dim" if d < today else ("purple" if i >= 6 else "title")
+                    text(cr, cx, y, str(d.day), 11, tone, align=0.5)
+            y += 16
 
     def month(self, cr, x: float, y: float, w: float, year: int, month: int, today: date) -> float:
         text(cr, x, y, f"{calendar.month_name[month]} {year}", 14, "title", bold=True)

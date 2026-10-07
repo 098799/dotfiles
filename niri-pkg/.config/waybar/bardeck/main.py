@@ -8,8 +8,8 @@
 
 STRIP / PANEL: quota sys net dev power clock (ws: strip only, one per output).
 
-Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the PNGs from
-$XDG_RUNTIME_DIR/bardeck and sends hover / click / scroll to this daemon's socket
+Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
+$XDG_RUNTIME_DIR/bardeck (raw ARGB, core.write_strip) and sends hover / click / scroll to this daemon's socket
 there (ctl). "full" strips are drawn at 1x (DP-1), "compact" ones at 2x (the
 laptop's eDP-1 at scale 1.25); bar-strip.so's "scale" says the same.
 
@@ -96,9 +96,11 @@ class Daemon:
         self.s, self.quota, self.strips, self.panels = build()
         self.deck = Deck(self.panels)
         self.ws = WsStrip(self.draw_ws)
+        self.s.watch_bluez()
         self.tick_n = 0
         self.dirty = False
         self.last_variants = None
+        self.keys: dict[tuple, object] = {}  # (strip, variant) -> the inputs it was drawn from
         # The raw state, compared raw: a theme that falls back to gruvbox (no colors.d
         # file) must not look like a change on every tick, or waybar reloads for ever.
         self.theme = core.theme_key()
@@ -120,8 +122,16 @@ class Daemon:
         return tuple(v for v in VARIANTS if (v[0] == "compact" and laptop) or (v[0] == "full" and other))
 
     def write(self, name: str, surf) -> None:
-        if core.write_png(f"{RUN_DIR}/{name}.png", surf):
+        if core.write_strip(f"{RUN_DIR}/{name}.argb", surf):
             self.dirty = True
+
+    def draw_strip(self, name: str, strip, variant: str, scale: int) -> None:
+        """Draw unless its inputs are the same as last time (strip.key, when it has one)."""
+        key = strip.key(variant) if hasattr(strip, "key") else None
+        if key is not None and self.keys.get((name, variant)) == key:
+            return
+        self.keys[(name, variant)] = key
+        self.write(f"{name}-{variant}", strip.draw(variant, scale))
 
     def tick(self) -> bool:
         t0 = time.perf_counter()
@@ -144,7 +154,7 @@ class Daemon:
             for name, (strip, every) in self.strips.items():
                 if n % every == 0 or fresh:
                     for variant, scale in variants:
-                        self.write(f"{name}-{variant}", strip.draw(variant, scale))
+                        self.draw_strip(name, strip, variant, scale)
             if self.quota is not None and (n % 2 == 0 or fresh) and self.quota.changed():
                 for variant, scale in variants:
                     self.write(f"quota-{variant}", self.quota.strips(variant, scale))

@@ -18,9 +18,12 @@ NET_ACTIONS = (("rescan", "󰑐"), ("link rates", "󰓅"), ("reconnect", "󰑓")
                ("reset adapter", "󰜺"), ("nmtui", ""), ("speedtest", "󰓅"))
 
 
-def signal_pct(dbm: str | None) -> int | None:
+def signal_pct(wifi: dict) -> int | None:
+    """NetworkManager's strength, or the dBm iw gave, as 0-100."""
+    if wifi.get("strength") is not None:
+        return int(wifi["strength"])
     try:
-        return max(0, min(100, int((int(dbm) + 100) * 2)))
+        return max(0, min(100, int((int(wifi.get("signal")) + 100) * 2)))
     except (TypeError, ValueError):
         return None
 
@@ -46,7 +49,7 @@ class NetStrip:
             c.icon("󰖪", "hit", 15)
             c.text("offline", "hit")
         elif wifi.get("ssid"):
-            pct = signal_pct(wifi.get("signal"))
+            pct = signal_pct(wifi)
             tone = "ok" if (pct or 0) >= 70 else ("warn" if (pct or 0) >= 40 else "orange")
             c.icon(wifi_glyph(pct), tone, 15)
             if variant == "full":
@@ -62,8 +65,8 @@ class NetStrip:
             n = 30
             rx, tx = list(s.rx)[-n:], list(s.tx)[-n:]
             top = max([1.0, *rx, *tx])
-            core.spark(c.cr, c.x, 6, 34, core.BAR_H - 12, rx, "blue", top=top, fill=0.35, line=1)
-            core.spark(c.cr, c.x, 6, 34, core.BAR_H - 12, tx, "purple", top=top, fill=0.0, line=1)
+            core.spark(c.cr, c.x, core.MID - 7, 34, 14, rx, "blue", top=top, fill=0.35, line=1)
+            core.spark(c.cr, c.x, core.MID - 7, 34, 14, tx, "purple", top=top, fill=0.0, line=1)
             c.gap(38)
             now = (rx[-1] if rx else 0) + (tx[-1] if tx else 0)
             if now >= 100 * 1024:
@@ -93,6 +96,13 @@ class NetPanel(Panel):
     def size(self):
         return self.W, 352
 
+    def opened(self) -> None:
+        self.s.want_link = True  # iw's dBm and link rates, only while open
+        self.s.poke()
+
+    def closed(self) -> None:
+        self.s.want_link = False
+
     def draw(self, cr, hits: Hits) -> None:
         s = self.s
         W, P = self.W, 16
@@ -100,7 +110,7 @@ class NetPanel(Panel):
         wifi = s.wifi
         y = 12
         if wifi.get("ssid"):
-            pct = signal_pct(wifi.get("signal"))
+            pct = signal_pct(wifi)
             tone = "ok" if (pct or 0) >= 70 else ("warn" if (pct or 0) >= 40 else "orange")
             core.icon(cr, P, y + 11, wifi_glyph(pct), 22, tone)
             text(cr, P + 30, y, wifi["ssid"], 18, "title", bold=True)
@@ -110,9 +120,13 @@ class NetPanel(Panel):
                     "6 GHz" if float(wifi.get("freq", 0)) >= 5900 else "2.4 GHz")
             except ValueError:
                 pass
-            text(cr, W - P, y + 4, f"{wifi.get('signal', '?')} dBm · {pct or 0}% · {band}", 12, tone, align=1)
+            dbm = f"{wifi['signal']} dBm · " if wifi.get("signal") else ""
+            text(cr, W - P, y + 4, f"{dbm}{pct or 0}% · {band}", 12, tone, align=1)
             y += 28
-            text(cr, P + 30, y, f"↓ {wifi.get('rx', '?')}   ↑ {wifi.get('tx', '?')}   link rate", 12, "dim")
+            if wifi.get("rx"):
+                text(cr, P + 30, y, f"↓ {wifi['rx']}   ↑ {wifi.get('tx', '?')}   link rate", 12, "dim")
+            else:
+                text(cr, P + 30, y, f"{wifi.get('bitrate', '?')} link rate", 12, "dim")
         elif s.links:
             core.icon(cr, P, y + 11, "󰈀", 22, "ok")
             text(cr, P + 30, y, "wired", 18, "title", bold=True)

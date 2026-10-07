@@ -25,13 +25,14 @@
     "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
-    // 26 px pills, 4 px of wallpaper above them. ~/bin/barmenu opens its menus under
-    // the whole 30 (BAR_HEIGHT there).
-    "height": 26,
-    "margin-top": 4,
+    // 28 px: a 24 px pill and 3 px of room for its shadow (bardeck/core.py SH), under
+    // 3 px of wallpaper. The pills' own margins make the gap between them; spacing
+    // only adds 2. ~/bin/barmenu opens its menus under the whole 31 (BAR_HEIGHT there).
+    "height": 28,
+    "margin-top": 3,
     "margin-left": 6,
     "margin-right": 6,
-    "spacing": 6,
+    "spacing": 2,
     "modules-left": ["cffi/ws", "custom/bardeck"],
     "modules-center": ["cffi/quota"],
     "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"]
@@ -42,11 +43,11 @@
     "include": ["~/.config/waybar/modules.jsonc"],
     "layer": "top",
     "position": "top",
-    "height": 26,
-    "margin-top": 4,
+    "height": 28,
+    "margin-top": 3,
     "margin-left": 6,
     "margin-right": 6,
-    "spacing": 6,
+    "spacing": 2,
     // No centre: at 1536 px the right side would run into a centred quota strip
     // (~1350 px of pills in all), so quota follows the workspaces.
     "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],

@@ -17,9 +17,7 @@
     // start one; the second waits on a lock.
     "custom/bardeck": {
         "exec": "~/bin/bardeck daemon",
-        "tooltip": false,
-        // Back after a crash; the strips keep their last pictures meanwhile.
-        "restart-interval": 5
+        "tooltip": false
     },
 
     // Workspaces of this bar's output, with a mark per column (an app icon, or a
@@ -29,11 +27,12 @@
         "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
         "strip": "ws", "variant": "full", "scale": 1, "per-output": true, "hover-ms": 0
     },
-    // Panel: the time to the second, UTC, two months with ISO weeks.
+    // Panel: the time to the second, UTC, two months with ISO weeks. Right click:
+    // the whole year (pinned; y toggles, u/p a year). "right-click": bar-strip.so
+    // sends the right click to bardeck instead of to waybar.
     "cffi/clock": {
         "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
-        "strip": "clock", "variant": "full", "scale": 1,
-        "on-click-right": "alacritty -e bash -c \"cal -y; read -p 'Press enter to close...'\""
+        "strip": "clock", "variant": "full", "scale": 1, "right-click": true
     },
     // Panel: every account's quota week (qtop's chart). Middle: qtop. Right: switch account.
     "cffi/quota": {

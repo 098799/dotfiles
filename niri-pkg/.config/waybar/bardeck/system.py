@@ -40,17 +40,17 @@ class SysStrip:
         n = 40 if variant == "full" else 24
         recent = list(s.cpu)[-n:]
         w = 36 if variant == "full" else 24
-        core.spark(c.cr, c.x, 6, w, core.BAR_H - 12, recent, tone, fill=0.3, line=1.1)
+        core.spark(c.cr, c.x, core.MID - 7, w, 14, recent, tone, fill=0.3, line=1.1)
         c.gap(w + 5)
         c.text(f"{cpu:3.0f}%", tone)
         c.gap()
         mem = s.mem[-1] if s.mem else 0.0
         c.icon("󰘚", "fg", 14)
         if variant == "full":
-            core.bar(c.cr, c.x, core.BAR_H / 2 - 2.5, 22, 5, mem / 100, mem_tone(mem))
+            core.bar(c.cr, c.x, core.MID - 2.5, 22, 5, mem / 100, mem_tone(mem))
             swap = s.swap[-1] if s.swap else 0.0
             if swap > 1:
-                core.bar(c.cr, c.x, core.BAR_H / 2 + 4, 22, 2, swap / 100, "purple", r=1)
+                core.bar(c.cr, c.x, core.MID + 4, 22, 2, swap / 100, "purple", r=1)
             c.gap(27)
         c.text(f"{mem:.0f}%", mem_tone(mem))
         if s.temp:

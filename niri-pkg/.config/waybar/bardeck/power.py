@@ -62,6 +62,10 @@ class PowerStrip:
     def __init__(self, s: Sampler):
         self.s = s
 
+    def key(self, variant: str):
+        s = self.s
+        return (s.bat.get("capacity"), s.bat.get("status"), s.ac, s.profile, s.boost)
+
     def draw(self, variant: str, scale: int):
         s = self.s
         c = core.StripCanvas(scale)

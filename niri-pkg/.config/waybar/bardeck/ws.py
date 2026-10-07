@@ -27,7 +27,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import core  # noqa: E402
-from .core import BAR_H, rgba, text  # noqa: E402
+from .core import MID, PILL_H, PILL_Y, SH, rgba, text  # noqa: E402
 
 TERMINALS = {"alacritty", "kitty", "foot", "org.wezfurlong.wezterm", "com.mitchellh.ghostty"}
 MAX_MARKS = {"full": 7, "compact": 4}
@@ -99,7 +99,7 @@ def term_letters(title: str) -> str:
 
 
 class WsStrip:
-    """Draws one PNG per output and variant; keeps the click map of each."""
+    """Draws one picture per output; keeps the click map of each."""
 
     name = "ws"
 
@@ -163,7 +163,7 @@ class WsStrip:
         for w in self.windows:
             wins_by_ws.setdefault(w.get("workspace_id"), []).append(w)
         hits: list[tuple[float, float, object]] = []
-        c.x = 4
+        c.x = SH + 2
         for ws in sorted((w for w in self.workspaces if w.get("output") == output), key=lambda w: w["idx"]):
             wins = wins_by_ws.get(ws["id"], [])
             if not wins and not ws.get("is_active"):
@@ -192,11 +192,11 @@ class WsStrip:
             cw = 8 + lw + (6 + mw + more_w if marks else 0) + 6
             bg = "urgent" if urgent else ("accent" if focused else ("bg2" if active else None))
             if bg:
-                core.rrect(cr, x0, 3, cw, BAR_H - 6, 5)
+                core.rrect(cr, x0, PILL_Y + 2.5, cw, PILL_H - 5, 5)
                 cr.set_source_rgba(*rgba(bg, 1.0 if focused or urgent else 0.8))
                 cr.fill()
             fg = "bg" if focused or urgent else ("title" if active else "fg")
-            text(cr, x0 + 8, BAR_H / 2, label, 13, fg, bold=bool(focused), valign=0.5)
+            text(cr, x0 + 8, MID, label, 13, fg, bold=bool(focused), valign=0.5)
             x = x0 + 8 + lw + 6
             hits.append((x0, x0 + 8 + lw + 3, ("ws", ws["id"])))
             active_win = ws.get("active_window_id")
@@ -205,19 +205,19 @@ class WsStrip:
                 mw1 = self._mark_w(cr, w0)
                 self._mark(cr, x, w0, fg, scale, on_accent=bool(focused))
                 if any(w["id"] == active_win for w in col) and len(columns) > 1:
-                    core.rrect(cr, x, BAR_H - 6, mw1, 2, 1)
+                    core.rrect(cr, x, PILL_Y + PILL_H - 5, mw1, 2, 1)
                     cr.set_source_rgba(*rgba("bg" if focused else "title", 0.9))
                     cr.fill()
                 target = next((w for w in col if w["id"] == active_win), w0)
                 hits.append((x - 1, x + mw1 + 2, ("win", target["id"])))
                 x += mw1 + 3
             if more > 0:
-                text(cr, x, BAR_H / 2, f"+{more}", 11, fg, valign=0.5)
+                text(cr, x, MID, f"+{more}", 11, fg, valign=0.5)
                 x += more_w
             c.x = x0 + cw + 4
         c.x -= 4
         c.x = max(c.x, 20)
-        c.PAD = 4
+        c.PAD = SH + 2
         surf = c.finish()
         return surf, hits
 
@@ -231,17 +231,17 @@ class WsStrip:
         if app.lower() in TERMINALS:
             letters = term_letters(w.get("title", ""))
             mw = self._mark_w(cr, w)
-            core.rrect(cr, x, BAR_H / 2 - 8, mw, 16, 4)
+            core.rrect(cr, x, MID - 8, mw, 16, 4)
             cr.set_source_rgba(*rgba("bg" if on_accent else "bg1", 0.35 if on_accent else 1))
             cr.fill()
-            text(cr, x + mw / 2, BAR_H / 2, letters, 11, fg, align=0.5, valign=0.5)
+            text(cr, x + mw / 2, MID, letters, 11, fg, align=0.5, valign=0.5)
             return
         surf = app_icon(app, scale)
         if surf is None:
-            text(cr, x + ICON / 2, BAR_H / 2, (app[:1] or "?").upper(), 12, fg, align=0.5, valign=0.5)
+            text(cr, x + ICON / 2, MID, (app[:1] or "?").upper(), 12, fg, align=0.5, valign=0.5)
             return
         cr.save()
-        cr.translate(x, BAR_H / 2 - ICON / 2)
+        cr.translate(x, MID - ICON / 2)
         cr.set_source_surface(surf, 0, 0)
         cr.paint()
         cr.restore()

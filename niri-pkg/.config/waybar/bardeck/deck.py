@@ -57,6 +57,11 @@ class Panel:
         """What, besides new data, changes the picture (for the drawn-ahead cache)."""
         return ()
 
+    def alternate(self) -> bool:
+        """A right click on the strip (when its module sends it): the other view.
+        True = it changed."""
+        return False
+
 
 class Deck:
     # The pointer may cross the bar between a strip and its panel, and a strip only
@@ -265,6 +270,10 @@ class Deck:
                 self.hide()
             else:
                 self.show(panel, center, monitor, pinned=True)
+        elif verb == "right":  # the panel's other view, pinned (the clock: the year)
+            self.show(panel, center, monitor, pinned=True)
+            if panel.alternate():
+                self.area.queue_draw()
         return True
 
     # -- input -----------------------------------------------------------------

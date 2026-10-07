@@ -1,14 +1,13 @@
 """Shared ground for every strip and panel: palette, text, shapes, files, signals.
 
 A *strip* is one pill on the bar. bardeck draws it to
-$XDG_RUNTIME_DIR/bardeck/<name>-<variant>.png and bar-strip.so (a waybar CFFI
+$XDG_RUNTIME_DIR/bardeck/<name>-<variant>.argb and bar-strip.so (a waybar CFFI
 module) shows it. A *panel* is what opens under a strip on hover: drawn by the
 Deck (deck.py) on a layer-shell overlay.
 """
 
 from __future__ import annotations
 
-import hashlib
 import math
 import os
 import pwd
@@ -26,10 +25,16 @@ from gi.repository import Pango, PangoCairo  # noqa: E402
 REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir  # agent shells run with a fake $HOME
 RUN_DIR = f"{os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'}/bardeck"
 SCRIPTS = f"{REAL_HOME}/scripts"  # the i3blocks scripts (i3-pkg), whose menus the panels reuse
-# bar-strip.so reloads a strip's PNG on this signal when the file changed.
+# bar-strip.so reloads a strip on this signal when the file changed.
 SIGNAL = 16
-# The bar's height (config.jsonc "height"); every strip is drawn this tall.
-BAR_H = 26
+# Every strip is drawn BAR_H tall (= config.jsonc "height"): a PILL_H pill at PILL_Y,
+# and around it SH px for its shadow (left, right, below). MID is the pill's middle,
+# where a strip's content is centred.
+BAR_H = 28
+SH = 3
+PILL_Y = 1
+PILL_H = BAR_H - PILL_Y - SH
+MID = PILL_Y + PILL_H / 2
 BAR_MARGIN_X = 6  # config.jsonc "margin-left"
 FONT = "Ubuntu Mono"
 ICON_FONT = "UbuntuMono Nerd Font Propo"
@@ -54,8 +59,9 @@ STATUS = {
 }
 PALETTE: dict[str, str] = {}
 THEME = ("dark", "gruvbox")
-PILL_ALPHA = 0.94
-SHADOW = {"dark": 0.35, "light": 0.14}
+PILL_ALPHA = 0.96
+SHADOW = {"dark": 0.75, "light": 0.30}  # the shadow's total darkness
+HIGHLIGHT = {"dark": 0.07, "light": 0.55}
 PILL_R = 7
 
 
@@ -103,9 +109,10 @@ def load_theme() -> tuple[str, str]:
         "bright": roles.get("accent_fg", roles["title_fg"]) if mode == "dark" else roles["title_fg"],
         "dim": roles["fg_dim"], "accent": roles["accent"], "info": roles.get("info", status["blue"]),
         "urgent": roles.get("urgent", status["purple"]), "sep": sep, "alt": bg1,
-        # The pill's rim: the second background on dark, the separator on light, where
-        # the second background is too close to the wallpaper's cream.
-        "rim": bg1 if mode == "dark" else sep,
+        # The pill's rim: between the second background and the separator on dark (on
+        # the darkest wallpapers no shadow shows, so the rim draws the edge); the
+        # separator on light, where the second background is the wallpaper's cream.
+        "rim": mix(bg1, sep, 0.5) if mode == "dark" else sep,
         **status,
         "pace": status["blue"], "max": status["purple"], "team": status["blue"],
     })
@@ -118,7 +125,8 @@ def theme_css() -> str:
     p = PALETTE
     return (f"/* written by bardeck for the theme {' '.join(THEME)}; see style.css */\n"
             f"@define-color pill_bg {p['bg']};\n@define-color pill_rim {p['rim']};\n"
-            f"@define-color pill_shadow rgba(0, 0, 0, {SHADOW[THEME[0]]});\n"
+            f"@define-color pill_shadow rgba(0, 0, 0, {SHADOW[THEME[0]] * 0.6:.2f});\n"
+            f"@define-color pill_highlight rgba(255, 255, 255, {HIGHLIGHT[THEME[0]]});\n"
             f"@define-color fg_main {p['fg']};\n@define-color title_fg {p['title']};\n"
             f"@define-color red {p['hit']};\n@define-color green {p['ok']};\n")
 
@@ -204,19 +212,28 @@ def rrect(cr, x, y, w, h, r) -> None:
     cr.close_path()
 
 
-def pill(cr, w: float, h: float = BAR_H) -> None:
-    """The strip's own background: the same pill style.css gives the native modules.
+def pill(cr, w: float) -> None:
+    """The strip's own background, the same pill style.css gives the native modules.
 
-    A rim, and outside it a faint dark ring, so the pill keeps its shape on any
-    wallpaper: on the light themes the pill is the colour of the cream wallpapers."""
-    rrect(cr, 0.5, 0.5, w - 1, h - 1, PILL_R + 0.5)
-    cr.set_source_rgba(*rgba("#000000", SHADOW[THEME[0]]))
-    cr.set_line_width(1)
-    cr.stroke()
-    rrect(cr, 1.5, 1.5, w - 3, h - 3, PILL_R - 0.5)
+    So the bar stands out on any wallpaper: a soft shadow under the pill (stacked
+    rings, offset 1 px down), a rim, and a faint highlight along the top inside, so it
+    reads as a raised object even where its colour matches the wallpaper (the light
+    themes' pills are the colour of the cream wallpapers)."""
+    x, y, pw, ph, r = SH + 0.5, PILL_Y + 0.5, w - 2 * SH - 1, PILL_H - 1, PILL_R
+    strength = SHADOW[THEME[0]]
+    for spread, share in ((3.0, 0.18), (2.0, 0.27), (1.0, 0.55)):
+        rrect(cr, x - spread, y + 1 - spread * 0.5, pw + 2 * spread, ph + spread * 1.5, r + spread)
+        cr.set_source_rgba(0, 0, 0, strength * share)
+        cr.fill()
+    rrect(cr, x, y, pw, ph, r)
     cr.set_source_rgba(*rgba("bg", PILL_ALPHA))
     cr.fill_preserve()
     cr.set_source_rgba(*rgba("rim"))
+    cr.set_line_width(1)
+    cr.stroke()
+    cr.move_to(x + r, y + 1)
+    cr.line_to(x + pw - r, y + 1)
+    cr.set_source_rgba(1, 1, 1, HIGHLIGHT[THEME[0]])
     cr.stroke()
 
 
@@ -291,18 +308,28 @@ def surface(w: float, h: float, scale: int):
 
 
 _WRITTEN: dict[str, bytes] = {}
+MAGIC = b"BDK1"
 
 
-def write_png(path: str, surf) -> bool:
-    """Write atomically, and only when the picture changed (bar-strip.so reloads on mtime)."""
+def write_strip(path: str, surf) -> bool:
+    """Write a strip for bar-strip.so: a 16-byte header (magic, width, height, stride
+    in pixels/bytes, little-endian u32) and cairo's own premultiplied ARGB32 rows.
+
+    Raw, not PNG: waybar loads the strips on its GTK main thread, and the system
+    strip changes every second; zlib both ways was most of the cost. Written
+    atomically, and only when the bytes changed (bar-strip.so reloads on mtime)."""
+    import struct
+
     surf.flush()
-    digest = hashlib.blake2b(bytes(surf.get_data()), digest_size=16).digest()
-    if _WRITTEN.get(path) == digest and os.path.exists(path):
+    data = bytes(surf.get_data())
+    if _WRITTEN.get(path) == data and os.path.exists(path):
         return False
     tmp = f"{path}.tmp"
-    surf.write_to_png(tmp)
+    with open(tmp, "wb") as fh:
+        fh.write(MAGIC + struct.pack("<III", surf.get_width(), surf.get_height(), surf.get_stride()))
+        fh.write(data)
     os.replace(tmp, path)
-    _WRITTEN[path] = digest
+    _WRITTEN[path] = data
     return True
 
 
@@ -487,7 +514,7 @@ class StripCanvas:
         surf = c.finish()
     """
 
-    PAD = 9
+    PAD = SH + 7
     GAP = 10
 
     def __init__(self, scale: int, max_w: int = 1400):
@@ -496,7 +523,7 @@ class StripCanvas:
         self.surf.set_device_scale(scale, scale)
         self.cr = cairo.Context(self.surf)
         self.x = float(self.PAD)
-        self.mid = BAR_H / 2
+        self.mid = MID
 
     def gap(self, g: float | None = None) -> None:
         self.x += self.GAP if g is None else g

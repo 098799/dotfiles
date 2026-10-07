@@ -30,12 +30,14 @@ tooltip { background: @pill_bg; border: 1px solid @pill_rim; border-radius: 7px;
 tooltip label { color: @title_fg; padding: 2px 4px; }
 
 /* The native pills. */
+/* The same geometry as bardeck's pill: 24 px tall from y=1, 3 px of room for the
+ * shadow on the sides and below (core.py PILL_Y, PILL_H, SH). */
 #audio, #tray {
-    background: alpha(@pill_bg, 0.94);
+    background: alpha(@pill_bg, 0.96);
     border: 1px solid @pill_rim;
     border-radius: 7px;
-    box-shadow: 0 0 0 1px @pill_shadow;
-    margin: 1px;
+    box-shadow: 0 1px 3px 0 @pill_shadow, inset 0 1px 0 0 @pill_highlight;
+    margin: 1px 3px 3px 3px;
     padding: 0 10px;
 }
 #tray { padding: 0 9px; }

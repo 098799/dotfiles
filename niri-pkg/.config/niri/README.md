@@ -120,7 +120,7 @@ i3blocks scripts' menus.
 | network | Signal, SSID, traffic, the VPN, tailscale. | The link (signal, band, link rates, addresses), 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (rescan, reconnect, reset adapter, speedtest, …). |
 | devices | Bluetooth, and the headphones, keyboard and mouse lit when connected. | Connect / disconnect each, Bluetooth on / off, where sound goes (click to switch output or input), mixer, bluetoothctl, restart logid, nuke bt. |
 | power | Battery, the power profile, turbo boost when on. | The battery's last 24 h (upower's history), draw, health, the charge limit; power profile and turbo boost switches. |
-| clock | Date, time, ISO week. | Time to the second, UTC, day of the year, two months with week numbers. Pinned: `u`/`p` month, `t` today. |
+| clock | Date, time, ISO week. | Time to the second, UTC, day of the year, two months with week numbers. **Right click: the whole year.** Pinned: `y` year ⇄ two months, `u`/`p` a month (a year in the year view), `t` today. |
 
 **The buttons reuse the scripts.** A panel button runs the i3blocks script's own
 menu entry (`core.menu_action`): a `rofi` shim on PATH answers the menu with the
@@ -128,12 +128,18 @@ button's choice. So `vpn.sh` still owns the wg-quick lines, `network.sh` the
 adapter reset and the speedtest, `bt-*.sh` the devices (their `MAC=`/`NAME=` are
 the device list).
 
-**One process for the whole bar.** The old bar ran a script per block per bar
-every few seconds (~15% of a core after the 7 Oct sharing fix, ~70% before).
-bardeck reads `/proc`, `/sys` and niri's socket itself, writes a picture only
-when it changed, and draws only the variant a screen shows: **~1.4% of a core**
-and ~45 MB, measured 7 Oct 2026. Slow reads (`iw`, `bt-state.sh`, `pactl`,
-`checkupdates` hourly) run on a worker thread, so they never stall the bar.
+**One process for the whole bar, and no others.** The old bar ran a script per
+block per bar every few seconds (~15% of a core after the 7 Oct sharing fix, ~70%
+before). bardeck reads `/proc` and `/sys`, NetworkManager and BlueZ over D-Bus
+(BlueZ only when it signals a change), addresses by ioctl, and niri's socket. It
+starts no program in steady state: `iw` and `pactl` only while their panel is
+open, `checkupdates` once an hour on its own thread. A strip is drawn only when
+its inputs changed (`key()`), written only when its bytes changed, and only in
+the variant a screen shows. Strips are raw ARGB (`core.write_strip`), not PNG:
+waybar copies them on its main thread instead of decoding. Measured 7 Oct 2026
+over 90 s: **bardeck ~1.0% of a core, waybar ~0.1%, 0 child processes**, ~45 MB.
+(The first version was 7.6%: a /proc scan per signal to find waybar, and
+`bt-state.sh`/`iw`/`ip` every 4 s.)
 
 **Fast panels.** The panels live in the daemon on one hidden layer-shell
 overlay. A panel opens in ~20 ms (one map and one blit); the quota panel, which
@@ -144,9 +150,16 @@ takes ~0.15 s to draw, is drawn ahead whenever its data changes.
 palette comes from the same `~/.config/i3/colors.d/<palette>-<mode>.conf` i3
 uses, with status colours tuned per theme in `core.STATUS`. On a switch bardeck
 writes `waybar/theme.css` (imported by `style.css`, not in git) and reloads
-waybar. Each pill has a faint dark ring outside its rim, so it keeps its shape on
-the cream light wallpapers. Checked on every gruvbox-dark, gruvbox-light and
-selenized-dark wallpaper.
+waybar.
+
+**Standing out on the wallpapers.** The bar has no background: the wallpaper
+shows between the pills. Each pill is nearly opaque (0.96), has a soft shadow
+under it (stronger on dark themes), a rim, and a faint highlight along its top,
+so it reads as a raised object where its colour matches the wallpaper (the light
+themes' pills are the cream of their wallpapers). On the darkest wallpapers no
+shadow shows, so the dark themes' rim is a step brighter. `style.css` gives the
+native pills the same (box-shadow). Checked on every gruvbox-dark, gruvbox-light
+and selenized-dark wallpaper.
 
 **Working on it.**
 
@@ -159,7 +172,10 @@ selenized-dark wallpaper.
 - **waybar exits on a CSS error**, a `/*` inside a comment included. Check
   `/run/user/1000/waybar.log` after a `style.css` edit; restart it with
   `niri msg action spawn -- sh -c 'waybar > /run/user/1000/waybar.log 2>&1'`.
-- The bar is 26 px plus a 4 px top margin; `barmenu` opens under the 30.
+- The bar is 28 px (a 24 px pill and 3 px for its shadow, `core.SH`) under a
+  3 px top margin; `barmenu` opens under the 31.
+- No `restart-interval` on `custom/bardeck`: with it, every waybar reload left a
+  zombie `[waybar]` process.
 - A strip may change width freely (`bar-strip.so` sizes itself to the
   picture). The quota strip is in the centre on the main bar because waybar
   pushes a centre module off centre when the right side runs into it; on the
