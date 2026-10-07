@@ -40,7 +40,7 @@ def niri(request) -> dict | list | None:
         return None
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.settimeout(1.0)
+            s.settimeout(0.3)  # on the main loop: a stalled niri must not freeze the bar
             s.connect(path)
             s.sendall((json.dumps(request) + "\n").encode())
             buf = b""
@@ -125,10 +125,12 @@ class WsStrip:
                     s.connect(os.environ["NIRI_SOCKET"])
                     s.sendall(b'"EventStream"\n')
                     f = s.makefile("rb")
+                    # Terminal titles change all the time (agents animate them): at most
+                    # five redraws a second.
                     for _line in f:
                         if not self._pending:
                             self._pending = True
-                            GLib.timeout_add(40, self._refresh)
+                            GLib.timeout_add(200, self._refresh)
             except OSError as err:
                 core.log(f"niri event stream: {err!r}")
             time.sleep(2)

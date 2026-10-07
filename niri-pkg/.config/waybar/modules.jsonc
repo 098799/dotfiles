@@ -17,7 +17,9 @@
     // start one; the second waits on a lock.
     "custom/bardeck": {
         "exec": "~/bin/bardeck daemon",
-        "tooltip": false
+        "tooltip": false,
+        // Back after a crash; the strips keep their last pictures meanwhile.
+        "restart-interval": 5
     },
 
     // Workspaces of this bar's output, with a mark per column (an app icon, or a

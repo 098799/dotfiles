@@ -62,12 +62,16 @@ def build(with_ws: bool = True):
     from .devices import DevPanel, DevStrip
     from .net import NetPanel, NetStrip
     from .power import PowerPanel, PowerStrip
-    from .quota import Quota, QuotaPanel
     from .sample import Sampler
     from .system import SysStrip, SystemPanel
 
     s = Sampler()
-    quota = Quota()
+    try:  # quota imports ~/bin/qtop: a host without it still gets the rest of the bar
+        from .quota import Quota, QuotaPanel
+        quota = Quota()
+    except Exception as err:
+        core.log(f"no quota strip: {err!r}")
+        quota = None
     strips = {
         "sys": (SysStrip(s), 1),
         "net": (NetStrip(s), 2),
@@ -75,8 +79,9 @@ def build(with_ws: bool = True):
         "power": (PowerStrip(s), 5),
         "clock": (ClockStrip(), 1),
     }
-    panels = {p.name: p for p in (QuotaPanel(quota), SystemPanel(s), NetPanel(s), DevPanel(s),
-                                  PowerPanel(s), ClockPanel())}
+    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s), ClockPanel())}
+    if quota is not None:
+        panels["quota"] = QuotaPanel(quota)
     return s, quota, strips, panels
 
 
@@ -93,7 +98,10 @@ class Daemon:
         self.ws = WsStrip(self.draw_ws)
         self.tick_n = 0
         self.dirty = False
-        self.theme = core.THEME
+        self.last_variants = None
+        # The raw state, compared raw: a theme that falls back to gruvbox (no colors.d
+        # file) must not look like a change on every tick, or waybar reloads for ever.
+        self.theme = core.theme_key()
         if write_css():  # waybar started with another theme's colours
             reload_waybar()
         self.ws.load()
@@ -120,20 +128,25 @@ class Daemon:
         n = self.tick_n
         self.tick_n += 1
         if n % 2 == 0 and core.theme_key() != self.theme:
+            self.theme = core.theme_key()
             core.load_theme()
-            self.theme = core.THEME
-            core.log(f"theme {' '.join(self.theme)}: reloading waybar")
+            core.log(f"theme {' '.join(core.THEME)}: reloading waybar")
             write_css()
             reload_waybar()  # restarts this daemon too: everything comes back in the new colours
             return True
+        variants = self.variants()
+        fresh = variants != self.last_variants  # a screen came or went: draw its bar now
+        self.last_variants = variants
+        if fresh and self.quota is not None:
+            self.quota.seen = None
         try:
             self.s.tick()
             for name, (strip, every) in self.strips.items():
-                if n % every == 0:
-                    for variant, scale in self.variants():
+                if n % every == 0 or fresh:
+                    for variant, scale in variants:
                         self.write(f"{name}-{variant}", strip.draw(variant, scale))
-            if n % 2 == 0 and self.quota.changed():
-                for variant, scale in self.variants():
+            if self.quota is not None and (n % 2 == 0 or fresh) and self.quota.changed():
+                for variant, scale in variants:
                     self.write(f"quota-{variant}", self.quota.strips(variant, scale))
                 self.deck.invalidate("quota")
         except Exception as err:  # keep the bar alive across one bad reading

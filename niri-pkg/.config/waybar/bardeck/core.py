@@ -30,6 +30,7 @@ SCRIPTS = f"{REAL_HOME}/scripts"  # the i3blocks scripts (i3-pkg), whose menus t
 SIGNAL = 16
 # The bar's height (config.jsonc "height"); every strip is drawn this tall.
 BAR_H = 26
+BAR_MARGIN_X = 6  # config.jsonc "margin-left"
 FONT = "Ubuntu Mono"
 ICON_FONT = "UbuntuMono Nerd Font Propo"
 TRACE = bool(os.environ.get("BARDECK_TRACE"))
@@ -86,7 +87,7 @@ def load_theme() -> tuple[str, str]:
         parts = line.split()
         if len(parts) >= 3 and parts[0] == "set" and parts[1].startswith("$") and parts[2].startswith("#"):
             roles[parts[1][1:]] = parts[2][:7].lower()
-    if "bg_main" not in roles:  # an unknown theme (win95): the bar stays gruvbox-dark
+    if "bg_main" not in roles:  # a theme with no colors.d file: the bar stays gruvbox-dark
         mode, palette = "dark", "gruvbox"
         roles = {"bg_main": "#282828", "bg_alt": "#3c3836", "title_fg": "#ebdbb2", "fg_main": "#a89984",
                  "fg_dim": "#7c6f64", "accent": "#98971a", "accent_fg": "#fbf1c7", "sep": "#504945",

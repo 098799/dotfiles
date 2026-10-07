@@ -73,7 +73,10 @@ class Deck:
         self.cache: dict[tuple, cairo.ImageSurface] = {}
         self.hide_timer = 0
         self.live_timer = 0
+        self.live_at = 0.0
         self.asked = 0.0
+        self.inside = False  # the pointer is on the panel: nothing may close it but a click or Esc
+        self.monitor = None
 
         win = self.win = Gtk.Window()
         GtkLayerShell.init_for_window(win)
@@ -145,7 +148,9 @@ class Deck:
         p = self.panel
         pw, _ = p.size()
         width = self.win.get_allocated_width()
-        x = (width - pw - 8) if self.center is None else self.center - pw / 2
+        # The strip's centre comes in the bar window's coordinates, which start
+        # core.BAR_MARGIN_X into the output.
+        x = (width - pw - 8) if self.center is None else self.center + core.BAR_MARGIN_X - pw / 2
         self.origin = (int(min(max(x, 8), max(8, width - pw - 8))), 6)
         cr.translate(*self.origin)
         if p.drawn_ahead:
@@ -178,6 +183,11 @@ class Deck:
         if pinned and not self.pinned:
             self.pinned = True
             GtkLayerShell.set_keyboard_mode(self.win, GtkLayerShell.KeyboardMode.EXCLUSIVE)
+        if self.shown and monitor is not None and monitor != self.monitor:
+            self.hide()  # a strip on another output: open there, not on the old one
+            if pinned:
+                self.pinned = True
+                GtkLayerShell.set_keyboard_mode(self.win, GtkLayerShell.KeyboardMode.EXCLUSIVE)
         if center is not None:
             self.center = center
         if self.shown:
@@ -192,7 +202,8 @@ class Deck:
         panel.opened()
         if monitor is not None:
             GtkLayerShell.set_monitor(self.win, monitor)
-        self.shown, self.asked = True, time.perf_counter()
+            self.monitor = monitor
+        self.shown, self.asked, self.inside = True, time.perf_counter(), False
         self.win.show_all()
         if not self.live_timer:
             self.live_timer = GLib.timeout_add(1000, self._live)
@@ -202,7 +213,9 @@ class Deck:
             self.live_timer = 0
             return False
         p = self.panel
-        if p is not None and p.live:
+        now = time.monotonic()
+        if p is not None and p.live and now - self.live_at >= p.live - 0.05:
+            self.live_at = now
             self.area.queue_draw()
         return True
 
@@ -210,7 +223,7 @@ class Deck:
         self.cancel_hide()
         if not self.shown:
             return
-        self.shown = False
+        self.shown = self.inside = False
         self.win.hide()
         if self.panel is not None:
             self.panel.closed()
@@ -223,12 +236,12 @@ class Deck:
             GLib.idle_add(lambda: self.invalidate(p.name) or False)
 
     def hide_soon(self) -> None:
-        if self.shown and not self.pinned and not self.hide_timer:
+        if self.shown and not self.pinned and not self.inside and not self.hide_timer:
             self.hide_timer = GLib.timeout_add(self.HIDE_GRACE_MS, self._hide_timeout)
 
     def _hide_timeout(self) -> bool:
         self.hide_timer = 0
-        if not self.pinned:
+        if not self.pinned and not self.inside:
             self.hide()
         return False
 
@@ -263,25 +276,28 @@ class Deck:
         pw, ph = self.panel.size()
         return ox <= ex < ox + pw and oy <= ey < oy + ph
 
-    def on_enter(self, _w, event) -> bool:
-        if self.in_panel(event.x, event.y):
+    def track(self, ex: float, ey: float) -> None:
+        """The pointer is over the overlay at (ex, ey). On the panel: keep it open. Off it:
+        close after the grace, not at once, so the way from the strip to the panel (the
+        band above the panel, a diagonal from a strip near the edge) does not close it."""
+        self.inside = self.in_panel(ex, ey)
+        if self.inside:
             self.cancel_hide()
         elif not self.pinned:
-            self.hide()
+            self.hide_soon()
+
+    def on_enter(self, _w, event) -> bool:
+        self.track(event.x, event.y)
         return False
 
     def on_leave(self, _w, event) -> bool:
         if event.detail != Gdk.NotifyType.INFERIOR:
+            self.inside = False
             self.hide_soon()  # up to the bar: maybe onto a strip, which says "enter"
         return False
 
     def on_motion(self, _w, event) -> bool:
-        if self.pinned:
-            return False
-        if self.in_panel(event.x, event.y):
-            self.cancel_hide()
-        else:
-            self.hide()
+        self.track(event.x, event.y)
         return False
 
     def on_press(self, _w, event) -> bool:

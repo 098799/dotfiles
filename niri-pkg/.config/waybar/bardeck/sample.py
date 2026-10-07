@@ -130,6 +130,8 @@ class Sampler:
         self.want_audio = False
         self.want_top = False
         self._lock = threading.Lock()
+        self._checking = False
+        self._checked_at = 0.0
         self._wake = threading.Event()
         threading.Thread(target=self._worker, daemon=True).start()
 
@@ -274,10 +276,12 @@ class Sampler:
                     age = time.time() - os.stat(UPDATES_CACHE).st_mtime
                 except OSError:
                     age = UPDATES_EVERY
-                if age >= UPDATES_EVERY:
-                    self._check_updates()
-                else:
-                    self._read_updates()
+                if age >= UPDATES_EVERY and not self._checking and time.time() - self._checked_at >= UPDATES_EVERY:
+                    # Its own thread: checkupdates takes up to minutes, and the wifi,
+                    # Bluetooth and audio readings must not wait for it.
+                    self._checking, self._checked_at = True, time.time()  # one try an hour, failed or not
+                    threading.Thread(target=self._check_updates, daemon=True).start()
+                self._read_updates()
             except Exception as err:  # never let the worker die
                 core.log(f"sampler: {err!r}")
             self._wake.wait(WORKER_EVERY)
@@ -347,11 +351,17 @@ class Sampler:
             pass
 
     def _check_updates(self) -> None:
-        out = run(["checkupdates"], timeout=120)
+        """checkupdates: 0 = updates listed, 2 = none, anything else = it failed
+        (offline, the db lock): then keep the old cache, and try again next hour."""
         try:
-            with open(UPDATES_CACHE + ".bardeck", "w") as fh:
-                fh.write(out)
-            os.replace(UPDATES_CACHE + ".bardeck", UPDATES_CACHE)
-        except OSError:
+            proc = subprocess.run(["nice", "-n", "19", "checkupdates"], capture_output=True, text=True,
+                                  timeout=300)
+            if proc.returncode in (0, 2):
+                with open(UPDATES_CACHE + ".bardeck", "w") as fh:
+                    fh.write(proc.stdout if proc.returncode == 0 else "")
+                os.replace(UPDATES_CACHE + ".bardeck", UPDATES_CACHE)
+        except (OSError, subprocess.TimeoutExpired):
             pass
+        finally:
+            self._checking = False
         self._read_updates()

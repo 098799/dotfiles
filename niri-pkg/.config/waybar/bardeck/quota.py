@@ -519,6 +519,8 @@ class QuotaPanel(Panel):
 
     def key(self, key: str, ctrl: bool) -> bool:
         n = len(self.q.m.accounts())
+        if n == 0:
+            return False
         if key in ("i", "Down") or (ctrl and key == "n"):
             self.sel = (self.sel + 1) % n
         elif key in ("o", "Up") or (ctrl and key == "p"):

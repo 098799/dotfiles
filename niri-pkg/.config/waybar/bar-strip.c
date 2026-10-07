@@ -57,6 +57,7 @@ typedef struct {
     int px;  // the pointer, strip coordinates, at the last event
     guint hover_timer;
     gboolean entered;  // "enter" was sent and no "leave" yet
+    double scroll;     // smooth scroll so far: a touchpad swipe is many small events
 } Strip;
 
 static void monitor_pos(Strip *s, int *mx, int *my) {
@@ -173,6 +174,7 @@ static gboolean on_leave(GtkWidget *w, GdkEventCrossing *e, gpointer data) {
         g_source_remove(s->hover_timer);
         s->hover_timer = 0;
     }
+    s->scroll = 0;
     if (s->entered) {
         s->entered = FALSE;
         send_msg(s, "leave");
@@ -195,13 +197,29 @@ static gboolean on_press(GtkWidget *w, GdkEventButton *e, gpointer data) {
 
 static gboolean on_scroll(GtkWidget *w, GdkEventScroll *e, gpointer data) {
     Strip *s = data;
-    gdouble dx, dy;
-    if (e->direction == GDK_SCROLL_UP || (e->direction == GDK_SCROLL_SMOOTH &&
-                                          gdk_event_get_scroll_deltas((GdkEvent *)e, &dx, &dy) && dy < 0))
+    if (e->direction == GDK_SCROLL_UP) {
         send_msg(s, "scroll-up");
-    else if (e->direction == GDK_SCROLL_DOWN || (e->direction == GDK_SCROLL_SMOOTH &&
-                                                 gdk_event_get_scroll_deltas((GdkEvent *)e, &dx, &dy) && dy > 0))
+    } else if (e->direction == GDK_SCROLL_DOWN) {
         send_msg(s, "scroll-down");
+    } else if (e->direction == GDK_SCROLL_SMOOTH) {
+        // One step per whole unit of scroll, not one per event: a swipe sends dozens.
+        if (e->is_stop) {
+            s->scroll = 0;
+            return FALSE;
+        }
+        gdouble dx, dy;
+        if (!gdk_event_get_scroll_deltas((GdkEvent *)e, &dx, &dy))
+            return FALSE;
+        s->scroll += dy;
+        while (s->scroll <= -1.0) {
+            s->scroll += 1.0;
+            send_msg(s, "scroll-up");
+        }
+        while (s->scroll >= 1.0) {
+            s->scroll -= 1.0;
+            send_msg(s, "scroll-down");
+        }
+    }
     return FALSE;
 }
 
@@ -262,6 +280,10 @@ void *wbcffi_init(const wbcffi_init_info *info, const wbcffi_config_entry *entri
 
 void wbcffi_deinit(void *instance) {
     Strip *s = instance;
+    // The widgets may outlive this call by a moment during a reload: no handler may
+    // reach the freed Strip.
+    g_signal_handlers_disconnect_by_data(s->root, s);
+    g_signal_handlers_disconnect_by_data(s->area, s);
     if (s->hover_timer)
         g_source_remove(s->hover_timer);
     if (s->surface)
