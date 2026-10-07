@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -I
 """Run an i3blocks script and emit waybar JSON.
 
 The niri bar runs the SAME ~/scripts/*.sh that i3blocks runs, so both bars show
@@ -20,6 +20,21 @@ waybar: one JSON object with "text" (full_text), "alt" (short_text) and
 A read gives up after 10s by default, so one stuck bluetoothctl cannot freeze a
 block. updates.sh runs checkupdates on a cold cache, which takes longer.
 
+A read must stay cheap, because waybar runs it for every block, on every bar
+(one bar per screen), every few seconds -- about 70% of a core on 7 Oct 2026,
+on a machine already at load 70. So:
+
+  * One run serves both bars. The answer is kept SHARE_FOR seconds in
+    $XDG_RUNTIME_DIR/i3blocks-waybar/cache, and a lock stops the same script
+    from running twice at once: the second bar waits and takes the first one's
+    answer. A click drops the answer, so the redraw after it is new.
+  * The script runs at nice NICE, so the bar gives way to real work.
+  * A timeout kills the script's whole process group. Killing bash alone left
+    its stuck children running, one more on every tick.
+  * A script that times out shows its last answer, up to STALE_FOR seconds
+    old, instead of an empty block.
+  * python3 -I: no site-packages scan, a quarter of the start-up time.
+
 A click is not a read, and it runs differently:
 
   * No timeout. A click often opens a rofi menu and waits for you. A timeout
@@ -34,15 +49,20 @@ A click is not a read, and it runs differently:
     few seconds later for the things scripts start in the background
     (bluetoothctl connect, wg-quick up), so the block shows the new state.
 """
+import fcntl
 import html
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
 
 READ_TIMEOUT = 10
 RESIGNAL_AFTER = 4
+SHARE_FOR = 2
+STALE_FOR = 300
+NICE = 10
 
 BARMENU = os.path.join(os.path.dirname(os.path.realpath(__file__)), "barmenu")
 SHIM = f"""#!/bin/sh
@@ -53,8 +73,80 @@ exec /usr/bin/rofi "$@"
 """
 
 
+def runtime_dir() -> str:
+    return os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "i3blocks-waybar")
+
+
+def cache_file(script: str) -> str:
+    path = os.path.join(runtime_dir(), "cache")
+    os.makedirs(path, exist_ok=True)
+    return os.path.join(path, script.strip("/").replace("/", "_"))
+
+
+def cached(path: str, max_age: float) -> str | None:
+    try:
+        if time.time() - os.stat(path).st_mtime >= max_age:
+            return None
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def drop_cached(script: str) -> None:
+    try:
+        os.unlink(cache_file(script))
+    except OSError:
+        pass
+
+
+def run_script(script: str, timeout: int) -> str | None:
+    try:
+        proc = subprocess.Popen(
+            [script], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, start_new_session=True,
+        )
+    except OSError:
+        return None
+    try:
+        return proc.communicate(timeout=timeout)[0]
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        return None
+
+
+def shared_read(script: str, timeout: int) -> str | None:
+    path = cache_file(script)
+    out = cached(path, SHARE_FOR)
+    if out is not None:
+        return out
+    with open(path + ".lock", "w") as lock:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    return cached(path, STALE_FOR)
+                time.sleep(0.05)
+        # The other bar held the lock, so it has likely just written the answer.
+        out = cached(path, SHARE_FOR)
+        if out is not None:
+            return out
+        out = run_script(script, timeout)
+        if out is None:
+            return cached(path, STALE_FOR)
+        tmp = f"{path}.{os.getpid()}"
+        with open(tmp, "w") as f:
+            f.write(out)
+        os.replace(tmp, path)
+        return out
+
+
 def shim_dir() -> str:
-    path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "i3blocks-waybar")
+    path = runtime_dir()
     shim = os.path.join(path, "rofi")
     try:
         with open(shim) as f:
@@ -81,19 +173,19 @@ def click(script: str, button: str, signal_number: int | None) -> int:
         subprocess.run([script], env=env, stdout=subprocess.DEVNULL, check=False)
     except OSError:
         return 1
+    drop_cached(script)
     if signal_number is not None:
         signal_waybar(signal_number)
         time.sleep(RESIGNAL_AFTER)
+        drop_cached(script)
         signal_waybar(signal_number)
     return 0
 
 
 def read(script: str, timeout: int, hint: str) -> int:
-    try:
-        out = subprocess.run(
-            [script], capture_output=True, text=True, timeout=timeout
-        ).stdout
-    except (OSError, subprocess.SubprocessError):
+    os.nice(NICE)
+    out = shared_read(script, timeout)
+    if out is None:
         print(json.dumps({"text": ""}), flush=True)
         return 0
 

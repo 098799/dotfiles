@@ -17,8 +17,9 @@ case $BLOCK_BUTTON in
         ;;
 esac
 
-# Check if bluetooth is powered on
-POWERED=$(echo "show" | timeout 2 bluetoothctl 2>/dev/null | grep "Powered:" | awk '{print $2}')
+# One shared bluetoothctl query for every bt block (see bt-state.sh)
+STATE=$("${BASH_SOURCE%/*}/bt-state.sh")
+POWERED=$(awk '$1 == "powered" { print $2 }' <<<"$STATE")
 
 if [[ "$POWERED" != "yes" ]]; then
     echo "󰂲 Off"
@@ -28,7 +29,7 @@ if [[ "$POWERED" != "yes" ]]; then
 fi
 
 # Get connected devices
-CONNECTED=$(echo "devices Connected" | timeout 2 bluetoothctl 2>/dev/null | grep "^Device" | head -1 | cut -d' ' -f3-)
+CONNECTED=$(grep -m1 "^connected " <<<"$STATE" | cut -d' ' -f3-)
 
 if [[ -n "$CONNECTED" ]]; then
     # Shorten MX Master to MXM3
