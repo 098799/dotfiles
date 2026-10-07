@@ -24,14 +24,17 @@ reads rcmon's usage federation files. Nothing here asks Anthropic.
 
 Usage:
     quota-deck daemon            render the bar images; waybar starts it (custom/quota-daemon)
-    quota-deck deck              open the deck (the strip's left click)
+    quota-deck deck              open the deck without the daemon (slow: ~1.5 s cold)
+    pkill -USR1 -x quota-deck    open / close the deck the daemon holds (the strip's left click)
     quota-deck strip FILE [--compact] [--scale N]   draw the strip to a PNG, for testing
     quota-deck deck-png FILE [--scale N]            draw the deck to a PNG, for testing
 
 Why a daemon: waybar's image module runs its `exec` on the GTK main thread, so a
 slow exec freezes the whole bar. The daemon renders in the background, writes
 $XDG_RUNTIME_DIR/quota-deck/{full,compact}.out (image path + tooltip), and sends
-waybar SIGRTMIN+SIGNAL; the image modules then only `cat` that file.
+waybar SIGRTMIN+SIGNAL; the image modules then only `cat` that file. The same
+process holds the deck, hidden and drawn ahead, so the strip's click (SIGUSR1)
+shows it at once: see Deck.
 """
 
 from __future__ import annotations
@@ -60,6 +63,8 @@ from gi.repository import Pango, PangoCairo  # noqa: E402
 
 REAL_HOME = pwd.getpwuid(os.getuid()).pw_dir  # agent shells run with a fake $HOME
 ACCOUNT_FILE = f"{REAL_HOME}/.config/claude-active-account"
+# QUOTA_DECK_TRACE=1: print when the deck is asked for and when it is on screen (stderr).
+TRACE = bool(os.environ.get("QUOTA_DECK_TRACE"))
 RUN_DIR = f"{os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'}/quota-deck"
 # The image modules' "signal" in modules.jsonc.
 SIGNAL = 16
@@ -557,133 +562,251 @@ def draw_card(cr, r: Row, now: float, x: float, y: float, w: float, h: float) ->
 # ── the deck window ──────────────────────────────────────────────────────────
 
 
-def deck() -> int:
-    gi.require_version("Gtk", "3.0")
-    gi.require_version("Gdk", "3.0")
-    gi.require_version("GtkLayerShell", "0.1")
-    from gi.repository import Gdk, GLib, Gtk, GtkLayerShell
+def model():
+    """qtop's model, with Store.weeks cached until the log grows.
 
-    # One deck at a time: a second click on the strip lands on the overlay and closes it,
-    # but a key bind or a second bar could start another.
-    lock = open(f"{RUN_DIR}/deck.lock", "w")
-    try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        return 0
-
+    weeks() rebuilds every week from the whole log, and a deck draw asks for it twice
+    per account (the cards and the pool totals): two thirds of the draw time."""
     m = Q.Model(Q.Store(Q.CSV))
-    m.store.load()
-    state = {"back": 0, "sel": -1, "hits": [], "origin": None}
-    active = read_active()
-    accts = m.accounts()
-    if active in accts:
-        state["sel"] = accts.index(active)
+    store, raw, cache = m.store, m.store.weeks, {}
 
-    win = Gtk.Window()
-    GtkLayerShell.init_for_window(win)
-    GtkLayerShell.set_namespace(win, "quota-deck")
-    GtkLayerShell.set_layer(win, GtkLayerShell.Layer.OVERLAY)
-    for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
-                 GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
-        GtkLayerShell.set_anchor(win, edge, True)
-    GtkLayerShell.set_exclusive_zone(win, -1)  # cover the bar too, so a click there closes
-    GtkLayerShell.set_keyboard_mode(win, GtkLayerShell.KeyboardMode.EXCLUSIVE)
-    visual = win.get_screen().get_rgba_visual()
-    if visual is not None:
-        win.set_visual(visual)
-    win.set_app_paintable(True)
-    area = Gtk.DrawingArea()
-    win.add(area)
+    def weeks(account: str):
+        key = (account, store.offset)
+        if key not in cache:
+            for old in [k for k in cache if k[1] != store.offset]:
+                del cache[old]
+            cache[key] = raw(account)
+        return cache[key]
 
-    def place(px: float) -> None:
-        """Open under the click, like ~/bin/barmenu: centred on the pointer, kept on screen."""
-        if state["origin"] is not None:
+    store.weeks = weeks
+    return m
+
+
+class Deck:
+    """The drop-down: a transparent overlay over the whole output, the deck drawn on it
+    under the click, so a click anywhere else lands on the overlay and closes it.
+
+    In the daemon it is resident: the window is built once and hidden, and the deck is
+    drawn ahead of time whenever the data changes (draw_deck takes ~0.15 s; a cold
+    `quota-deck deck` took ~1.5 s, most of it importing GTK and parsing the log). A
+    click sends SIGUSR1 and costs one map and one blit. Without the daemon,
+    `quota-deck deck` builds one of these and quits when it closes."""
+
+    def __init__(self, m, resident: bool):
+        from gi.repository import Gdk, GLib, Gtk, GtkLayerShell
+
+        self.Gdk, self.GLib, self.Gtk = Gdk, GLib, Gtk
+        self.m, self.resident = m, resident
+        self.back, self.sel, self.origin, self.hits = 0, -1, None, []
+        self.cache: dict[tuple, tuple] = {}  # (back, sel, scale) -> (surface, hits)
+        self.shown = False
+        self.asked = 0.0  # perf_counter of the last show, for TRACE
+        self.last_origin: tuple[int, int] | None = None  # where the deck opened last
+        self.placed = False  # place() ran for this opening
+
+        win = self.win = Gtk.Window()
+        GtkLayerShell.init_for_window(win)
+        GtkLayerShell.set_namespace(win, "quota-deck")
+        GtkLayerShell.set_layer(win, GtkLayerShell.Layer.OVERLAY)
+        for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
+                     GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
+            GtkLayerShell.set_anchor(win, edge, True)
+        GtkLayerShell.set_exclusive_zone(win, -1)  # cover the bar too, so a click there closes
+        GtkLayerShell.set_keyboard_mode(win, GtkLayerShell.KeyboardMode.EXCLUSIVE)
+        visual = win.get_screen().get_rgba_visual()
+        if visual is not None:
+            win.set_visual(visual)
+        win.set_app_paintable(True)
+        self.area = Gtk.DrawingArea()
+        win.add(self.area)
+        self.area.connect("draw", self.on_draw)
+        win.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.POINTER_MOTION_MASK
+                       | Gdk.EventMask.BUTTON_PRESS_MASK)
+        win.connect("enter-notify-event", lambda _w, e: self.place(e.x) or False)
+        win.connect("motion-notify-event", lambda _w, e: self.place(e.x) or False)
+        win.connect("button-press-event", self.on_press)
+        win.connect("key-press-event", self.on_key)
+        win.connect("delete-event", lambda *_: self.hide() or True)
+
+
+    # -- drawing ---------------------------------------------------------------
+
+    def scales(self) -> set[int]:
+        """The scale factor of every monitor: the deck is drawn ahead for each."""
+        display = self.Gdk.Display.get_default()
+        return {display.get_monitor(i).get_scale_factor() for i in range(display.get_n_monitors())} or {1}
+
+    def frame(self, scale: int) -> tuple:
+        key = (self.back, self.sel, scale)
+        if key not in self.cache:
+            if TRACE and self.shown:
+                print(f"quota-deck: drawing {key} (not drawn ahead)", file=sys.stderr, flush=True)
+            w, h = deck_size(len(self.m.accounts()))
+            surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * scale, h * scale)
+            surface.set_device_scale(scale, scale)
+            hits = draw_deck(cairo.Context(surface), self.m, time.time(), self.back, self.sel)
+            self.cache[key] = (surface, hits)
+        return self.cache[key]
+
+    def refresh(self) -> None:
+        """New data: redraw the frames a click will want — the current week, the active
+        account selected — and, when open, the one on screen."""
+        self.cache.clear()
+        if self.shown:
+            self.area.queue_draw()
             return
-        dw, _ = deck_size(len(m.accounts()))
-        width = win.get_allocated_width()
-        state["origin"] = (int(min(max(px - dw / 2, 6), max(6, width - dw - 6))), BAR_HEIGHT + 4)
-        area.queue_draw()
+        self.back, self.sel = 0, self.active_index()
+        for scale in self.scales():
+            self.frame(scale)
 
-    def draw(_w, cr) -> bool:
+    def on_draw(self, _w, cr) -> bool:
         cr.set_source_rgba(0, 0, 0, 0)
         cr.set_operator(cairo.OPERATOR_SOURCE)
         cr.paint()
         cr.set_operator(cairo.OPERATOR_OVER)
-        if state["origin"] is None:
+        if self.origin is None:
             return False
-        ox, oy = state["origin"]
-        cr.translate(ox, oy)
-        state["hits"] = draw_deck(cr, m, time.time(), state["back"], state["sel"])
+        surface, self.hits = self.frame(self.win.get_scale_factor())
+        dw, _ = deck_size(len(self.m.accounts()))
+        x = min(self.origin[0], max(6, self.win.get_allocated_width() - dw - 6))  # a narrower output
+        self.origin = (x, self.origin[1])
+        cr.set_source_surface(surface, *self.origin)
+        cr.paint()
+        if TRACE and self.asked:
+            print(f"quota-deck: drawn {(time.perf_counter() - self.asked) * 1000:.0f} ms after the click",
+                  file=sys.stderr, flush=True)
+            self.asked = 0.0
         return False
 
-    area.connect("draw", draw)
+    # -- showing ---------------------------------------------------------------
 
-    def card_at(ex: float, ey: float) -> str | None | bool:
+    def active_index(self) -> int:
+        accts = self.m.accounts()
+        active = read_active()
+        return accts.index(active) if active in accts else -1
+
+    def show(self) -> None:
+        if self.shown:
+            return
+        sel = self.active_index()
+        if (self.back, self.sel) != (0, sel):
+            self.back, self.sel = 0, sel
+        self.shown, self.asked = True, time.perf_counter()
+        # Where it opened last time: the strip does not move, so neither does the deck,
+        # and it draws in the first frame. Only the very first opening waits for the
+        # pointer; later, place() moves it only when the pointer is far from it (the
+        # other monitor's bar).
+        self.origin, self.placed = self.last_origin, False
+        self.win.show_all()
+        if self.origin is None:
+            # No pointer seen in time: open at the right, where the strip usually is.
+            self.GLib.timeout_add(150, lambda: self.place(self.win.get_allocated_width()) or False)
+
+    def hide(self) -> None:
+        if not self.resident:
+            self.Gtk.main_quit()
+            return
+        self.shown = False
+        self.win.hide()
+        if (self.back, self.sel) != (0, self.active_index()):
+            self.GLib.idle_add(lambda: self.refresh() or False)  # have the default frame ready again
+
+    def toggle(self) -> bool:
+        self.hide() if self.shown else self.show()
+        return True  # keep the GLib signal source
+
+    def place(self, px: float) -> None:
+        """Open under the click, like ~/bin/barmenu: centred on the pointer, kept on screen.
+
+        Once per opening. When the deck is already up at the last place, it stays put
+        unless the pointer is further away than half a strip: clicks anywhere on the
+        strip then open it in one place, and it does not jump."""
+        if self.placed or not self.shown:
+            return
+        self.placed = True
+        dw, _ = deck_size(len(self.m.accounts()))
+        width = self.win.get_allocated_width()
+        x = int(min(max(px - dw / 2, 6), max(6, width - dw - 6)))
+        if self.origin is not None and abs(self.origin[0] - x) <= STRIP["full"]["width"] / 2:
+            return
+        self.origin = self.last_origin = (x, BAR_HEIGHT + 4)
+        self.area.queue_draw()
+
+    # -- input -----------------------------------------------------------------
+
+    def card_at(self, ex: float, ey: float) -> str | None | bool:
         """The account under (ex, ey); None inside the deck but on no card; False outside."""
-        if state["origin"] is None:
+        if self.origin is None:
             return False
-        ox, oy = state["origin"]
-        dw, dh = deck_size(len(m.accounts()))
+        ox, oy = self.origin
+        dw, dh = deck_size(len(self.m.accounts()))
         if not (ox <= ex < ox + dw and oy <= ey < oy + dh):
             return False
-        for account, y0, y1 in state["hits"]:
+        for account, y0, y1 in self.hits:
             if y0 <= ey - oy < y1:
                 return account
         return None
 
-    def open_qtop(account: str) -> None:
+    def open_qtop(self, account: str) -> None:
         subprocess.Popen(["alacritty", "-e", "qtop", account], start_new_session=True,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        Gtk.main_quit()
+        self.hide()
 
-    def on_press(_w, event) -> bool:
-        hit = card_at(event.x, event.y)
+    def on_press(self, _w, event) -> bool:
+        hit = self.card_at(event.x, event.y)
         if hit is False:
-            Gtk.main_quit()
+            self.hide()
         elif hit:
-            open_qtop(hit)
+            self.open_qtop(hit)
         return True
 
-    def on_key(_w, event) -> bool:
-        key = Gdk.keyval_name(event.keyval) or ""
-        ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
-        n = len(m.accounts())
+    def on_key(self, _w, event) -> bool:
+        key = self.Gdk.keyval_name(event.keyval) or ""
+        ctrl = bool(event.state & self.Gdk.ModifierType.CONTROL_MASK)
+        n = len(self.m.accounts())
         if key in ("Escape", "q") or (ctrl and key == "g"):
-            Gtk.main_quit()
-        elif key in ("i", "Down") or (ctrl and key == "n"):
-            state["sel"] = (state["sel"] + 1) % n
+            self.hide()
+            return True
+        if key in ("i", "Down") or (ctrl and key == "n"):
+            self.sel = (self.sel + 1) % n
         elif key in ("o", "Up") or (ctrl and key == "p"):
-            state["sel"] = (state["sel"] - 1) % n
+            self.sel = (self.sel - 1) % n
         elif key in ("u", "Left") or (ctrl and key == "b"):
-            state["back"] += 1
+            self.back += 1
         elif key in ("p", "Right") or (ctrl and key == "f"):
-            state["back"] = max(0, state["back"] - 1)
+            self.back = max(0, self.back - 1)
         elif key == "r":
-            m.sample()
-        elif key in ("Return", "KP_Enter") and 0 <= state["sel"] < n:
-            open_qtop(m.accounts()[state["sel"]])
+            self.m.sample()
+            self.cache.clear()
+        elif key in ("Return", "KP_Enter") and 0 <= self.sel < n:
+            self.open_qtop(self.m.accounts()[self.sel])
+            return True
         else:
             return False
-        area.queue_draw()
+        self.area.queue_draw()
         return True
 
-    win.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.POINTER_MOTION_MASK
-                   | Gdk.EventMask.BUTTON_PRESS_MASK)
-    win.connect("enter-notify-event", lambda _w, e: place(e.x) or False)
-    win.connect("motion-notify-event", lambda _w, e: place(e.x) or False)
-    win.connect("button-press-event", on_press)
-    win.connect("key-press-event", on_key)
-    win.connect("destroy", lambda _w: Gtk.main_quit())
-    # No pointer seen in time: open at the right, where the strip usually is.
-    GLib.timeout_add(200, lambda: place(win.get_allocated_width()) or False)
 
-    def refresh() -> bool:
-        m.store.load()
-        area.queue_draw()
-        return True
+def require_gtk() -> None:
+    gi.require_version("Gtk", "3.0")
+    gi.require_version("Gdk", "3.0")
+    gi.require_version("GtkLayerShell", "0.1")
 
-    GLib.timeout_add_seconds(10, refresh)
-    win.show_all()
+
+def deck() -> int:
+    """The slow path: no daemon to ask (the strip's click tries the daemon first)."""
+    require_gtk()
+    from gi.repository import Gtk
+
+    lock = open(f"{RUN_DIR}/deck.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0  # one is open already
+    m = model()
+    m.store.load()
+    d = Deck(m, resident=False)
+    d.show()
     Gtk.main()
     return 0
 
@@ -727,24 +850,55 @@ def render_all(m, now: float) -> None:
 def daemon() -> int:
     # Die with waybar (it starts us as a custom module), and only one renderer: both
     # bars start one, the second waits on the lock and takes over if the first dies.
-    ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+    libc = ctypes.CDLL("libc.so.6")
+    libc.prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
     lock = open(f"{RUN_DIR}/daemon.lock", "w")
     fcntl.flock(lock, fcntl.LOCK_EX)
-    m = Q.Model(Q.Store(Q.CSV))
-    seen = None
-    while True:
+    # Named only once it holds the lock: the strip's click is `pkill -USR1 -x quota-deck`,
+    # and SIGUSR1 would kill a daemon still waiting on the lock (default action).
+    libc.prctl(15, b"quota-deck", 0, 0, 0)  # PR_SET_NAME
+    require_gtk()
+    from gi.repository import GLib, Gtk
+
+    m = model()
+    d = Deck(m, resident=True)
+    # Toggle from an idle callback at default priority, never straight from a
+    # high-priority source: GDK starts a Wayland read in its source's prepare step, a
+    # higher-priority dispatch skips the check step that finishes it, and the
+    # layer-shell map then waits in a roundtrip for that read for ever (seen: the
+    # first click froze the daemon inside show_all).
+    def on_usr1() -> bool:
+        GLib.idle_add(lambda: d.toggle() and False)
+        return True
+
+    try:
+        gi.require_version("GLibUnix", "2.0")
+        from gi.repository import GLibUnix
+
+        GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, on_usr1)
+    except (ImportError, ValueError):  # GLib < 2.84
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, on_usr1)
+    seen = [None]
+
+    def tick() -> bool:
         now = time.time()
         # The federation writes every 30 s; the minute makes the "now" line move when it is quiet.
         key = (mtime(Q.CSV), mtime(Q.SNAPSHOT), mtime(ACCOUNT_FILE), int(now // 60))
-        if key != seen:
-            seen = key
+        if key != seen[0]:
+            seen[0] = key
             try:
                 m.store.load()
                 render_all(m, now)
                 signal_waybar()
+                d.refresh()
             except Exception as err:  # keep the bar alive across a bad row or a qtop edit
                 print(f"quota-deck: {err!r}", file=sys.stderr, flush=True)
-        time.sleep(2)
+        return True
+
+    tick()
+    GLib.timeout_add_seconds(2, tick)
+    Gtk.main()
+    return 0
 
 
 def main(argv: list[str]) -> int:
@@ -756,14 +910,14 @@ def main(argv: list[str]) -> int:
     if cmd == "deck":
         return deck()
     if cmd == "strip" and len(argv) > 2:
-        m = Q.Model(Q.Store(Q.CSV))
+        m = model()
         m.store.load()
         now = time.time()
         draw_strip(argv[2], rows(m, now), now, "compact" if "--compact" in argv else "full", scale)
         print(tooltip(m, rows(m, now), now).replace("&#10;", "\n"))
         return 0
     if cmd == "deck-png" and len(argv) > 2:
-        m = Q.Model(Q.Store(Q.CSV))
+        m = model()
         m.store.load()
         back = int(argv[argv.index("--back") + 1]) if "--back" in argv else 0
         w, h = deck_size(len(m.accounts()))

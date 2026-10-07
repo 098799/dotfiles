@@ -59,14 +59,16 @@
     "image#quota": {
         "exec": "cat $XDG_RUNTIME_DIR/quota-deck/full.out",
         "size": 560, "signal": 16, "interval": 60,
-        "on-click": "~/bin/quota-deck deck",
+        // The daemon holds the deck ready; the slow standalone one only when it is not running.
+        "on-click": "pkill -USR1 -x quota-deck || ~/bin/quota-deck deck",
         "on-click-middle": "alacritty -e qtop",
         "on-click-right": "~/bin/i3blocks-waybar --signal 16 ~/scripts/claude-usage.sh 3"
     },
     "image#quota-compact": {
         "exec": "cat $XDG_RUNTIME_DIR/quota-deck/compact.out",
         "size": 330, "signal": 16, "interval": 60,
-        "on-click": "~/bin/quota-deck deck",
+        // The daemon holds the deck ready; the slow standalone one only when it is not running.
+        "on-click": "pkill -USR1 -x quota-deck || ~/bin/quota-deck deck",
         "on-click-middle": "alacritty -e qtop",
         "on-click-right": "~/bin/i3blocks-waybar --signal 16 ~/scripts/claude-usage.sh 3"
     },
