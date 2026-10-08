@@ -24,12 +24,10 @@
 input {
     keyboard {
         xkb {
-            // i3 bound F14 to ~/bin/set_keyboard, which flips setxkbmap between
-            // pl and a second layout. setxkbmap talks to an X server, so it is
-            // inert under niri: the layouts are declared HERE, and F14 (binds.kdl)
-            // walks them with switch-layout. us stays first, so nothing about
-            // today's typing changes until the key is pressed.
-            layout "us,pl"
+            // us only. pl went on 8 Oct 2026: its AltGr letters need right Alt,
+            // and kanata (~/.config/kanata) makes right Alt the Esc/NUM thumb.
+            // F14's switch-layout (binds.kdl) has nothing to switch to now.
+            layout "us"
         }
         numlock
         repeat-delay 300

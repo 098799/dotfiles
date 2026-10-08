@@ -1,17 +1,39 @@
-;; Home-row mods for the p14s BUILT-IN keyboard only.
+;; The TOTEM layout on the p14s BUILT-IN keyboard.
 ;;
-;; Same feel as the TOTEM (~/zmk-config-totem/config/totem.keymap) and the
-;; Corne/Planck (~/qmk_firmware, keymap tg):
-;;   A=Super S=Alt D=Shift F=Ctrl | J=Ctrl K=Shift L=Alt ;=Super
+;; A port of ~/zmk-config-totem/config/totem.keymap (itself a port of the
+;; Corne/Planck keymap tg in ~/qmk_firmware): home-row mods, the six thumb keys
+;; and the layers SYM / NUM / ADJ / MOV / MOUSE.
+;;
+;; Home-row mods  A=Super S=Alt D=Shift F=Ctrl | J=RCtrl K=Shift L=Alt ;=Super
 ;;   tap-hold-release        = QMK PERMISSIVE_HOLD = ZMK flavor "balanced"
 ;;   tap-repress-timeout 150 = ZMK quick-tap-ms (tap then hold = repeat the letter)
 ;;   require-prior-idle 120  = ZMK require-prior-idle-ms (not on Shift: it made "di" from "I")
 ;;   180 ms term, 160 ms on the Shift keys (QMK MIDDLE_TAPPING_TERM)
+;;   J holds RIGHT Ctrl so the SYM thumb can tell it from F (Ctrl+Tab trick below).
+;;
+;; Thumbs: the laptop's bottom row stands in for the TOTEM's six thumb keys.
+;;
+;;   laptop key       TOTEM thumb    tap                 hold
+;;   leftmost (Fn)*   left outer     Backspace           -
+;;   left Super       left middle    one-shot SYM        SYM   (J-Ctrl held: Ctrl+Tab)
+;;   left Alt         left inner     toggle MOUSE        MOV
+;;   Space            right inner    Space               Super
+;;   right Alt        right middle   Esc                 NUM
+;;   PrtSc / Menu     right outer    Enter               -
+;;
+;;   * The ThinkPad firmware owns Fn: it sends no key code. The BIOS setting
+;;     FnCtrlKeySwap=Enable makes that key send Left Ctrl (and the Ctrl key
+;;     becomes Fn), so `lctl` below IS the leftmost key. Before the swap is
+;;     active, `lctl` is the physical Ctrl key, second from the left.
+;;
+;; Caps Lock = the TOTEM left outer pinky: toggle MOV (tap again to leave).
+;; Right Ctrl stays a plain Ctrl.
 ;;
 ;; Only the laptop keyboard is grabbed. The TOTEM and the Corne do their own
-;; mods in firmware and must never pass through here.
+;; layout in firmware and must never pass through here.
 ;;
-;; Emergency exit: hold LeftCtrl + Space + Esc (the physical keys).
+;; Emergency exit: hold LeftCtrl + Space + Esc (the input keys, i.e. after the
+;; Fn/Ctrl swap: the leftmost key + Space + the Esc key in the top-left corner).
 ;; Service: kanata-laptop.service (system unit, see README.md next to this file).
 
 (defcfg
@@ -19,10 +41,15 @@
   ;; keys not in defsrc still pass through kanata, so a press of any key
   ;; counts for the permissive-hold decision and key order is kept
   process-unmapped-keys yes
+  ;; QMK-style mouse acceleration: a diagonal keeps the speed already reached
+  movemouse-inherit-accel-state yes
 )
 
 (defsrc
-  a s d f   j k l ;
+  q    w    e    r    t    y    u    i    o    p
+  caps a    s    d    f    g    h    j    k    l    ;    '
+  z    x    c    v    b    n    m    ,    .    /
+  lctl lmet lalt spc  ralt prnt menu
 )
 
 (defvar
@@ -33,17 +60,89 @@
 )
 
 (defalias
+  ;; home-row mods
   a (tap-hold-release $tap-repress $term       a lmet (require-prior-idle $prior-idle))
   s (tap-hold-release $tap-repress $term       s lalt (require-prior-idle $prior-idle))
   d (tap-hold-release $tap-repress $shift-term d lsft)
   f (tap-hold-release $tap-repress $term       f lctl (require-prior-idle $prior-idle))
-  j (tap-hold-release $tap-repress $term       j lctl (require-prior-idle $prior-idle))
+  j (tap-hold-release $tap-repress $term       j rctl (require-prior-idle $prior-idle))
   k (tap-hold-release $tap-repress $shift-term k rsft)
-  ;; left Alt on L, never right Alt: right Alt is AltGr
   l (tap-hold-release $tap-repress $term       l lalt (require-prior-idle $prior-idle))
   ; (tap-hold-release $tap-repress $term       ; rmet (require-prior-idle $prior-idle))
+
+  ;; left middle thumb: one-shot SYM (= ZMK &sl SYM, 1 s), held = SYM while held.
+  ;; With RIGHT Ctrl down (J held) it sends Tab instead, Ctrl kept: Ctrl+Tab, and
+  ;; with K-Shift as well Ctrl+Shift+Tab. F-Ctrl is LEFT Ctrl, so F + this thumb
+  ;; still opens SYM for Ctrl+<symbol>. (= sym_tab in totem.keymap)
+  sym (fork (one-shot-release 1000 (layer-while-held sym)) tab (rctl))
+  ;; left inner thumb: hold = MOV while held, tap = MOUSE on (= mov_or_mouse)
+  movmou (tap-hold-release 0 200 (layer-switch mouse) (layer-while-held mov))
+  mouoff (tap-hold-release 0 200 (layer-switch base) (layer-while-held mov))
+  ;; right inner thumb: Space, held = Super (= &mt LGUI SPACE, tap-preferred 220)
+  spc (tap-hold 175 220 spc lmet)
+  ;; right middle thumb: Esc, held = NUM (= &lt NUM ESC, tap-preferred 200)
+  num (tap-hold 0 200 esc (layer-while-held num))
+  ;; Caps Lock: toggle MOV (= &tog MOV on the left outer pinky)
+  movon  (layer-switch mov)
+  base   (layer-switch base)
+  adj    (layer-while-held adj)
+
+  ;; mouse: ~250 px/s at the start, ~3000 px/s after 0.5 s (the Corne's ramp)
+  ms← (movemouse-accel-left  16 500 4 48)
+  ms↓ (movemouse-accel-down  16 500 4 48)
+  ms↑ (movemouse-accel-up    16 500 4 48)
+  ms→ (movemouse-accel-right 16 500 4 48)
+  wh← (mwheel-left  50 120)
+  wh↓ (mwheel-down  50 120)
+  wh↑ (mwheel-up    50 120)
+  wh→ (mwheel-right 50 120)
 )
 
 (deflayer base
-  @a @s @d @f   @j @k @l @;
+  q       w       e       r       t       y       u       i       o       p
+  @movon  @a      @s      @d      @f      g       h       @j      @k      @l      @;      '
+  z       x       c       v       b       n       m       ,       .       /
+  bspc    @sym    @movmou @spc    @num    ret     ret
+)
+
+;; ! @ # $ %    ^ & * ( )  /  ? : - _ 2   1 = + [ ]  /  ` ~ ' " <   > \ | { }
+(deflayer sym
+  S-1     S-2     S-3     S-4     S-5     S-6     S-7     S-8     S-9     S-0
+  _       S-/     S-;     -       S--     2       1       =       S-=     [       ]       _
+  grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
+  lmet    tab     _       _       @adj    _       _
+)
+
+;; 1-0 on the top row; mouse buttons on S D F; cursor on J K L ;; wheel on M , . /
+(deflayer num
+  1       2       3       4       5       6       7       8       9       0
+  _       @a      mmid    mrgt    mlft    _       _       @ms←    @ms↓    @ms↑    @ms→    _
+  _       _       _       _       _       _       @wh←    @wh↓    @wh↑    @wh→
+  del     @adj    _       _       _       _       _
+)
+
+;; F1-F6 on the home row, F7-F12 below (the TOTEM's boot/BT top row has no use here)
+(deflayer adj
+  _       _       _       _       _       _       _       _       _       _
+  _       f1      f2      f3      f4      f5      f6      _       _       _       _       _
+  f7      f8      f9      f10     f11     f12     _       _       _       _
+  _       _       _       _       _       _       _
+)
+
+;; arrows on U I O P; Home / word-left / PgDn / PgUp / word-right on H J K L ;; End on '
+;; workspaces (Super = niri Mod): G B | N M , . /
+(deflayer mov
+  q       w       e       r       t       y       left    down    up      rght
+  @base   @a      @s      @d      @f      M-g     home    C-left  pgdn    pgup    C-rght  end
+  z       x       c       v       M-b     M-n     M-m     M-,     M-.     M-/
+  bspc    @sym    @movmou @spc    esc     ret     ret
+)
+
+;; clicks on S D F; cursor on J K L ;; wheel on M , . /; Space = left click.
+;; Leave with a tap on left Alt or on Caps Lock.
+(deflayer mouse
+  q       w       e       r       t       y       u       i       o       p
+  @base   @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
+  z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
+  bspc    @sym    @mouoff mlft    @num    ret     ret
 )

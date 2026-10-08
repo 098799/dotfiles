@@ -2,7 +2,7 @@
 
 The kanata output device is grabbed (EVIOCGRAB) before any key is injected,
 so nothing reaches the compositor. Abort if the grab fails.
-Run as root: python3 hrm_harness.py <kanata.kbd>
+Run as root: python3 hrm-harness.py <kanata.kbd>
 """
 import re
 import subprocess
@@ -13,7 +13,7 @@ import evdev
 from evdev import UInput, ecodes as e
 
 cfg_src = open(sys.argv[1]).read()
-src = UInput({e.EV_KEY: list(range(1, 120))}, name="hrm-test-src")
+src = UInput({e.EV_KEY: list(range(1, 250))}, name="hrm-test-src")
 time.sleep(0.5)
 src_path = src.device.path
 cfg = re.sub(r"linux-dev \S+", f"linux-dev {src_path}", cfg_src)
@@ -38,8 +38,16 @@ time.sleep(1.0)
 while out.read_one():  # drain
     pass
 
-K = {c: getattr(e, "KEY_" + c.upper()) for c in "asdfjklqxi"}
-K[";"] = e.KEY_SEMICOLON
+SPECIAL = {";": "SEMICOLON", "lctl": "LEFTCTRL", "lmet": "LEFTMETA", "lalt": "LEFTALT",
+           "ralt": "RIGHTALT", "spc": "SPACE", "prnt": "SYSRQ", "caps": "CAPSLOCK"}
+
+
+class Keys(dict):
+    def __missing__(self, name):
+        return getattr(e, "KEY_" + SPECIAL.get(name, name.upper()))
+
+
+K = Keys()
 
 
 def ev(key, val, wait_ms):
@@ -52,9 +60,9 @@ def collect():
     seq = []
     while (x := out.read_one()) is not None:
         if x.type == e.EV_KEY and x.value in (0, 1):
-            name = e.KEY[x.code]
+            name = e.bytype[e.EV_KEY][x.code]
             name = name if isinstance(name, str) else name[0]
-            seq.append(("+" if x.value else "-") + name.replace("KEY_", "").lower())
+            seq.append(("+" if x.value else "-") + name.replace("KEY_", "").replace("BTN_", "btn_").lower())
     return " ".join(seq)
 
 
@@ -104,6 +112,47 @@ results = [
          [("f", 1, 25), ("s", 1, 40), ("s", 0, 20), ("f", 0, 0)],
          "+leftctrl +s -s -leftctrl"),
     case("unmapped key passes through", [("q", 1, 30), ("q", 0, 0)], "+q -q"),
+    # --- thumbs ---
+    case("left outer thumb (lctl input) = Backspace", [("lctl", 1, 40), ("lctl", 0, 0)], "+backspace -backspace"),
+    case("right outer thumb (PrtSc) = Enter", [("prnt", 1, 40), ("prnt", 0, 0)], "+enter -enter"),
+    case("right Alt tap = Esc", [("ralt", 1, 40), ("ralt", 0, 0)], "+esc -esc"),
+    case("Space tap = space", [("spc", 1, 40), ("spc", 0, 0)], "+space -space"),
+    case("Space held past 220 + q = Super+q",
+         [("spc", 1, 260), ("q", 1, 30), ("q", 0, 30), ("spc", 0, 0)],
+         "+leftmeta +q -q -leftmeta"),
+    # --- SYM ---
+    case("left Super tap = one-shot SYM: d -> '-', then d is d again",
+         [("lmet", 1, 40), ("lmet", 0, 40), ("d", 1, 40), ("d", 0, 250), ("d", 1, 40), ("d", 0, 0)],
+         "+minus -minus +d -d"),
+    case("SYM held: q w = ! @ (shifted 1 2)",
+         [("lmet", 1, 40), ("q", 1, 30), ("q", 0, 30), ("w", 1, 30), ("w", 0, 30), ("lmet", 0, 0)],
+         "+leftshift +1 -leftshift -1 +leftshift +2 -leftshift -2"),  # shift is down at each press = "!@"
+    case("J-Ctrl held + left Super = Ctrl+Tab",
+         [("j", 1, 250), ("lmet", 1, 40), ("lmet", 0, 40), ("j", 0, 0)],
+         "+rightctrl +tab -tab -rightctrl"),
+    case("F-Ctrl held + left Super opens SYM: j -> Ctrl+=",
+         [("f", 1, 250), ("lmet", 1, 40), ("lmet", 0, 40), ("j", 1, 30), ("j", 0, 30), ("f", 0, 0)],
+         "+leftctrl +equal -equal -leftctrl"),
+    # --- NUM / ADJ ---
+    case("right Alt held: q = 1, f = left click",
+         [("ralt", 1, 230), ("q", 1, 30), ("q", 0, 30), ("f", 1, 30), ("f", 0, 30), ("ralt", 0, 0)],
+         "+1 -1 +btn_left -btn_left"),
+    case("SYM held + right Alt held = ADJ: a = F1, z = F7",
+         [("lmet", 1, 40), ("ralt", 1, 40), ("a", 1, 30), ("a", 0, 30), ("z", 1, 30), ("z", 0, 30),
+          ("ralt", 0, 30), ("lmet", 0, 0)],
+         "+f1 -f1 +f7 -f7"),
+    # --- MOV / MOUSE ---
+    case("left Alt held: u i o p = arrows",
+         [("lalt", 1, 40), ("u", 1, 30), ("u", 0, 30), ("p", 1, 30), ("p", 0, 30), ("lalt", 0, 0)],
+         "+left -left +right -right"),
+    case("Caps toggles MOV on: i = down; Caps again: i = i",
+         [("caps", 1, 40), ("caps", 0, 40), ("i", 1, 30), ("i", 0, 40),
+          ("caps", 1, 40), ("caps", 0, 40), ("i", 1, 30), ("i", 0, 0)],
+         "+down -down +i -i"),
+    case("left Alt tap = MOUSE: f = left click, Space = left click; tap left Alt again: f = f",
+         [("lalt", 1, 40), ("lalt", 0, 60), ("f", 1, 30), ("f", 0, 40), ("spc", 1, 30), ("spc", 0, 40),
+          ("lalt", 1, 40), ("lalt", 0, 60), ("f", 1, 30), ("f", 0, 0)],
+         "+btn_left -btn_left +btn_left -btn_left +f -f"),
 ]
 
 out.ungrab()

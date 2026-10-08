@@ -1,11 +1,34 @@
-# kanata — home-row mods on the p14s built-in keyboard
+# kanata — the TOTEM layout on the p14s built-in keyboard
 
-The laptop keyboard gets the same home-row mods as the TOTEM and the Corne:
-`A`=Super `S`=Alt `D`=Shift `F`=Ctrl | `J`=Ctrl `K`=Shift `L`=Alt `;`=Super.
-Timing is copied from `~/zmk-config-totem/config/totem.keymap` (see the header of `kanata.kbd`).
+The laptop keyboard runs the same layout as the TOTEM (`~/zmk-config-totem/config/totem.keymap`):
+home-row mods, the six thumb keys, and the layers SYM / NUM / ADJ / MOV / MOUSE.
+`kanata.kbd` has the full map and the timing in its header.
 
 Only `/dev/input/by-path/platform-i8042-serio-0-event-kbd` (the built-in keyboard) is
-grabbed. External keyboards do their mods in firmware and never pass through kanata.
+grabbed. External keyboards do their layout in firmware and never pass through kanata.
+
+## The bottom row = the TOTEM thumbs
+
+| Laptop key | TOTEM thumb | Tap | Hold |
+|---|---|---|---|
+| leftmost (Fn)* | left outer | Backspace | — |
+| left Super | left middle | one-shot SYM | SYM (J-Ctrl held: Ctrl+Tab) |
+| left Alt | left inner | toggle MOUSE | MOV |
+| Space | right inner | Space | Super |
+| right Alt | right middle | Esc | NUM |
+| PrtSc | right outer | Enter | — |
+
+Caps Lock = the TOTEM left outer pinky: toggles MOV. Right Ctrl stays Ctrl.
+Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Super.
+
+\* The ThinkPad firmware owns Fn; it sends no key code. BIOS setting **FnCtrlKeySwap = Enable**
+(set 8 Oct 2026 through think-lmi, no BIOS password) makes it send Left Ctrl, and the Ctrl key
+becomes Fn. It takes effect after a reboot. Check or undo it from Linux:
+
+```bash
+sudo cat /sys/class/firmware-attributes/thinklmi/attributes/FnCtrlKeySwap/current_value
+echo Disable | sudo tee /sys/class/firmware-attributes/thinklmi/attributes/FnCtrlKeySwap/current_value   # then reboot
+```
 
 ## Files
 
@@ -20,23 +43,26 @@ grabbed. External keyboards do their mods in firmware and never pass through kan
 ```bash
 sudo systemctl restart kanata-laptop        # after an edit of kanata.kbd
 kanata --check -c ~/.config/kanata/kanata.kbd
-sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 13 cases
+sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 27 cases
 sudo systemctl disable --now kanata-laptop  # turn it off
 journalctl -u kanata-laptop
 ```
 
-**Emergency exit:** hold the physical `LeftCtrl` + `Space` + `Esc`. kanata exits 0 and stays off
-until `sudo systemctl restart kanata-laptop`.
+**Emergency exit:** hold Left Ctrl + Space + Esc, as kanata sees them: after the Fn/Ctrl swap
+that is the leftmost key + Space + the Esc key in the top-left corner. kanata exits 0 and
+stays off until `sudo systemctl restart kanata-laptop`.
 
 The unit in `/etc/systemd/system/` is a **copy**; `install.sh` warns when it differs. After you edit it:
 `sudo install -m644 ~/dotfiles/kanata-pkg/systemd/kanata-laptop.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart kanata-laptop`.
 
 Install from scratch (p14s only — p340 has no built-in keyboard): `pikaur -S kanata-bin`, then
 `./install.sh` in `~/dotfiles`. It stows `kanata-pkg` only where kanata is installed and prints
-the one root command for the unit.
+the one root command for the unit. Then set FnCtrlKeySwap as above.
 
 ## Known limits
 
+- **PrtSc is Enter now.** Screenshots: `Mod+Alt+Shift+J` (region to clipboard), `+S`, `+K` (niri binds).
+- **No Polish letters** on this laptop: the `pl` xkb layout is gone (right Alt is a thumb key).
 - **Ctrl/Shift + mouse click:** the touchpad and the TrackPoint are other devices, so kanata does not
   see the click. A held `F` becomes Ctrl only when its 180 ms term ends. Hold the key a moment
   before you click.
