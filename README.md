@@ -15,6 +15,7 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 | `bin-pkg` | `~/bin/` helper scripts: theme switching, and `rofi-run`, which opens a terminal for rofi run entries that need one (rules in its header, fixes in `.config/rofi/run-overrides`) |
 | `espanso-pkg` | Text expansion config |
 | `logid-pkg` | Logitech mouse (logid) config |
+| `kanata-pkg` | Home-row mods on the p14s built-in keyboard (kanata, system service). Start at [`kanata-pkg/.config/kanata/README.md`](kanata-pkg/.config/kanata/README.md) |
 | `emacs` | `.emacs`, `.emacs.d/` |
 | `vim` | `.vimrc`, `.vim/` |
 | `bash` | `.bashrc`, `.bash_aliases` |

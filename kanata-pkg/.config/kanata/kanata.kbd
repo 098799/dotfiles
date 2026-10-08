@@ -1,0 +1,49 @@
+;; Home-row mods for the p14s BUILT-IN keyboard only.
+;;
+;; Same feel as the TOTEM (~/zmk-config-totem/config/totem.keymap) and the
+;; Corne/Planck (~/qmk_firmware, keymap tg):
+;;   A=Super S=Alt D=Shift F=Ctrl | J=Ctrl K=Shift L=Alt ;=Super
+;;   tap-hold-release        = QMK PERMISSIVE_HOLD = ZMK flavor "balanced"
+;;   tap-repress-timeout 150 = ZMK quick-tap-ms (tap then hold = repeat the letter)
+;;   require-prior-idle 120  = ZMK require-prior-idle-ms (not on Shift: it made "di" from "I")
+;;   180 ms term, 160 ms on the Shift keys (QMK MIDDLE_TAPPING_TERM)
+;;
+;; Only the laptop keyboard is grabbed. The TOTEM and the Corne do their own
+;; mods in firmware and must never pass through here.
+;;
+;; Emergency exit: hold LeftCtrl + Space + Esc (the physical keys).
+;; Service: kanata-laptop.service (system unit, see README.md next to this file).
+
+(defcfg
+  linux-dev /dev/input/by-path/platform-i8042-serio-0-event-kbd
+  ;; keys not in defsrc still pass through kanata, so a press of any key
+  ;; counts for the permissive-hold decision and key order is kept
+  process-unmapped-keys yes
+)
+
+(defsrc
+  a s d f   j k l ;
+)
+
+(defvar
+  tap-repress 150
+  term        180
+  shift-term  160
+  prior-idle  120
+)
+
+(defalias
+  a (tap-hold-release $tap-repress $term       a lmet (require-prior-idle $prior-idle))
+  s (tap-hold-release $tap-repress $term       s lalt (require-prior-idle $prior-idle))
+  d (tap-hold-release $tap-repress $shift-term d lsft)
+  f (tap-hold-release $tap-repress $term       f lctl (require-prior-idle $prior-idle))
+  j (tap-hold-release $tap-repress $term       j lctl (require-prior-idle $prior-idle))
+  k (tap-hold-release $tap-repress $shift-term k rsft)
+  ;; left Alt on L, never right Alt: right Alt is AltGr
+  l (tap-hold-release $tap-repress $term       l lalt (require-prior-idle $prior-idle))
+  ; (tap-hold-release $tap-repress $term       ; rmet (require-prior-idle $prior-idle))
+)
+
+(deflayer base
+  @a @s @d @f   @j @k @l @;
+)

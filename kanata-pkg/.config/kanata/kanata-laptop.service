@@ -1,0 +1,12 @@
+[Unit]
+Description=kanata: home-row mods on the p14s built-in keyboard
+Documentation=file:///home/tgrining/.config/kanata/README.md
+
+[Service]
+ExecStart=/usr/bin/kanata --no-wait --quiet -c /home/tgrining/.config/kanata/kanata.kbd
+# The emergency exit (LCtrl+Space+Esc) exits 0, so it stays off until restarted.
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
