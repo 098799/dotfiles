@@ -16,7 +16,7 @@ grabbed. External keyboards do their layout in firmware and never pass through k
 | left Alt | left inner | toggle MOUSE | MOV |
 | Space | right inner | Space | Super |
 | right Alt | right middle | Esc | NUM |
-| PrtSc | right outer | Enter | — |
+| Copilot key** | right outer | Enter | — |
 
 Caps Lock = the TOTEM left outer pinky: toggles MOV. Right Ctrl stays Ctrl.
 Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Super.
@@ -29,6 +29,11 @@ becomes Fn. It takes effect after a reboot. Check or undo it from Linux:
 sudo cat /sys/class/firmware-attributes/thinklmi/attributes/FnCtrlKeySwap/current_value
 echo Disable | sudo tee /sys/class/firmware-attributes/thinklmi/attributes/FnCtrlKeySwap/current_value   # then reboot
 ```
+
+\*\* The Copilot key (P14s Gen 6, right of right Alt) has no key code of its own: firmware sends
+Left Super + Left Shift + F23. kanata maps F23 to `(unmod (lsft) ret)`: Enter without that Shift.
+Its Super opens SYM for a moment, and the F23 press uses up the one-shot. Held mods still apply:
+F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot = Shift+Enter. The BIOS has no Copilot option.
 
 ## Files
 
@@ -43,7 +48,7 @@ echo Disable | sudo tee /sys/class/firmware-attributes/thinklmi/attributes/FnCtr
 ```bash
 sudo systemctl restart kanata-laptop        # after an edit of kanata.kbd
 kanata --check -c ~/.config/kanata/kanata.kbd
-sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 27 cases
+sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 31 cases
 sudo systemctl disable --now kanata-laptop  # turn it off
 journalctl -u kanata-laptop
 ```
@@ -61,7 +66,6 @@ the one root command for the unit. Then set FnCtrlKeySwap as above.
 
 ## Known limits
 
-- **PrtSc is Enter now.** Screenshots: `Mod+Alt+Shift+J` (region to clipboard), `+S`, `+K` (niri binds).
 - **No Polish letters** on this laptop: the `pl` xkb layout is gone (right Alt is a thumb key).
 - **Ctrl/Shift + mouse click:** the touchpad and the TrackPoint are other devices, so kanata does not
   see the click. A held `F` becomes Ctrl only when its 180 ms term ends. Hold the key a moment

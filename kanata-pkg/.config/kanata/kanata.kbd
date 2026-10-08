@@ -19,12 +19,16 @@
 ;;   left Alt         left inner     toggle MOUSE        MOV
 ;;   Space            right inner    Space               Super
 ;;   right Alt        right middle   Esc                 NUM
-;;   PrtSc / Menu     right outer    Enter               -
+;;   Copilot key**    right outer    Enter               -
 ;;
 ;;   * The ThinkPad firmware owns Fn: it sends no key code. The BIOS setting
 ;;     FnCtrlKeySwap=Enable makes that key send Left Ctrl (and the Ctrl key
 ;;     becomes Fn), so `lctl` below IS the leftmost key. Before the swap is
 ;;     active, `lctl` is the physical Ctrl key, second from the left.
+;;  ** The Copilot key (right of right Alt, P14s Gen 6) has no key code of its
+;;     own: firmware sends Left Super + Left Shift + F23. Its Super opens SYM
+;;     for a moment (harmless: the F23 press uses up the one-shot); F23 is the
+;;     key mapped here, as Enter with that Left Shift removed.
 ;;
 ;; Caps Lock = the TOTEM left outer pinky: toggle MOV (tap again to leave).
 ;; Right Ctrl stays a plain Ctrl.
@@ -49,7 +53,7 @@
   q    w    e    r    t    y    u    i    o    p
   caps a    s    d    f    g    h    j    k    l    ;    '
   z    x    c    v    b    n    m    ,    .    /
-  lctl lmet lalt spc  ralt prnt menu
+  lctl lmet lalt spc  ralt f23
 )
 
 (defvar
@@ -82,6 +86,10 @@
   spc (tap-hold 175 220 spc lmet)
   ;; right middle thumb: Esc, held = NUM (= &lt NUM ESC, tap-preferred 200)
   num (tap-hold 0 200 esc (layer-while-held num))
+  ;; right outer thumb = the Copilot key's F23: Enter without the Left Shift the
+  ;; key adds. Only lsft goes, so F-Ctrl + Copilot = Ctrl+Enter and K-Shift
+  ;; (right Shift) + Copilot = Shift+Enter.
+  cop (unmod (lsft) ret)
   ;; Caps Lock: toggle MOV (= &tog MOV on the left outer pinky)
   movon  (layer-switch mov)
   base   (layer-switch base)
@@ -102,7 +110,7 @@
   q       w       e       r       t       y       u       i       o       p
   @movon  @a      @s      @d      @f      g       h       @j      @k      @l      @;      '
   z       x       c       v       b       n       m       ,       .       /
-  bspc    @sym    @movmou @spc    @num    ret     ret
+  bspc    @sym    @movmou @spc    @num    @cop
 )
 
 ;; ! @ # $ %    ^ & * ( )  /  ? : - _ 2   1 = + [ ]  /  ` ~ ' " <   > \ | { }
@@ -110,7 +118,7 @@
   S-1     S-2     S-3     S-4     S-5     S-6     S-7     S-8     S-9     S-0
   _       S-/     S-;     -       S--     2       1       =       S-=     [       ]       _
   grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
-  lmet    tab     _       _       @adj    _       _
+  lmet    tab     _       _       @adj    @cop
 )
 
 ;; 1-0 on the top row; mouse buttons on S D F; cursor on J K L ;; wheel on M , . /
@@ -118,7 +126,7 @@
   1       2       3       4       5       6       7       8       9       0
   _       @a      mmid    mrgt    mlft    _       _       @ms←    @ms↓    @ms↑    @ms→    _
   _       _       _       _       _       _       @wh←    @wh↓    @wh↑    @wh→
-  del     @adj    _       _       _       _       _
+  del     @adj    _       _       _       @cop
 )
 
 ;; F1-F6 on the home row, F7-F12 below (the TOTEM's boot/BT top row has no use here)
@@ -126,7 +134,7 @@
   _       _       _       _       _       _       _       _       _       _
   _       f1      f2      f3      f4      f5      f6      _       _       _       _       _
   f7      f8      f9      f10     f11     f12     _       _       _       _
-  _       _       _       _       _       _       _
+  _       _       _       _       _       @cop
 )
 
 ;; arrows on U I O P; Home / word-left / PgDn / PgUp / word-right on H J K L ;; End on '
@@ -135,7 +143,7 @@
   q       w       e       r       t       y       left    down    up      rght
   @base   @a      @s      @d      @f      M-g     home    C-left  pgdn    pgup    C-rght  end
   z       x       c       v       M-b     M-n     M-m     M-,     M-.     M-/
-  bspc    @sym    @movmou @spc    esc     ret     ret
+  bspc    @sym    @movmou @spc    esc     @cop
 )
 
 ;; clicks on S D F; cursor on J K L ;; wheel on M , . /; Space = left click.
@@ -144,5 +152,5 @@
   q       w       e       r       t       y       u       i       o       p
   @base   @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
   z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
-  bspc    @sym    @mouoff mlft    @num    ret     ret
+  bspc    @sym    @mouoff mlft    @num    @cop
 )

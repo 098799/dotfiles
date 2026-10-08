@@ -39,7 +39,7 @@ while out.read_one():  # drain
     pass
 
 SPECIAL = {";": "SEMICOLON", "lctl": "LEFTCTRL", "lmet": "LEFTMETA", "lalt": "LEFTALT",
-           "ralt": "RIGHTALT", "spc": "SPACE", "prnt": "SYSRQ", "caps": "CAPSLOCK"}
+           "ralt": "RIGHTALT", "spc": "SPACE", "caps": "CAPSLOCK"}
 
 
 class Keys(dict):
@@ -75,6 +75,37 @@ def case(title, steps, expect):
     print(f"{'PASS' if ok else 'FAIL'}  {title}\n      got:    {got}\n      expect: {expect}")
     return ok
 
+
+MODS = {"leftshift", "rightshift", "leftctrl", "rightctrl", "leftalt", "rightalt", "leftmeta", "rightmeta"}
+
+
+def typed(seq):
+    """Replay the output: return [(key, mods held at its press)] for non-modifier presses."""
+    held, out = set(), []
+    for tok in seq.split():
+        sign, name = tok[0], tok[1:]
+        if name in MODS:
+            (held.add if sign == "+" else held.discard)(name)
+        elif sign == "+":
+            out.append((name, frozenset(held)))
+    return out
+
+
+def case_typed(title, steps, expect):
+    """Like case(), but compares what was TYPED (key + mods held), not the raw event order."""
+    time.sleep(0.4)
+    for key, val, wait in steps:
+        ev(key, val, wait)
+    raw = collect()
+    got = [(k, sorted(m)) for k, m in typed(raw)]
+    want = [(k, sorted(m)) for k, m in expect]
+    ok = got == want
+    print(f"{'PASS' if ok else 'FAIL'}  {title}\n      raw:    {raw}\n      typed:  {got}")
+    return ok
+
+
+COPILOT = [("lmet", 1, 3), ("leftshift", 1, 3), ("f23", 1, 60), ("f23", 0, 3), ("leftshift", 0, 3), ("lmet", 0, 0)]
+COPILOT_AT_ONCE = [("lmet", 1, 1), ("leftshift", 1, 1), ("f23", 1, 1), ("f23", 0, 1), ("leftshift", 0, 1), ("lmet", 0, 0)]
 
 results = [
     case("tap a", [("a", 1, 50), ("a", 0, 0)], "+a -a"),
@@ -114,7 +145,14 @@ results = [
     case("unmapped key passes through", [("q", 1, 30), ("q", 0, 0)], "+q -q"),
     # --- thumbs ---
     case("left outer thumb (lctl input) = Backspace", [("lctl", 1, 40), ("lctl", 0, 0)], "+backspace -backspace"),
-    case("right outer thumb (PrtSc) = Enter", [("prnt", 1, 40), ("prnt", 0, 0)], "+enter -enter"),
+    case_typed("Copilot key (Super+Shift+F23) = plain Enter", COPILOT, [("enter", [])]),
+    case_typed("Copilot key, whole sequence at once = plain Enter", COPILOT_AT_ONCE, [("enter", [])]),
+    case_typed("Copilot then d = Enter, d (the SYM one-shot is used up)",
+               COPILOT + [("d", 1, 30), ("d", 0, 0)], [("enter", []), ("d", [])]),
+    case_typed("F-Ctrl held + Copilot = Ctrl+Enter",
+               [("f", 1, 250)] + COPILOT + [("f", 0, 0)], [("enter", ["leftctrl"])]),
+    case_typed("K-Shift held + Copilot = Shift+Enter",
+               [("k", 1, 250)] + COPILOT + [("k", 0, 0)], [("enter", ["rightshift"])]),
     case("right Alt tap = Esc", [("ralt", 1, 40), ("ralt", 0, 0)], "+esc -esc"),
     case("Space tap = space", [("spc", 1, 40), ("spc", 0, 0)], "+space -space"),
     case("Space held past 220 + q = Super+q",
