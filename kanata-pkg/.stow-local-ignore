@@ -1,0 +1,6 @@
+# systemd/ goes to /etc/systemd/system, not ~ — install.sh checks it. A local ignore
+# file replaces stow's defaults, so keep the Syncthing conflict and backup patterns.
+^/systemd
+.*sync-conflict-.*
+.*\.pre-stow
+__pycache__

@@ -66,6 +66,21 @@ if ! cmp -s "$_pam" /etc/pam.d/hyprlock-password; then
 fi
 unset _pam
 
+# kanata: home-row mods on the built-in laptop keyboard (p14s). Only where kanata
+# is installed (AUR kanata-bin), so a host without a laptop keyboard skips it.
+# The unit lives in /etc/systemd/system, so stow cannot place it; it runs as root
+# because it grabs /dev/input and writes /dev/uinput.
+if command -v kanata &> /dev/null; then
+    echo "Stowing kanata-pkg..."
+    stow -v -t ~ kanata-pkg
+    _unit=kanata-pkg/systemd/kanata-laptop.service
+    if ! cmp -s "$_unit" /etc/systemd/system/kanata-laptop.service; then
+        echo "  WARNING: /etc/systemd/system/kanata-laptop.service is missing or differs from $_unit"
+        echo "           sudo install -m 644 $PWD/$_unit /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now kanata-laptop"
+    fi
+    unset _unit
+fi
+
 # Seed the i3 active palette symlink if it's missing — i3's `include` silently
 # no-ops on a missing file, which would drop the bar{} block and client.*
 # colors. The `theme` script overwrites this symlink on demand.

@@ -12,7 +12,7 @@ grabbed. External keyboards do their mods in firmware and never pass through kan
 | File | What |
 |---|---|
 | `kanata.kbd` | the config |
-| `kanata-laptop.service` | system unit (runs as root, so no `input`/`uinput` group and no re-login) |
+| `~/dotfiles/kanata-pkg/systemd/kanata-laptop.service` | system unit (runs as root, so no `input`/`uinput` group and no re-login). Not stowed: `.stow-local-ignore` keeps it out of `~` |
 | `hrm-harness.py` | behaviour check: a fake keyboard feeds a private kanata, output is grabbed so nothing types |
 
 ## Commands
@@ -28,11 +28,12 @@ journalctl -u kanata-laptop
 **Emergency exit:** hold the physical `LeftCtrl` + `Space` + `Esc`. kanata exits 0 and stays off
 until `sudo systemctl restart kanata-laptop`.
 
-The unit in `/etc/systemd/system/` is a **copy**. After you edit `kanata-laptop.service`:
-`sudo install -m644 ~/.config/kanata/kanata-laptop.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart kanata-laptop`.
+The unit in `/etc/systemd/system/` is a **copy**; `install.sh` warns when it differs. After you edit it:
+`sudo install -m644 ~/dotfiles/kanata-pkg/systemd/kanata-laptop.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart kanata-laptop`.
 
-Install from scratch (p14s only — p340 has no built-in keyboard):
-`pikaur -S kanata-bin`, `stow -t ~ kanata-pkg` in `~/dotfiles`, then the install line above plus `enable --now`.
+Install from scratch (p14s only — p340 has no built-in keyboard): `pikaur -S kanata-bin`, then
+`./install.sh` in `~/dotfiles`. It stows `kanata-pkg` only where kanata is installed and prints
+the one root command for the unit.
 
 ## Known limits
 
