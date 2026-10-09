@@ -27,6 +27,12 @@ on until the next tap.
 
 Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Super.
 
+**Switch keys** — Caps = MOV, left Alt tap = MOUSE. Only one switched layer is on at a time,
+never a stack. Tap the key of the layer you are in: back to base. Tap the other switch key:
+that layer. **Two quick taps on any switch key = base, from any layer** (a `guard` layer keeps
+base for 400 ms after a switch key went back to base, so the 2nd tap cannot turn a layer on).
+Held layers (SYM, NUM, MOV on left Alt, MOUSE on left Shift) end when you let go.
+
 \* The ThinkPad firmware owns Fn; it sends no key code. BIOS setting **FnCtrlKeySwap = Enable**
 (set 8 Oct 2026 through think-lmi, no BIOS password) makes it send Left Ctrl, and the Ctrl key
 becomes Fn. It takes effect after a reboot. Check or undo it from Linux:
@@ -54,7 +60,7 @@ F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot = Shift+Enter. The BIOS has no 
 ```bash
 sudo systemctl restart kanata-laptop        # after an edit of kanata.kbd
 kanata --check -c ~/.config/kanata/kanata.kbd
-sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 40 cases
+sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 54 cases
 sudo systemctl disable --now kanata-laptop  # turn it off
 journalctl -u kanata-laptop
 ```

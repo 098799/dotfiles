@@ -107,6 +107,26 @@ def case_typed(title, steps, expect):
 COPILOT = [("lmet", 1, 3), ("leftshift", 1, 3), ("f23", 1, 60), ("f23", 0, 3), ("leftshift", 0, 3), ("lmet", 0, 0)]
 COPILOT_AT_ONCE = [("lmet", 1, 1), ("leftshift", 1, 1), ("f23", 1, 1), ("f23", 0, 1), ("leftshift", 0, 1), ("lmet", 0, 0)]
 
+def tap(k, gap=60):
+    return [(k, 1, 40), (k, 0, gap)]
+
+
+PROBE = tap("i", 30) + tap("f", 30)
+SEEN = {"base": "+i -i +f -f", "mov": "+down -down +f -f", "mouse": "+i -i +btn_left -btn_left"}
+ENTER = {"base": [], "mov": tap("caps"), "mouse": tap("lalt")}
+
+
+def switch_case(st, kn, k, n, want):
+    """Enter layer st, tap switch key k n times (quick), read the layer from PROBE."""
+    ok = case(f"from {st}: {kn} x{n} = {want}",
+              ENTER[st] + ([("f24", 0, 500)] if ENTER[st] else []) + tap(k) * n + PROBE, SEEN[want])
+    time.sleep(0.5)  # back to base: two quick Caps taps (the property under test)
+    for key, val, wait in tap("caps") * 2:
+        ev(key, val, wait)
+    collect()
+    return ok
+
+
 results = [
     case("tap a", [("a", 1, 50), ("a", 0, 0)], "+a -a"),
     case("hold f past term, tap x = Ctrl+x",
@@ -177,6 +197,11 @@ results = [
     case("SYM held: q w = ! @ (shifted 1 2)",
          [("lmet", 1, 40), ("q", 1, 30), ("q", 0, 30), ("w", 1, 30), ("w", 0, 30), ("lmet", 0, 0)],
          "+leftshift +1 -leftshift -1 +leftshift +2 -leftshift -2"),  # shift is down at each press = "!@"
+    case_typed("SYM held: a k = ? + (Shift+/ and Shift+=)",
+               [("lmet", 1, 40)] + tap("a", 30) + tap("k", 30) + [("lmet", 0, 0)],
+               [("slash", ["leftshift"]), ("equal", ["leftshift"])]),
+    case_typed("one-shot SYM: a = ?, then a = a",
+               tap("lmet") + tap("a", 300) + tap("a", 0), [("slash", ["leftshift"]), ("a", [])]),
     case("J-Ctrl held + left Super = Ctrl+Tab",
          [("j", 1, 250), ("lmet", 1, 40), ("lmet", 0, 40), ("j", 0, 0)],
          "+rightctrl +tab -tab -rightctrl"),
@@ -210,6 +235,17 @@ results = [
     case("left Alt held: u i o p = arrows",
          [("lalt", 1, 40), ("u", 1, 30), ("u", 0, 30), ("p", 1, 30), ("p", 0, 30), ("lalt", 0, 0)],
          "+left -left +right -right"),
+] + [
+    # switch keys: one switched layer at a time; two quick taps = base from anywhere
+    switch_case(st, kn, k, n, want) for st, kn, k, n, want in [
+        ("base", "Caps", "caps", 1, "mov"), ("base", "Caps", "caps", 2, "base"),
+        ("base", "lAlt", "lalt", 1, "mouse"), ("base", "lAlt", "lalt", 2, "base"),
+        ("mov", "Caps", "caps", 1, "base"), ("mov", "Caps", "caps", 2, "base"),
+        ("mov", "lAlt", "lalt", 1, "mouse"), ("mov", "lAlt", "lalt", 2, "base"),
+        ("mouse", "Caps", "caps", 1, "mov"), ("mouse", "Caps", "caps", 2, "base"),
+        ("mouse", "lAlt", "lalt", 1, "base"), ("mouse", "lAlt", "lalt", 2, "base"),
+    ]
+] + [
     case("Caps toggles MOV on: i = down; Caps again: i = i",
          [("caps", 1, 40), ("caps", 0, 40), ("i", 1, 30), ("i", 0, 40),
           ("caps", 1, 40), ("caps", 0, 40), ("i", 1, 30), ("i", 0, 0)],

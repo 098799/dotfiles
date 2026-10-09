@@ -31,6 +31,12 @@
 ;;     key mapped here, as Enter with that Left Shift removed.
 ;;
 ;; Caps Lock = the TOTEM left outer pinky: toggle MOV (tap again to leave).
+;;
+;; Switch keys (Caps = MOV, left Alt tap = MOUSE). Only one switched layer is on
+;; at a time, never a stack. A tap on the key of the layer you are in = base; a
+;; tap on the other switch key = that layer. Two quick taps on any switch key =
+;; base, from any layer (the `guard` layer holds base for 400 ms after a switch
+;; key went back to base).
 ;; Left Shift = MOUSE while held (laptop only; D and K are the Shift keys). No
 ;; tap action, so no timeout: the cursor moves at once and MOUSE ends on release.
 ;; Right Ctrl and right Shift stay plain.
@@ -68,7 +74,12 @@
 ;; Tab on the SYM thumb inside SYM goes through a virtual key. kanata does not let
 ;; a re-press of the key that started a one-shot use the one-shot up, so a plain
 ;; `tab` there left SYM on for one more key (double tap, d = "Tab -").
-(defvirtualkeys symtab tab)
+(defvirtualkeys
+  symtab tab
+  ;; held for 400 ms after a switch key goes back to base: a fast 2nd tap of
+  ;; any switch key then stays in base (double tap = base, from any layer)
+  guard  (layer-while-held guard)
+)
 
 (defalias
   ;; home-row mods
@@ -93,7 +104,7 @@
   symtab (multi (on-press press-vkey symtab) (on-release release-vkey symtab))
   ;; left inner thumb: hold = MOV while held, tap = MOUSE on (= mov_or_mouse)
   movmou (tap-hold-release 0 200 (layer-switch mouse) (layer-while-held mov))
-  mouoff (tap-hold-release 0 200 (layer-switch base) (layer-while-held mov))
+  mouoff (tap-hold-release 0 200 (multi (layer-switch base) (hold-for-duration 400 guard)) (layer-while-held mov))
   ;; right inner thumb: Space, held = Super (= &mt LGUI SPACE, tap-preferred 220)
   spc (tap-hold 175 220 spc lmet)
   ;; right middle thumb: Esc, held = NUM (= &lt NUM ESC, tap-preferred 200)
@@ -104,7 +115,9 @@
   cop (unmod (lsft) ret)
   ;; Caps Lock: toggle MOV (= &tog MOV on the left outer pinky)
   movon  (layer-switch mov)
-  base   (layer-switch base)
+  base   (multi (layer-switch base) (hold-for-duration 400 guard))
+  ;; in the guard: left Alt tap = stay in base, hold = MOV as usual
+  grdalt (tap-hold-release 0 200 (layer-switch base) (layer-while-held mov))
   adj    (layer-while-held adj)
 
   ;; mouse: ~250 px/s at the start, ~3000 px/s after 0.5 s (the Corne's ramp)
@@ -160,10 +173,18 @@
 
 ;; clicks on S D F; cursor on J K L ;; wheel on M , . /; Space = left click.
 ;; Two ways in: hold left Shift (MOUSE ends on release), or tap left Alt
-;; (MOUSE stays on; leave with a tap on left Alt or on Caps Lock).
+;; (MOUSE stays on; leave with a tap on left Alt; Caps switches to MOV).
 (deflayer mouse
   q       w       e       r       t       y       u       i       o       p
-  @base   @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
+  @movon  @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
   @mouse  z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
   bspc    @sym    @mouoff mlft    @num    @cop
+)
+
+;; 400 ms after a switch key went back to base (see `guard` above)
+(deflayer guard
+  _       _       _       _       _       _       _       _       _       _
+  (layer-switch base) _       _       _       _       _       _       _       _       _       _       _
+  _       _       _       _       _       _       _       _       _       _       _
+  _       _       @grdalt _       _       _
 )
