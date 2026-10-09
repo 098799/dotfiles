@@ -14,7 +14,7 @@
 ;; Thumbs: the laptop's bottom row stands in for the TOTEM's six thumb keys.
 ;;
 ;;   laptop key       TOTEM thumb    tap                 hold
-;;   leftmost (Fn)*   left outer     Backspace           -
+;;   leftmost (Fn)*   left outer     Backspace           MOUSE (laptop only)
 ;;   left Super       left middle    one-shot SYM        SYM   (J-Ctrl held: Ctrl+Tab)
 ;;   left Alt         left inner     toggle MOUSE        MOV
 ;;   Space            right inner    Space               Super
@@ -74,6 +74,11 @@
   l (tap-hold-release $tap-repress $term       l lalt (require-prior-idle $prior-idle))
   ; (tap-hold-release $tap-repress $term       ; rmet (require-prior-idle $prior-idle))
 
+  ;; left outer thumb: Backspace, held = MOUSE while held. Not on the TOTEM: here
+  ;; the left pinky holds the corner key and the right hand drives the cursor on
+  ;; J K L ;, with no layer to leave after. tap-hold-release, so a quick Backspace
+  ;; rolled into the next letter stays Backspace; tap then hold = held Backspace.
+  bsmou (tap-hold-release $tap-repress 200 bspc (layer-while-held mouse))
   ;; left middle thumb: one-shot SYM (= ZMK &sl SYM, 1 s), held = SYM while held.
   ;; With RIGHT Ctrl down (J held) it sends Tab instead, Ctrl kept: Ctrl+Tab, and
   ;; with K-Shift as well Ctrl+Shift+Tab. F-Ctrl is LEFT Ctrl, so F + this thumb
@@ -110,7 +115,7 @@
   q       w       e       r       t       y       u       i       o       p
   @movon  @a      @s      @d      @f      g       h       @j      @k      @l      @;      '
   z       x       c       v       b       n       m       ,       .       /
-  bspc    @sym    @movmou @spc    @num    @cop
+  @bsmou  @sym    @movmou @spc    @num    @cop
 )
 
 ;; ! @ # $ %    ^ & * ( )  /  ? : - _ 2   1 = + [ ]  /  ` ~ ' " <   > \ | { }
@@ -147,7 +152,8 @@
 )
 
 ;; clicks on S D F; cursor on J K L ;; wheel on M , . /; Space = left click.
-;; Leave with a tap on left Alt or on Caps Lock.
+;; Two ways in: hold the leftmost key (MOUSE ends on release), or tap left Alt
+;; (MOUSE stays on; leave with a tap on left Alt or on Caps Lock).
 (deflayer mouse
   q       w       e       r       t       y       u       i       o       p
   @base   @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '

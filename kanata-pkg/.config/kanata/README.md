@@ -11,7 +11,7 @@ grabbed. External keyboards do their layout in firmware and never pass through k
 
 | Laptop key | TOTEM thumb | Tap | Hold |
 |---|---|---|---|
-| leftmost (Fn)* | left outer | Backspace | — |
+| leftmost (Fn)* | left outer | Backspace | MOUSE while held (laptop only) |
 | left Super | left middle | one-shot SYM | SYM (J-Ctrl held: Ctrl+Tab) |
 | left Alt | left inner | toggle MOUSE | MOV |
 | Space | right inner | Space | Super |
@@ -19,6 +19,9 @@ grabbed. External keyboards do their layout in firmware and never pass through k
 | Copilot key** | right outer | Enter | — |
 
 Caps Lock = the TOTEM left outer pinky: toggles MOV. Right Ctrl stays Ctrl.
+Mouse without a toggle: hold the leftmost key, move with J K L ;, click with Space (or S D F),
+let go — you are back in base. Tap then hold the key for a repeating Backspace. A tap on left Alt
+still turns MOUSE on until the next tap.
 Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Super.
 
 \* The ThinkPad firmware owns Fn; it sends no key code. BIOS setting **FnCtrlKeySwap = Enable**
@@ -48,7 +51,7 @@ F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot = Shift+Enter. The BIOS has no 
 ```bash
 sudo systemctl restart kanata-laptop        # after an edit of kanata.kbd
 kanata --check -c ~/.config/kanata/kanata.kbd
-sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 31 cases
+sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 35 cases
 sudo systemctl disable --now kanata-laptop  # turn it off
 journalctl -u kanata-laptop
 ```
