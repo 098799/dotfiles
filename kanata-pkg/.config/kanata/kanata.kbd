@@ -63,6 +63,11 @@
   prior-idle  120
 )
 
+;; Tab on the SYM thumb inside SYM goes through a virtual key. kanata does not let
+;; a re-press of the key that started a one-shot use the one-shot up, so a plain
+;; `tab` there left SYM on for one more key (double tap, d = "Tab -").
+(defvirtualkeys symtab tab)
+
 (defalias
   ;; home-row mods
   a (tap-hold-release $tap-repress $term       a lmet (require-prior-idle $prior-idle))
@@ -84,6 +89,8 @@
   ;; with K-Shift as well Ctrl+Shift+Tab. F-Ctrl is LEFT Ctrl, so F + this thumb
   ;; still opens SYM for Ctrl+<symbol>. (= sym_tab in totem.keymap)
   sym (fork (one-shot-release 1000 (layer-while-held sym)) tab (rctl))
+  ;; left middle thumb inside SYM: Tab (double tap = Tab, SYM ends)
+  symtab (multi (on-press press-vkey symtab) (on-release release-vkey symtab))
   ;; left inner thumb: hold = MOV while held, tap = MOUSE on (= mov_or_mouse)
   movmou (tap-hold-release 0 200 (layer-switch mouse) (layer-while-held mov))
   mouoff (tap-hold-release 0 200 (layer-switch base) (layer-while-held mov))
@@ -123,7 +130,7 @@
   S-1     S-2     S-3     S-4     S-5     S-6     S-7     S-8     S-9     S-0
   _       S-/     S-;     -       S--     2       1       =       S-=     [       ]       _
   grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
-  lmet    tab     _       _       @adj    @cop
+  lmet    @symtab _       _       @adj    @cop
 )
 
 ;; 1-0 on the top row; mouse buttons on S D F; cursor on J K L ;; wheel on M , . /

@@ -51,7 +51,7 @@ F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot = Shift+Enter. The BIOS has no 
 ```bash
 sudo systemctl restart kanata-laptop        # after an edit of kanata.kbd
 kanata --check -c ~/.config/kanata/kanata.kbd
-sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 35 cases
+sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 40 cases
 sudo systemctl disable --now kanata-laptop  # turn it off
 journalctl -u kanata-laptop
 ```
