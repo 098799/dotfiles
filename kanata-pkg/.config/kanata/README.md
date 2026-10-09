@@ -11,7 +11,7 @@ grabbed. External keyboards do their layout in firmware and never pass through k
 
 | Laptop key | TOTEM thumb | Tap | Hold |
 |---|---|---|---|
-| leftmost (Fn)* | left outer | Backspace | MOUSE while held (laptop only) |
+| leftmost (Fn)* | left outer | Backspace | — |
 | left Super | left middle | one-shot SYM | SYM (J-Ctrl held: Ctrl+Tab) |
 | left Alt | left inner | toggle MOUSE | MOV |
 | Space | right inner | Space | Super |
@@ -19,9 +19,12 @@ grabbed. External keyboards do their layout in firmware and never pass through k
 | Copilot key** | right outer | Enter | — |
 
 Caps Lock = the TOTEM left outer pinky: toggles MOV. Right Ctrl stays Ctrl.
-Mouse without a toggle: hold the leftmost key, move with J K L ;, click with Space (or S D F),
-let go — you are back in base. Tap then hold the key for a repeating Backspace. A tap on left Alt
-still turns MOUSE on until the next tap.
+
+Mouse without a toggle: hold **left Shift**, move with J K L ;, click with Space (or S D F),
+let go — you are back in base. It has no tap action, so the cursor moves at once. The Shift keys
+are D and K (home-row mods); right Shift stays a plain Shift. A tap on left Alt still turns MOUSE
+on until the next tap.
+
 Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Super.
 
 \* The ThinkPad firmware owns Fn; it sends no key code. BIOS setting **FnCtrlKeySwap = Enable**
@@ -71,7 +74,7 @@ the one root command for the unit. Then set FnCtrlKeySwap as above.
 
 - **No Polish letters** on this laptop: the `pl` xkb layout is gone (right Alt is a thumb key).
 - **Ctrl/Shift + mouse click:** the touchpad and the TrackPoint are other devices, so kanata does not
-  see the click. A held `F` becomes Ctrl only when its 180 ms term ends. Hold the key a moment
+  see the click. For an instant Shift+click use the plain right Shift (left Shift is MOUSE). A held `F` becomes Ctrl only when its 180 ms term ends. Hold the key a moment
   before you click.
 - **Emacs `fs` chord:** release `f` first and you get `fs`. Release `s` first and you get `C-s`.
   QMK PERMISSIVE_HOLD and ZMK `balanced` do the same.

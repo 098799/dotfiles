@@ -14,7 +14,7 @@
 ;; Thumbs: the laptop's bottom row stands in for the TOTEM's six thumb keys.
 ;;
 ;;   laptop key       TOTEM thumb    tap                 hold
-;;   leftmost (Fn)*   left outer     Backspace           MOUSE (laptop only)
+;;   leftmost (Fn)*   left outer     Backspace           -
 ;;   left Super       left middle    one-shot SYM        SYM   (J-Ctrl held: Ctrl+Tab)
 ;;   left Alt         left inner     toggle MOUSE        MOV
 ;;   Space            right inner    Space               Super
@@ -31,7 +31,9 @@
 ;;     key mapped here, as Enter with that Left Shift removed.
 ;;
 ;; Caps Lock = the TOTEM left outer pinky: toggle MOV (tap again to leave).
-;; Right Ctrl stays a plain Ctrl.
+;; Left Shift = MOUSE while held (laptop only; D and K are the Shift keys). No
+;; tap action, so no timeout: the cursor moves at once and MOUSE ends on release.
+;; Right Ctrl and right Shift stay plain.
 ;;
 ;; Only the laptop keyboard is grabbed. The TOTEM and the Corne do their own
 ;; layout in firmware and must never pass through here.
@@ -52,7 +54,7 @@
 (defsrc
   q    w    e    r    t    y    u    i    o    p
   caps a    s    d    f    g    h    j    k    l    ;    '
-  z    x    c    v    b    n    m    ,    .    /
+  lsft z    x    c    v    b    n    m    ,    .    /
   lctl lmet lalt spc  ralt f23
 )
 
@@ -79,11 +81,9 @@
   l (tap-hold-release $tap-repress $term       l lalt (require-prior-idle $prior-idle))
   ; (tap-hold-release $tap-repress $term       ; rmet (require-prior-idle $prior-idle))
 
-  ;; left outer thumb: Backspace, held = MOUSE while held. Not on the TOTEM: here
-  ;; the left pinky holds the corner key and the right hand drives the cursor on
-  ;; J K L ;, with no layer to leave after. tap-hold-release, so a quick Backspace
-  ;; rolled into the next letter stays Backspace; tap then hold = held Backspace.
-  bsmou (tap-hold-release $tap-repress 200 bspc (layer-while-held mouse))
+  ;; left Shift: MOUSE while held. The Copilot key's firmware Left Shift lands
+  ;; here too: MOUSE is on while it is down, and F23 is @cop in MOUSE as well.
+  mouse (layer-while-held mouse)
   ;; left middle thumb: one-shot SYM (= ZMK &sl SYM, 1 s), held = SYM while held.
   ;; With RIGHT Ctrl down (J held) it sends Tab instead, Ctrl kept: Ctrl+Tab, and
   ;; with K-Shift as well Ctrl+Shift+Tab. F-Ctrl is LEFT Ctrl, so F + this thumb
@@ -121,15 +121,15 @@
 (deflayer base
   q       w       e       r       t       y       u       i       o       p
   @movon  @a      @s      @d      @f      g       h       @j      @k      @l      @;      '
-  z       x       c       v       b       n       m       ,       .       /
-  @bsmou  @sym    @movmou @spc    @num    @cop
+  @mouse  z       x       c       v       b       n       m       ,       .       /
+  bspc    @sym    @movmou @spc    @num    @cop
 )
 
 ;; ! @ # $ %    ^ & * ( )  /  ? : - _ 2   1 = + [ ]  /  ` ~ ' " <   > \ | { }
 (deflayer sym
   S-1     S-2     S-3     S-4     S-5     S-6     S-7     S-8     S-9     S-0
   _       S-/     S-;     -       S--     2       1       =       S-=     [       ]       _
-  grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
+  @mouse  grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
   lmet    @symtab _       _       @adj    @cop
 )
 
@@ -137,7 +137,7 @@
 (deflayer num
   1       2       3       4       5       6       7       8       9       0
   _       @a      mmid    mrgt    mlft    _       _       @ms←    @ms↓    @ms↑    @ms→    _
-  _       _       _       _       _       _       @wh←    @wh↓    @wh↑    @wh→
+  @mouse  _       _       _       _       _       _       @wh←    @wh↓    @wh↑    @wh→
   del     @adj    _       _       _       @cop
 )
 
@@ -145,7 +145,7 @@
 (deflayer adj
   _       _       _       _       _       _       _       _       _       _
   _       f1      f2      f3      f4      f5      f6      _       _       _       _       _
-  f7      f8      f9      f10     f11     f12     _       _       _       _
+  @mouse  f7      f8      f9      f10     f11     f12     _       _       _       _
   _       _       _       _       _       @cop
 )
 
@@ -154,16 +154,16 @@
 (deflayer mov
   q       w       e       r       t       y       left    down    up      rght
   @base   @a      @s      @d      @f      M-g     home    C-left  pgdn    pgup    C-rght  end
-  z       x       c       v       M-b     M-n     M-m     M-,     M-.     M-/
+  @mouse  z       x       c       v       M-b     M-n     M-m     M-,     M-.     M-/
   bspc    @sym    @movmou @spc    esc     @cop
 )
 
 ;; clicks on S D F; cursor on J K L ;; wheel on M , . /; Space = left click.
-;; Two ways in: hold the leftmost key (MOUSE ends on release), or tap left Alt
+;; Two ways in: hold left Shift (MOUSE ends on release), or tap left Alt
 ;; (MOUSE stays on; leave with a tap on left Alt or on Caps Lock).
 (deflayer mouse
   q       w       e       r       t       y       u       i       o       p
   @base   @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
-  z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
+  @mouse  z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
   bspc    @sym    @mouoff mlft    @num    @cop
 )
