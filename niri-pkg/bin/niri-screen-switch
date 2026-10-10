@@ -14,6 +14,7 @@ set -u
 LAPTOP=eDP-1
 EXTERNAL=DP-1
 HDMI=HDMI-A-1
+PAD=AC:8E:BD:4C:5E:21   # Xbox Wireless Controller (BLE, bonded + trusted)
 
 # The wallpaper set is mixed 16:9 / 21:9 and the scaler ignores aspect, so a
 # layout change without this leaves the previous ratio squashed on the new
@@ -21,7 +22,25 @@ HDMI=HDMI-A-1
 repaper() {
     sleep 0.3
     "$HOME/bin/wallpaper-pick" 2>/dev/null || true
-    "$HOME/bin/niri-wallpaper" 2>/dev/null || true
+    # niri-wallpaper execs swaybg in the foreground; detach it or this script
+    # (and any shell waiting on it) never returns.
+    setsid -f "$HOME/bin/niri-wallpaper" >/dev/null 2>&1 </dev/null
+}
+
+# `niri msg output X on` exits 0 even when X is not connected ("The change
+# will apply when it is connected"). Turning the laptop off after that left
+# BOTH screens blank. Wait for the external output to go live first; if it
+# never does, keep the laptop panel on and say why.
+external_live() {
+    local out=$1 i
+    for i in $(seq 1 20); do
+        niri msg -j outputs | jq -e --arg o "$out" '.[$o].logical != null' >/dev/null 2>&1 && return 0
+        sleep 0.25
+    done
+    niri msg output "$out" off 2>/dev/null
+    niri msg output "$LAPTOP" on
+    notify-send -u critical "screen switch" "$out not detected - kept the laptop screen on. Replug the dock/cable." 2>/dev/null
+    return 1
 }
 
 layout_laptop() {
@@ -36,6 +55,7 @@ layout_laptop() {
 layout_narrow() {
     niri msg output "$HDMI" off 2>/dev/null
     niri msg output "$EXTERNAL" on
+    external_live "$EXTERNAL" || return 1
     niri msg output "$EXTERNAL" mode 2560x1440
     niri msg output "$EXTERNAL" position set 0 0
     niri msg output "$LAPTOP" off
@@ -45,6 +65,7 @@ layout_narrow() {
 layout_wide() {
     niri msg output "$HDMI" off 2>/dev/null
     niri msg output "$EXTERNAL" on
+    external_live "$EXTERNAL" || return 1
     niri msg output "$EXTERNAL" mode 3440x1440
     niri msg output "$EXTERNAL" position set 0 0
     niri msg output "$LAPTOP" off
@@ -54,7 +75,21 @@ layout_wide() {
 layout_hdmi() {
     niri msg output "$EXTERNAL" off
     niri msg output "$HDMI" on
+    external_live "$HDMI" || return 1
     niri msg output "$HDMI" mode 2560x1440
+    niri msg output "$HDMI" position set 0 0
+    niri msg output "$LAPTOP" off
+    repaper
+}
+
+# The LG TV on HDMI is 4K; "auto" takes its preferred mode (3840x2160@60) and
+# lets niri pick the scale from the reported physical size.
+layout_hdmi_native() {
+    niri msg output "$EXTERNAL" off
+    niri msg output "$HDMI" on
+    external_live "$HDMI" || return 1
+    niri msg output "$HDMI" mode auto
+    niri msg output "$HDMI" scale auto
     niri msg output "$HDMI" position set 0 0
     niri msg output "$LAPTOP" off
     repaper
@@ -74,17 +109,115 @@ layout_both() {
     repaper
 }
 
+# HDMI sound. The Radeon HDMI card sits at profile "off" while nothing is
+# plugged, and each port only reads "available" once the sink on the other end
+# has sent its ELD - a second or so after the output comes on. Wait for that,
+# switch the card to HiFi, then make the matching sink the default and move
+# every playing stream onto it.
+hdmi_card() {
+    pactl -f json list cards | jq -r '[.[] | select(.ports | keys | any(test("HDMI")))][0].name // empty'
+}
+
+sound_hdmi() {
+    local card port sink i
+    card=$(hdmi_card)
+    [[ -n $card ]] || { notify-send -u critical "sound" "no HDMI sound card"; return 1; }
+    for i in $(seq 1 40); do
+        port=$(pactl -f json list cards | jq -r --arg c "$card" \
+            '.[] | select(.name == $c) | .ports | to_entries[]
+             | select(.value.availability == "available") | .key' | head -1)
+        [[ -n $port ]] && break
+        sleep 0.25
+    done
+    if [[ -z $port ]]; then
+        notify-send -u critical "sound" "no HDMI sink answered - sound stays where it was"
+        return 1
+    fi
+    # "[Out] HDMI2" -> alsa_output.<card>.HiFi__HDMI2__sink
+    port=${port#\[Out\] }
+    pactl set-card-profile "$card" HiFi
+    sink="alsa_output.${card#alsa_card.}.HiFi__${port}__sink"
+    for i in $(seq 1 20); do
+        pactl list short sinks | cut -f2 | grep -qx "$sink" && break
+        sleep 0.25
+    done
+    set_sink "$sink"
+}
+
+sound_laptop() {
+    local sink
+    sink=$(pactl list short sinks | cut -f2 | grep -v HDMI | head -1)
+    [[ -n $sink ]] && set_sink "$sink"
+}
+
+set_sink() {
+    local id
+    pactl set-default-sink "$1" || return 1
+    for id in $(pactl list short sink-inputs | cut -f1); do
+        pactl move-sink-input "$id" "$1"
+    done
+}
+
+# The pad is bonded and trusted, so a connect is enough once it is switched
+# on; it reconnects without a new pairing (pad fw 5.23, see ~/xbox-controller).
+pad_connect() {
+    local i
+    for i in 1 2 3; do
+        bluetoothctl info "$PAD" | grep -q "Connected: yes" && return 0
+        timeout 15 bluetoothctl connect "$PAD" >/dev/null 2>&1 && return 0
+        sleep 2
+    done
+    return 1
+}
+
+# Game mode: TV on HDMI, sound on the TV, pad connected, Steam Big Picture.
+# AntiMicroX turns the pad into a mouse; with Big Picture also reading the pad,
+# every stick move would drive both the menu and the cursor. Stop it here and
+# start it again in game_end.
+layout_game() {
+    layout_hdmi_native || return 1
+    sound_hdmi
+    pad_connect & local pad_job=$!
+    systemctl --user stop antimicrox
+    setsid -f steam steam://open/bigpicture >/dev/null 2>&1 </dev/null
+    if wait "$pad_job"; then
+        notify-send "game" "TV, sound, pad and Big Picture are on."
+    else
+        notify-send -u critical "game" "Pad did not connect. Switch it on (Xbox button) and pick Game again."
+    fi
+}
+
+layout_game_end() {
+    setsid -f steam steam://close/bigpicture >/dev/null 2>&1 </dev/null
+    systemctl --user start antimicrox
+    layout_laptop
+    sound_laptop
+}
+
 if [[ ${1-} == layout-* ]]; then
     "layout_${1#layout-}"
     exit $?
 fi
 
+# rofi is a layer-shell surface: with every output off it has nowhere to map,
+# never takes keyboard focus, and the blind "Mod+BackSpace lap Enter" that
+# worked under i3 goes nowhere. Light the panel first so the menu can show.
+if ! niri msg -j outputs | jq -e 'any(.[]; .logical != null)' >/dev/null; then
+    niri msg output "$LAPTOP" on
+    sleep 0.5
+fi
+
 choice=$(printf '%s\n' \
+    "Game: TV + sound + pad + Big Picture" \
+    "Game: end (laptop)" \
     "Screen: laptop only" \
     "Screen: external 2560x1440" \
     "Screen: external 3440x1440 (wide)" \
+    "Screen: HDMI only (native)" \
     "Screen: HDMI 2560x1440" \
     "Screen: external + laptop" \
+    "Sound: HDMI" \
+    "Sound: laptop" \
     "Theme: w95" \
     "Theme: dark-gruv" \
     "Theme: light-gruv" \
@@ -94,12 +227,17 @@ choice=$(printf '%s\n' \
     "Font: middle" \
     "Font: big" \
     "Font: huge" \
-    | rofi -dmenu -i -lines 14 -font "Ubuntu 25" -p "switch")
+    | rofi -dmenu -i -lines 19 -font "Ubuntu 25" -p "switch")
 
 case "$choice" in
+    "Game: TV + sound + pad + Big Picture") layout_game ;;
+    "Game: end (laptop)")                   layout_game_end ;;
+    "Sound: HDMI")       sound_hdmi ;;
+    "Sound: laptop")     sound_laptop ;;
     "Screen: laptop only")                layout_laptop ;;
     "Screen: external 2560x1440")         layout_narrow ;;
     "Screen: external 3440x1440 (wide)")  layout_wide ;;
+    "Screen: HDMI only (native)")         layout_hdmi_native ;;
     "Screen: HDMI 2560x1440")             layout_hdmi ;;
     "Screen: external + laptop")          layout_both ;;
     "Theme: w95")        "$HOME/.local/bin/w95-rofi" ;;
