@@ -170,11 +170,25 @@ pad_connect() {
     return 1
 }
 
+# The TV must be on and showing this PC before niri can see the HDMI output
+# (external_live gives up after 5 s). ~/lgtv/tv.py wakes it over Wake-on-LAN,
+# waits until it answers (max 30 s) and picks HDMI 2, the PC cable. A failure
+# only warns: the TV may already be on and right, or be switched by hand.
+TV_CLI=/home/tgrining/lgtv/tv.py
+TV_PC_INPUT=HDMI_2
+
+tv_for_game() {
+    [[ -x $TV_CLI ]] || return 0
+    "$TV_CLI" ensure-on "$TV_PC_INPUT" >/dev/null 2>&1 \
+        || notify-send -u critical "game" "The TV did not answer - switch it on and pick HDMI 2 with the remote."
+}
+
 # Game mode: TV on HDMI, sound on the TV, pad connected, Steam Big Picture.
 # AntiMicroX turns the pad into a mouse; with Big Picture also reading the pad,
 # every stick move would drive both the menu and the cursor. Stop it here and
 # start it again in game_end.
 layout_game() {
+    tv_for_game
     layout_hdmi_native || return 1
     sound_hdmi
     pad_connect & local pad_job=$!
