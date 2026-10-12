@@ -172,15 +172,16 @@ pad_connect() {
 
 # The TV must be on and showing this PC before niri can see the HDMI output
 # (external_live gives up after 5 s). ~/lgtv/tv.py wakes it over Wake-on-LAN,
-# waits until it answers (max 30 s) and picks HDMI 2, the PC cable. A failure
+# waits until it answers (max 30 s) and picks HDMI 1, the PC cable (the TV's
+# labels say HDMI 2; that is the Sunrise box, checked 2026-10-12). A failure
 # only warns: the TV may already be on and right, or be switched by hand.
 TV_CLI=/home/tgrining/lgtv/tv.py
-TV_PC_INPUT=HDMI_2
+TV_PC_INPUT=HDMI_1
 
 tv_for_game() {
     [[ -x $TV_CLI ]] || return 0
     "$TV_CLI" ensure-on "$TV_PC_INPUT" >/dev/null 2>&1 \
-        || notify-send -u critical "game" "The TV did not answer - switch it on and pick HDMI 2 with the remote."
+        || notify-send -u critical "game" "The TV did not answer - switch it on and pick HDMI 1 with the remote."
 }
 
 # Game mode: TV on HDMI, sound on the TV, pad connected, Steam Big Picture.
@@ -194,11 +195,29 @@ layout_game() {
     pad_connect & local pad_job=$!
     systemctl --user stop antimicrox
     setsid -f steam steam://open/bigpicture >/dev/null 2>&1 </dev/null
+    bigpicture_fullscreen
     if wait "$pad_job"; then
         notify-send "game" "TV, sound, pad and Big Picture are on."
     else
         notify-send -u critical "game" "Pad did not connect. Switch it on (Xbox button) and pick Game again."
     fi
+}
+
+# Big Picture opens as an ordinary tiled column on the TV. Wait for its window
+# (Steam may still be starting), focus it and make it fullscreen. niri's
+# fullscreen-window toggles, so skip it when the window already fills the output.
+bigpicture_fullscreen() {
+    local i id w
+    for i in $(seq 1 60); do
+        id=$(niri msg -j windows | jq -r '[.[] | select(.title == "Steam Big Picture Mode")][0].id // empty')
+        [[ -n $id ]] && break
+        sleep 0.5
+    done
+    [[ -n $id ]] || return 0
+    niri msg action focus-window --id "$id"
+    w=$(niri msg -j outputs | jq -r --arg o "$HDMI" '.[$o].logical.width // 0')
+    [[ $(niri msg -j windows | jq -r --argjson i "$id" '.[] | select(.id == $i) | .layout.window_size[0]') -ge $w ]] \
+        || niri msg action fullscreen-window --id "$id"
 }
 
 layout_game_end() {
