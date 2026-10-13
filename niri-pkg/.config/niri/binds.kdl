@@ -121,7 +121,9 @@ binds {
     // width and height about its centre and exposes no per-edge verb at all.
 
     // ---- launchers (same keys as i3) --------------------------------------
-    Mod+D hotkey-overlay-title="rofi" { spawn "rofi" "-show" "combi" "-combi-modes" "run,drun" "-combi-display-format" "{text}" "-sort" "-sorting-method" "fzf" "-modes" "combi,drun,run,window" "-lines" "6" "-font" "Ubuntu 25" "-terminal" "alacritty"; }
+    // The bar's launcher (bardeck/palette.py); rofi only when the bar's daemon is down.
+    Mod+D hotkey-overlay-title="launcher" { spawn-sh "bardeck open palette || rofi -show combi -combi-modes run,drun -modes combi,drun,run,window -terminal alacritty"; }
+    Mod+Shift+V hotkey-overlay-title="clipboard history" { spawn "bardeck" "open" "clip"; }
     Mod+Z hotkey-overlay-title="alacritty" { spawn "alacritty"; }
     // niri opens every new window as a new column on the right; this one opens
     // the terminal under the focused window instead, in the same column.
