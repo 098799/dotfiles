@@ -1,7 +1,7 @@
 #!/bin/bash
 # Claude.ai usage for i3blocks / waybar / w95 — a READER.
 # Shows usage for every configured account, emphasises the active one
-# Right-click: rofi menu to switch account (also switches Claude Code credentials)
+# Right-click: rofi menu to pick the active account (rcmon's default; copies no login)
 #
 #   claude-usage.sh            the i3blocks line (five-hour window, active bold)
 #   claude-usage.sh --json     every window as JSON — what w95-sysmon reads
@@ -18,7 +18,6 @@
 HOME="$(getent passwd "$(id -un)" | cut -d: -f6)"
 CONFIG_DIR="$HOME/.config"
 ACCOUNT_FILE="$CONFIG_DIR/claude-active-account"
-CLAUDE_CREDS="$HOME/.claude/.credentials.json"
 
 MODE=bar
 case "${1:-}" in
@@ -104,48 +103,23 @@ else
     ACCOUNT="${ACCOUNTS[0]}"
 fi
 
-# Only an account with a backup in ~/.claude can be switched into the real home
-# (private always can: the live file is its own). An account that lives in its own
-# ~/claude-<name> home and has no backup — main2, success — is used there, by name
-# (`claw main2`). A copy of its login in ~/.claude would be a second holder of one
-# refresh chain, and the first to refresh logs the other out.
-switchable() { [[ "$1" == private || -f "$HOME/.claude/.credentials-$1.json" ]]; }
-
-# Keep active account's backup in sync (tokens get refreshed by Claude Code).
-# Never for an account that was not switched in: the live file then still holds
-# another account's login, and saving it under this name would hand that login to
-# every reader of the backup (creds_for, rcmon).
-if [[ -f "$CLAUDE_CREDS" ]] && switchable "$ACCOUNT"; then
-    BACKUP="$HOME/.claude/.credentials-$ACCOUNT.json"
-    if ! cmp -s "$CLAUDE_CREDS" "$BACKUP" 2>/dev/null; then
-        cp "$CLAUDE_CREDS" "$BACKUP"
-    fi
-fi
-
-# Handle click
+# Right-click picks the active account: the one rcmon spawns when nobody names one.
+# It only writes the marker. Each account has ONE login per host — ~/.claude for
+# private, ~/claude-<name>/.claude for the rest — and every tool runs it there.
+# Until 13 Oct 2026 this menu also copied logins in and out of ~/.claude
+# (~/.claude/.credentials-<name>.json). Two files with one refresh chain: the first
+# to refresh logs the other out, so switched accounts kept dying.
 case $BLOCK_BUTTON in
     3)
         eval $(xdotool getmouselocation --shell)
-        # Only switchable accounts, current one pre-selected.
-        MENU_ACCOUNTS=()
-        for _a in "${ACCOUNTS[@]}"; do switchable "$_a" && MENU_ACCOUNTS+=("$_a"); done
         SELECTED=0
-        for i in "${!MENU_ACCOUNTS[@]}"; do
-            [[ "${MENU_ACCOUNTS[$i]}" == "$ACCOUNT" ]] && SELECTED=$i && break
+        for i in "${!ACCOUNTS[@]}"; do
+            [[ "${ACCOUNTS[$i]}" == "$ACCOUNT" ]] && SELECTED=$i && break
         done
-        MENU=$(printf '%s\n' "${MENU_ACCOUNTS[@]}")
-        CHOICE=$(echo "$MENU" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: ${#MENU_ACCOUNTS[@]};}")
-        if [[ -n "$CHOICE" && "$CHOICE" != "$ACCOUNT" ]] && switchable "$CHOICE"; then
+        MENU=$(printf '%s\n' "${ACCOUNTS[@]}")
+        CHOICE=$(echo "$MENU" | rofi -dmenu -p "claude" -selected-row $SELECTED -theme-str "window {width: 200px; location: north west; x-offset: ${X}px; y-offset: ${Y}px;} listview {lines: ${#ACCOUNTS[@]};}")
+        if [[ -n "$CHOICE" && "$CHOICE" != "$ACCOUNT" ]]; then
             echo "$CHOICE" > "$ACCOUNT_FILE"
-            # Switch Claude Code credentials
-            CREDS_FILE="$HOME/.claude/.credentials-$CHOICE.json"
-            if [[ -f "$CREDS_FILE" ]]; then
-                # Always save current credentials back (tokens may have been refreshed)
-                cp "$CLAUDE_CREDS" "$HOME/.claude/.credentials-$ACCOUNT.json"
-                cp "$CREDS_FILE" "$CLAUDE_CREDS"
-            fi
-            # Kill chrome-native-host processes so the plugin reconnects with new creds
-            pkill -f 'claude.*--chrome-native-host' 2>/dev/null || true
             ACCOUNT="$CHOICE"
         fi
         ;;
