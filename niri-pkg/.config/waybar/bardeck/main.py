@@ -4,9 +4,12 @@
     bardeck css                        write theme.css for style.css (niri runs it before waybar)
     bardeck render FILE STRIP [compact] [--scale N] [--warm S]    a strip to a PNG
     bardeck panel FILE PANEL [--scale N] [--warm S]               a panel to a PNG
+    bardeck open PANEL                 open a panel by key, pinned, centred on the focused output
+                                       (palette: the launcher, clip: the clipboard history)
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
 STRIP / PANEL: quota sys net dev audio power disp notif clock (ws: strip only, one per output).
+Panels with no strip, opened by key only: palette clip.
 
 Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
 $XDG_RUNTIME_DIR/bardeck (raw ARGB, core.write_strip) and sends hover / click / scroll to this daemon's socket
@@ -61,11 +64,13 @@ def reload_waybar() -> None:
 def build(with_ws: bool = True):
     """Every strip and panel, wired to one sampler."""
     from .audio import Audio, AudioPanel, AudioStrip
+    from .clip import Clip, ClipPanel
     from .clock import ClockPanel, ClockStrip
     from .devices import DevPanel, DevStrip
     from .displays import DispPanel, DispStrip, Displays
     from .net import NetPanel, NetStrip
     from .notif import Dunst, NotifPanel, NotifStrip
+    from .palette import PalettePanel
     from .power import PowerPanel, PowerStrip
     from .sample import Sampler
     from .system import SysStrip, SystemPanel
@@ -93,6 +98,8 @@ def build(with_ws: bool = True):
     panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s), AudioPanel(audio),
                                   ClockPanel(), DispPanel(disp))}
     panels["notif"] = NotifPanel(dunst)
+    panels["clip"] = ClipPanel(Clip())
+    panels["palette"] = PalettePanel()
     if quota is not None:
         panels["quota"] = QuotaPanel(quota)
     return s, quota, strips, panels
@@ -110,6 +117,7 @@ class Daemon:
         self.deck = Deck(self.panels)
         self.ws = WsStrip(self.draw_ws)
         self.s.watch_bluez()
+        self.panels["clip"].clip.watch()  # the one `wl-paste --watch` (clip.py)
         # A strip with its own event feed (audio: pactl subscribe, MPRIS) is drawn when
         # that says something changed, not on the next tick.
         for name, (strip, _) in self.strips.items():
@@ -220,8 +228,22 @@ class Daemon:
             self.dirty = False
             core.signal_waybar()
 
+    def open(self, name: str) -> None:
+        """`bardeck open NAME`: the panel on the focused output, at that bar's zoom."""
+        from .ws import niri
+
+        out = niri("FocusedOutput") or {}
+        logical = out.get("logical") or {}
+        monitor = self.deck.monitor_at(logical["x"], logical["y"]) if logical else None
+        variant = "compact" if out.get("name", "").startswith("eDP") else "full"
+        if not self.deck.open(name, monitor, core.ZOOM[variant]):
+            core.log(f"open: no panel {name!r}")
+
     def message(self, msg: str) -> None:
         parts = msg.split()
+        if len(parts) == 2 and parts[0] == "open":
+            self.open(parts[1])
+            return
         if len(parts) < 7:
             return
         verb, strip = parts[0], parts[1]
@@ -338,8 +360,22 @@ def render(argv: list[str]) -> int:
     return 0
 
 
+def send_open(name: str) -> int:
+    """`bardeck open NAME`: one datagram to the daemon (bin/bardeck sends it without
+    importing this module: Mod+D should not wait 0.2 s for cairo and Pango)."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+        try:
+            s.sendto(f"open {name}".encode(), f"{RUN_DIR}/ctl")
+        except OSError as err:
+            print(f"bardeck: no daemon ({err})", file=sys.stderr)
+            return 1
+    return 0
+
+
 def main(argv: list[str]) -> int:
     cmd = argv[1] if len(argv) > 1 else ""
+    if cmd == "open" and len(argv) > 2:
+        return send_open(argv[2])
     if cmd == "daemon":
         return daemon()
     if cmd == "css":
