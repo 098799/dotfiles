@@ -40,6 +40,7 @@ class Panel:
     live = 0.0          # seconds between redraws while open; 0 = only on new data
     drawn_ahead = False  # slow to draw: keep a picture ready (see Deck.prerender)
     typing = False       # a text field has the keyboard: every key goes to text_key, Esc too
+    target: dict | None = None  # key-opened: the window that had the focus (niri's FocusedWindow)
     deck: Deck | None = None  # set by the Deck: for a panel that closes itself or opens another
 
     def size(self) -> tuple[int, int]:

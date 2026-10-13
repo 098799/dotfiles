@@ -15,6 +15,11 @@ The strip, per account:
     colour = qtop's verdict: green lands well, yellow wastes points, red hits 100%
     early. The active account (right-click to switch) is underlined.
 
+FOLDED (13 Oct 2026): only the active account gets that cell; every other account is
+one thin gauge after it — its weekly % as the fill, in the verdict's colour (a dim
+stub when it has no fresh reading). Six full cells took 636 px and pushed the clock
+off the screen; the panel (hover) still shows every account at full size.
+
 The panel: every account's week full size, its 5h peaks against burn's ceiling, the
 pool totals. Pinned: u/p earlier/later week, i/o select, Enter or a click on a card
 opens `qtop <account>`.
@@ -245,17 +250,30 @@ STRIP = {
 }
 
 
+GAUGE_W, GAUGE_GAP = 4.0, 3.0  # a folded account: one thin gauge
+
+
+def fold(rs: list[Row]) -> tuple[list[Row], list[Row]]:
+    """(the account with a full cell: the active one, else the first; the rest)."""
+    head = [r for r in rs if r.active][:1] or rs[:1]
+    return head, [r for r in rs if r not in head]
+
+
 def strip_layout(cr, rs: list[Row], variant: str) -> tuple[list[tuple[Row, float, float]], float]:
-    """(row, x, width) per cell, and the strip's width."""
+    """(row, x, width) per full cell — the active account only — and the strip's width
+    with the folded accounts' gauges after it."""
     spec = STRIP[variant]
     gap, edge = 8.0, SH + 7.0
+    head, rest = fold(rs)
     out, x = [], edge
-    for r in rs:
+    for r in head:
         w = text_width(cr, r.label, 13, bold=True) + 3 + spec["chart"] + 2 + 3
         if spec["pct"]:
             w += 3 + text_width(cr, "100", 13)
         out.append((r, x, w))
         x += w + gap
+    if rest:
+        x += len(rest) * (GAUGE_W + GAUGE_GAP) - GAUGE_GAP + gap
     return out, x - gap + edge
 
 
@@ -291,6 +309,19 @@ def draw_strip(rs: list[Row], now: float, variant: str, scale: int):
             rrect(cr, x - 2, PILL_Y + PILL_H - 4, w + 4, 2, 1)
             cr.set_source_rgba(*rgba("accent"))
             cr.fill()
+    # The folded accounts: a gauge each, weekly % as the fill, in the verdict's colour.
+    _, rest = fold(rs)
+    gx = (cells[-1][1] + cells[-1][2] + 8.0) if cells else SH + 7.0
+    for r in rest:
+        rrect(cr, gx, top, GAUGE_W, ch, 1.5)
+        cr.set_source_rgba(*rgba("bg1"))
+        cr.fill()
+        dim = r.over or r.stale or r.week is None
+        frac = 0.12 if dim else max(0.06, min(100.0, r.week.used) / 100)
+        rrect(cr, gx, top + ch * (1 - frac), GAUGE_W, ch * frac, 1.5)
+        cr.set_source_rgba(*rgba("bg3" if dim else r.colour))
+        cr.fill()
+        gx += GAUGE_W + GAUGE_GAP
     return surf
 
 

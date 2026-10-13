@@ -247,6 +247,9 @@ class Daemon:
         logical = out.get("logical") or {}
         monitor = self.deck.monitor_at(logical["x"], logical["y"]) if logical else None
         variant = "compact" if out.get("name", "").startswith("eDP") else "full"
+        panel = self.panels.get(name)
+        if panel is not None:  # where to paste back to (clip): the window the key was pressed in
+            panel.target = niri("FocusedWindow")
         if not self.deck.open(name, monitor, core.ZOOM[variant]):
             core.log(f"open: no panel {name!r}")
 

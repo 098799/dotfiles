@@ -9,7 +9,10 @@ clipstore.py: what is kept, what is skipped, the index). Nothing else runs.
 
 The panel reads the index when it opens, and again while open when its mtime
 moves. Enter (or a click) copies an entry back with `wl-copy` (with its MIME type
-for an image) and closes; the watcher then sees it and moves it to the top.
+for an image), closes, and PASTES it into the window the panel was opened from
+(`paste_into`: wtype sends that app's paste key — a terminal's Ctrl+Shift+V, Thunar's
+Ctrl+Shift+V = niri-paste-image for an image, Ctrl+V elsewhere); `y` only copies.
+The watcher then sees the copy and moves it to the top.
 `p` pins an entry (it stays on top and out of the KEEP cap), `x` removes one,
 `c` twice clears all but the pinned, `/` searches (every word must appear).
 """
@@ -35,6 +38,11 @@ _LIBC = ctypes.CDLL(None)  # loaded before any fork: the child only calls prctl
 PR_SET_PDEATHSIG = 1
 
 GLYPH_CLIP, GLYPH_SEARCH, GLYPH_PIN, GLYPH_PIN_OFF = "\U000f0a38", "\U000f0349", "\U000f0403", "\U000f0931"
+# app_ids (lower case) that paste text on Ctrl+Shift+V.
+TERMINALS = {"alacritty", "kitty", "foot", "footclient", "org.wezfurlong.wezterm", "com.mitchellh.ghostty",
+             "org.gnome.console", "org.gnome.terminal", "gnome-terminal-server", "org.kde.konsole",
+             "konsole", "xterm", "st", "urxvt", "terminator", "tilix", "xfce4-terminal"}
+PASTE_DELAY = 0.25  # s from the panel closing to the paste key
 GLYPH_CLOSE, GLYPH_CLEAR, GLYPH_IMAGE, GLYPH_EMPTY = "\U000f0156", "\U000f05e9", "\U000f02e9", "\U000f014c"
 
 
@@ -157,6 +165,42 @@ class Clip:
                                  start_new_session=True)
         except OSError as err:
             self.error = f"copy failed: {err.strerror or err}"
+
+    def paste_into(self, target: dict | None, e: dict) -> None:
+        """Paste the entry just copied into the window the panel was opened from, with
+        that app's own paste key, once the panel has closed and the focus is back.
+
+        Terminals paste text on Ctrl+Shift+V (Ctrl+V is a control character there);
+        an image goes to a terminal as Ctrl+V, the key Claude Code reads a clipboard
+        image on. Thunar's Ctrl+Shift+V is "Paste image here" (niri-paste-image: the
+        image as a new file in the open folder); its Ctrl+V pastes files. No window
+        (an empty workspace): nothing is sent."""
+        if not target:
+            return
+        app = (target.get("app_id") or "").lower()
+        image = e.get("kind") == "image"
+        if app in TERMINALS:
+            chord = ["ctrl"] if image else ["ctrl", "shift"]
+        elif app == "thunar":
+            chord = ["ctrl", "shift"] if image else ["ctrl"]
+        else:
+            chord = ["ctrl"]
+        argv = ["wtype"]
+        for m in chord:
+            argv += ["-M", m]
+        argv += ["-k", "v"]
+        for m in reversed(chord):
+            argv += ["-m", m]
+
+        def go():
+            time.sleep(PASTE_DELAY)  # the overlay lets go of the keyboard, wl-copy owns the selection
+            try:
+                subprocess.run(argv, timeout=3, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL)
+            except (OSError, subprocess.TimeoutExpired) as err:
+                core.log(f"clip paste: {err!r}")
+
+        threading.Thread(target=go, daemon=True, name="clip-paste").start()
 
     def pin(self, e: dict) -> None:
         clipstore.change(e["id"], pinned=not e.get("pinned"))
@@ -283,9 +327,11 @@ class ClipPanel(Panel):
 
     # -- actions ---------------------------------------------------------------
 
-    def copy(self, e: dict) -> bool:
+    def copy(self, e: dict, paste: bool = True) -> bool:
         self.clip.copy(e)
-        return True  # closes the panel: paste where you were
+        if paste:
+            self.clip.paste_into(self.target, e)
+        return True  # closes the panel; the paste lands in the window it was opened from
 
     def pin(self, e: dict) -> bool:
         self.clearing = False
@@ -347,6 +393,9 @@ class ClipPanel(Panel):
             self.searching = True
         elif key in ("Return", "KP_Enter") and sel is not None:
             self.copy(sel)
+            self.close()
+        elif key == "y" and not ctrl and sel is not None:  # copy only, no paste
+            self.copy(sel, paste=False)
             self.close()
         elif key == "p" and not ctrl and sel is not None:
             self.pin(sel)
@@ -423,7 +472,7 @@ class ClipPanel(Panel):
         y += 36
         self.draw_list(cr, hits, P, y)
         hint = ("type to search · Enter list · Esc clear" if self.searching else
-                "Enter copy · p pin · x remove · / search · c clear · Esc close")
+                "Enter paste · y copy only · p pin · x remove · / search · c clear · Esc close")
         text(cr, W / 2, H - 20, hint, 10, "dim", align=0.5)
 
     def draw_field(self, cr, hits: Hits, P: float, y: float) -> None:

@@ -10,6 +10,15 @@ Sources (Tab cycles a filter over them):
   commands  the programs on PATH: with a `>` first, or low in the list when the first
             word names one; run through rofi-run, which decides about a terminal (its
             rules and ~/.config/rofi/run-overrides)
+  history   every command line run before, with its arguments ("systemctl suspend",
+            "cam help"): rofi's own run history (~/.cache/rofi-4.runcache) and the
+            ones run from here. A line whose program is gone is left out.
+
+rofi's history seeds the ranking: its counts (rofi-4.runcache for command lines,
+rofi3.druncache for apps) add to the palette's own (palette.json), so what was used
+most under rofi comes first here too. Both files are read again when they change
+(rofi still runs as Mod+D's fallback). Commands start in the home directory, as
+rofi's did (its history has lines like "android/bin/down").
   actions   niri-screen-switch's entries (screens, sound, theme, font), network.sh's,
             vpn.sh's and power-profile.sh's menu entries (core.menu_action), and
             "Open <panel>" for every bardeck panel
@@ -53,8 +62,15 @@ from .ws import niri
 
 ROFI_RUN = f"{core.REAL_HOME}/bin/rofi-run"
 STATE = f"{core.REAL_HOME}/.local/state/bardeck/palette.json"
+ROFI_RUNCACHE = f"{core.REAL_HOME}/.cache/rofi-4.runcache"  # "COUNT LINE\x1fSHOWN" per line
+ROFI_DRUNCACHE = f"{core.REAL_HOME}/.cache/rofi3.druncache"  # "COUNT DESKTOP-ID" per line
 SEARCH_URL = "https://www.google.com/search?q={}"
 ROWS = 10
+# X11 tools from the i3 days, in rofi's history: they do nothing under niri. Still
+# found when typed (with a note), never offered on an empty field.
+X11_ONLY = {"scrot": "niri's screenshot (Mod+Alt+Shift+S)", "xkill": "", "arandr": "the displays panel",
+            "xrandr": "the displays panel", "xdotool": "", "xprop": "", "xev": "", "feh": "", "i3-msg": "",
+            "xclip": "wl-copy", "xsel": "wl-copy", "record-window": "niri-record-window"}
 COMMANDS_EVERY = 60.0  # seconds a PATH scan is reused
 
 GLYPH_SEARCH, GLYPH_CMD, GLYPH_CALC = "\U000f0349", "\U000f018d", "\U000f00ec"
@@ -288,8 +304,11 @@ class Usage:
         self.counts: dict[str, int] = {}
         self.last: dict[str, float] = {}
         self.mtime = -1.0
+        self.seed: dict[str, int] = {}  # rofi's counts, by the same keys ("run:LINE", "app:ID")
+        self._seed_at: tuple = ()
 
     def load(self) -> None:
+        self.load_rofi()
         try:
             mtime = os.stat(self.path).st_mtime
             if mtime == self.mtime:
@@ -301,6 +320,32 @@ class Usage:
             self.mtime = mtime
         except (OSError, ValueError, AttributeError):
             pass
+
+    def load_rofi(self) -> None:
+        """rofi's run and drun history, when either file changed."""
+        stamp = []
+        for path in (ROFI_RUNCACHE, ROFI_DRUNCACHE):
+            try:
+                stamp.append(os.stat(path).st_mtime)
+            except OSError:
+                stamp.append(None)
+        if tuple(stamp) == self._seed_at:
+            return
+        seed: dict[str, int] = {}
+        for path, prefix in ((ROFI_RUNCACHE, "run:"), (ROFI_DRUNCACHE, "app:")):
+            try:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    for line in fh:
+                        count, _, rest = line.rstrip("\n").partition(" ")
+                        rest = rest.split("\x1f", 1)[0].strip()
+                        if rest and count.isdigit():
+                            seed[prefix + rest] = seed.get(prefix + rest, 0) + int(count)
+            except OSError:
+                continue
+        self.seed, self._seed_at = seed, tuple(stamp)
+
+    def total(self, key: str) -> int:
+        return self.counts.get(key, 0) + self.seed.get(key, 0)
 
     def bump(self, key: str) -> None:
         self.counts[key] = self.counts.get(key, 0) + 1
@@ -315,7 +360,7 @@ class Usage:
             core.log(f"palette: {self.path}: {err!r}")
 
     def bonus(self, key: str) -> float:
-        return 3.0 * math.log2(1 + self.counts.get(key, 0))
+        return 3.0 * math.log2(1 + self.total(key))
 
 
 class Icons:
@@ -426,6 +471,7 @@ class PalettePanel(Panel):
         self.apps: list[Item] = []
         self.windows: list[Item] = []
         self.actions: list[Item] = []
+        self.history: list[Item] = []
         self.switch_entries: list[str] | None = None
         self._commands: tuple[float, dict[str, str]] = (0.0, {})  # name -> its PATH directory
         self._results: tuple[tuple, list[Item]] | None = None
@@ -443,6 +489,7 @@ class PalettePanel(Panel):
             core.log(f"palette: apps: {err!r}")
         self.windows = self.load_windows()
         self.actions = self.load_actions()
+        self.history = self.load_history()
         self.gen += 1
         self._results = None
 
@@ -527,6 +574,32 @@ class PalettePanel(Panel):
                                   run=lambda n=name: (self.deck.open(n) if self.deck else None) and False))
         return items
 
+    def load_history(self) -> list[Item]:
+        """Every command line run before (rofi's history and this palette's), as a row
+        of its own; the ones whose program is gone are left out."""
+        keys = {k for k in (*self.usage.seed, *self.usage.counts) if k.startswith("run:")}
+        out = []
+        for key in keys:
+            line = key[4:]
+            word = line.split()[0] if line.split() else ""
+            if not word or not self.resolves(word):
+                continue
+            n = self.usage.total(key)
+            item = self.command_item(line, word)
+            item.sub = f"history · run {n}×" if n else "history"
+            if os.path.basename(word) in X11_ONLY:
+                instead = X11_ONLY[os.path.basename(word)]
+                item.sub += " · X11 only" + (f": use {instead}" if instead else ": nothing on niri")
+            item.extra = line
+            out.append(item)
+        return out
+
+    def resolves(self, word: str) -> bool:
+        """A program on PATH, or a path (relative to home, as rofi ran it) that exists."""
+        if "/" in word:
+            return os.access(os.path.join(core.REAL_HOME, os.path.expanduser(word)), os.X_OK)
+        return word in self.commands()
+
     def commands(self) -> dict[str, str]:
         """Every program on PATH (name -> its directory, the first one wins, as the
         shell finds it), scanned at most once a minute, and only when asked."""
@@ -555,11 +628,13 @@ class PalettePanel(Panel):
                 argv = [name, *shlex.split(rest)]
             except ValueError:
                 argv = [name, *rest.split()]
-            run_argv([ROFI_RUN, *argv])
+            # From the home directory, as rofi ran it ("android/bin/down" is relative to it).
+            run_argv(["env", "-C", core.REAL_HOME, ROFI_RUN, *argv])
             return True
 
         where = self.commands().get(name, "").replace(core.REAL_HOME, "~")
-        return Item("cmd", f"cmd:{name}", shown, where, glyph=GLYPH_CMD, run=go, rank=rank)
+        # The key is the whole line: the history keeps "cam help" apart from "cam ship".
+        return Item("cmd", f"run:{shown}", shown, where, glyph=GLYPH_CMD, run=go, rank=rank)
 
     # -- ranking ---------------------------------------------------------------
 
@@ -579,15 +654,16 @@ class PalettePanel(Panel):
         if self.buf.startswith(">"):
             return self.command_items(self.buf[1:].strip())
 
-        pool = [i for i in (*self.apps, *self.windows, *self.actions) if kinds is None or i.kind in kinds]
+        pool = [i for i in (*self.apps, *self.windows, *self.actions, *self.history)
+                if kinds is None or i.kind in kinds]
         out: list[Item] = []
         if not q:
             # Nothing typed: the most used first, then the windows, then the apps by name.
             for i in pool:
                 i.score, i.pos = self.usage.bonus(i.key) + (1 if i.kind == "window" else 0), []
-            used = sorted((i for i in pool if self.usage.counts.get(i.key)),
-                          key=lambda i: (-self.usage.counts[i.key], -self.usage.last.get(i.key, 0)))
-            rest = sorted((i for i in pool if not self.usage.counts.get(i.key)),
+            used = sorted((i for i in pool if self.usage.total(i.key) and "X11 only" not in i.sub),
+                          key=lambda i: (-self.usage.total(i.key), -self.usage.last.get(i.key, 0)))
+            rest = sorted((i for i in pool if not self.usage.total(i.key) and i.kind != "cmd"),
                           key=lambda i: (i.kind != "window", i.kind != "app", i.name.lower()))
             return (used + rest)[:ROWS]
         words = q.lower().split()
@@ -614,9 +690,14 @@ class PalettePanel(Panel):
         if (kinds is None or "cmd" in kinds) and len(out) < ROWS and len(word) >= 2:
             # Low in the list: the programs whose name starts with the first word.
             names = [n for n in self.commands() if n.startswith(word)]
-            names.sort(key=lambda n: (-self.usage.counts.get(f"cmd:{n}", 0), len(n), n))
-            for n in names[:ROWS - len(out)]:
+            names.sort(key=lambda n: (-self.usage.total(f"run:{n}"), len(n), n))
+            have = {i.key for i in out}
+            for n in names:
+                if len(out) >= ROWS:
+                    break
                 it = self.command_item(q, n, rank=-50.0)
+                if it.key in have:  # the history has this very line already
+                    continue
                 it.pos = list(range(len(word)))
                 out.append(it)
         if not out and kinds is None:
@@ -624,15 +705,15 @@ class PalettePanel(Panel):
         return out[:ROWS]
 
     def command_items(self, line: str) -> list[Item]:
-        if not line:
-            names = sorted(self.usage.counts, key=lambda k: -self.usage.counts[k])
-            return [self.command_item(k[4:], k[4:]) for k in names if k.startswith("cmd:")][:ROWS]
+        if not line:  # `>` alone: the history, most run first
+            return sorted((i for i in self.history if "X11 only" not in i.sub),
+                          key=lambda i: -self.usage.total(i.key))[:ROWS]
         word = line.split()[0]
         scored = []
         for n in self.commands():
             m = fuzzy(word, n)
             if m is not None:
-                scored.append((m[0] + (20 if n == word else 0) + self.usage.bonus(f"cmd:{n}"), n, m[1]))
+                scored.append((m[0] + (20 if n == word else 0) + self.usage.bonus(f"run:{n}"), n, m[1]))
         scored.sort(key=lambda t: (-t[0], len(t[1])))
         out = []
         for sc, n, pos in scored[:ROWS]:
