@@ -1,0 +1,30 @@
+#!/bin/sh
+# Write the clipboard image to a new file (Thunar's "Paste image here",
+# Ctrl+Shift+V). Thunar's own paste takes files only, so a screenshot from
+# niri-screenshot-clip had no way into a folder.
+#   niri-paste-image [folder-or-file]   (a file means: its folder)
+target=${1:-.}
+if [ -d "$target" ]; then dir=$target; else dir=$(dirname -- "$target"); fi
+
+types=$(wl-paste --list-types 2>/dev/null)
+type=$(printf '%s\n' "$types" | grep -m1 -x 'image/png' \
+    || printf '%s\n' "$types" | grep -m1 '^image/')
+if [ -z "$type" ]; then
+    notify-send -t 3000 "Paste image" "The clipboard has no image."
+    exit 1
+fi
+
+ext=${type#image/}
+case $ext in jpeg) ext=jpg ;; svg+xml) ext=svg ;; esac
+base="$dir/clipboard_$(date +%Y-%m-%d_%H-%M-%S)"
+out="$base.$ext"
+n=2
+while [ -e "$out" ]; do out="$base-$n.$ext"; n=$((n + 1)); done
+
+if wl-paste --no-newline --type "$type" > "$out"; then
+    notify-send -t 2000 "Image pasted" "$out"
+else
+    rm -f -- "$out"
+    notify-send -t 3000 "Paste image" "wl-paste failed."
+    exit 1
+fi
