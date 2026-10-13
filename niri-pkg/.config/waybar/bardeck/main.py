@@ -8,7 +8,8 @@
                                        (palette: the launcher, clip: the clipboard history)
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
-STRIP / PANEL: quota sys net dev audio power disp notif clock (ws: strip only, one per output).
+STRIP / PANEL: quota sys net dev audio power disp notif clock ws (ws: a strip per output; its panel,
+the overview, opens on a right click).
 Panels with no strip, opened by key only: palette clip.
 
 Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
@@ -22,7 +23,8 @@ Theme: the palette follows ~/.config/theme/state (core.load_theme). When it chan
 the daemon writes theme.css and reloads waybar (SIGUSR2), which also restarts the
 daemon, so every strip and panel comes back in the new colours.
 
-Cadence: system every second, network and devices every 2 s, power every 5 s, the
+Cadence: system every second, network and devices every 2 s, power every second (drawn
+only when its inputs changed: the battery is read every 5 s, a recording's clock), the
 clock on the minute, quota when rcmon's federation writes, workspaces when niri says
 something changed. A picture is written only when it changed, and waybar is
 signalled only then. Measured cost: see the README.
@@ -64,6 +66,7 @@ def reload_waybar() -> None:
 def build(with_ws: bool = True):
     """Every strip and panel, wired to one sampler."""
     from .audio import Audio, AudioPanel, AudioStrip
+    from .caffeine import Caffeine
     from .clip import Clip, ClipPanel
     from .clock import ClockPanel, ClockStrip
     from .devices import DevPanel, DevStrip
@@ -74,8 +77,10 @@ def build(with_ws: bool = True):
     from .power import PowerPanel, PowerStrip
     from .sample import Sampler
     from .system import SysStrip, SystemPanel
+    from .ws import WsPanel
 
     s = Sampler()
+    caffeine = Caffeine(s)
     disp = Displays()
     audio = Audio()
     try:  # quota imports ~/bin/qtop: a host without it still gets the rest of the bar
@@ -89,14 +94,14 @@ def build(with_ws: bool = True):
         "sys": (SysStrip(s), 1),
         "net": (NetStrip(s), 2),
         "dev": (DevStrip(s), 2),
-        "power": (PowerStrip(s), 5),
+        "power": (PowerStrip(s, caffeine), 1),  # key(): redrawn only on a change (a recording's clock)
         "audio": (AudioStrip(audio), 5),  # drawn on its own events too (watch)
         "disp": (DispStrip(disp), 2),
         "clock": (ClockStrip(), 1),
         "notif": (NotifStrip(dunst), 1),
     }
-    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s), AudioPanel(audio),
-                                  ClockPanel(), DispPanel(disp))}
+    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine),
+                                  AudioPanel(audio), ClockPanel(), DispPanel(disp), WsPanel())}
     panels["notif"] = NotifPanel(dunst)
     panels["clip"] = ClipPanel(Clip())
     panels["palette"] = PalettePanel()
@@ -116,6 +121,7 @@ class Daemon:
         self.s, self.quota, self.strips, self.panels = build()
         self.deck = Deck(self.panels)
         self.ws = WsStrip(self.draw_ws)
+        self.panels["ws"].src = self.ws  # the overview reads the strip's niri state: no reads of its own
         self.s.watch_bluez()
         self.panels["clip"].clip.watch()  # the one `wl-paste --watch` (clip.py)
         # A strip with its own event feed (audio: pactl subscribe, MPRIS) is drawn when
@@ -222,6 +228,7 @@ class Daemon:
             self.ws.widths[key] = surf.get_width() / scale
             self.write(f"ws-{variant}@{rect['x']}_{rect['y']}", surf)
         self.flush()
+        self.deck.invalidate("ws")  # the overview, when it is open
 
     def flush(self) -> None:
         if self.dirty:
@@ -249,6 +256,12 @@ class Daemon:
         verb, strip = parts[0], parts[1]
         cx, mx, my, px = (int(v) for v in parts[2:6])
         variant = parts[6]
+        if strip == "ws" and verb == "right":  # the overview: a right click opens it, another closes it
+            if self.deck.shown and self.deck.panel is self.panels["ws"]:
+                self.deck.hide()
+            else:
+                self.deck.message("right", "ws", float(cx), self.deck.monitor_at(mx, my), core.ZOOM.get(variant, 1.0))
+            return
         if strip == "ws":
             key = (mx, my, variant)
             # The click is in bar (zoomed) px; the click map in the code's own px.

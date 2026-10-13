@@ -1,5 +1,8 @@
 """Power: battery and power profile on the strip; in the panel the battery's last 24 h
 (upower's own history), its draw and health, and the profile and boost switches.
+Also what keeps the machine awake or busy: caffeine (caffeine.py: a cup on the strip)
+and a screen recording that runs (recording.py: a red dot and its time on the strip,
+the file and a stop button in the panel).
 
 The switches run power-profile.sh's and cpu-boost.sh's clicks (they sudo-tee sysfs)."""
 
@@ -9,7 +12,9 @@ import glob
 import os
 import time
 
-from . import core
+from . import core, recording
+from .caffeine import MODES as CAFFEINE_MODES
+from .caffeine import Caffeine
 from .core import Hits, button, heading, rgba, text
 from .deck import Panel
 from .sample import Sampler
@@ -37,6 +42,24 @@ def bat_tone(cap: int, status: str) -> str:
     return "ok" if cap > 50 else "warn"
 
 
+GLYPH_CUP = "\U000f0176"
+GLYPH_STOP = "\uf04d"
+
+
+def rec_dot(cr, x: float, mid: float, r: float, rec: recording.Recording) -> float:
+    """The recording's mark: a red dot (amber, hollow, while its picker is up). Returns the width."""
+    cr.new_sub_path()
+    cr.arc(x + r, mid, r - (0.75 if rec.picking else 0), 0, 6.2832)
+    if rec.picking:
+        cr.set_source_rgba(*rgba("warn"))
+        cr.set_line_width(1.5)
+        cr.stroke()
+    else:
+        cr.set_source_rgba(*rgba("hit"))
+        cr.fill()
+    return 2 * r
+
+
 def history(hours: float = 24) -> list[tuple[float, float]]:
     """upower's charge history of the laptop battery: (time, percent)."""
     files = [f for f in glob.glob("/var/lib/upower/history-charge-*.dat") if ":" not in os.path.basename(f)]
@@ -57,14 +80,28 @@ def history(hours: float = 24) -> list[tuple[float, float]]:
 
 
 class PowerStrip:
+    """Drawn every second when its inputs change: a recording's time is one of them."""
+
     name = "power"
 
-    def __init__(self, s: Sampler):
+    def __init__(self, s: Sampler, caffeine: Caffeine):
         self.s = s
+        self.caffeine = caffeine
+        self.rec: recording.Recording | None = None
+        self.rec_at = 0.0
+
+    def current(self) -> recording.Recording | None:
+        now = time.monotonic()
+        if now - self.rec_at >= 0.5:  # once per tick, not once per variant
+            self.rec, self.rec_at = recording.current(), now
+        return self.rec
 
     def key(self, variant: str):
         s = self.s
-        return (s.bat.get("capacity"), s.bat.get("status"), s.ac, s.profile, s.boost)
+        self.caffeine.check()
+        rec = self.current()
+        return (s.bat.get("capacity"), s.bat.get("status"), s.ac, s.profile, s.boost, self.caffeine.mode,
+                rec and (rec.kind, int(rec.elapsed())))
 
     def draw(self, variant: str, scale: int):
         s = self.s
@@ -85,21 +122,33 @@ class PowerStrip:
         if s.boost == "1":
             c.gap(6)
             c.icon("󰓅", "hit", 14, after=0)
+        if self.caffeine.on:
+            c.gap(7)
+            c.icon(GLYPH_CUP, "warn", 14, after=0)
+        rec = self.rec
+        if rec is not None:
+            c.gap(9)
+            c.x += rec_dot(c.cr, c.x, core.MID, 4.5, rec) + 4
+            if not rec.picking:
+                c.text(recording.clock(rec.elapsed()), "hit", size=12, bold=True)
         return c.finish()
 
 
 class PowerPanel(Panel):
     name = "power"
-    live = 2.0
+    live = 1.0  # a recording's clock
     W = 470
 
-    def __init__(self, s: Sampler):
+    def __init__(self, s: Sampler, caffeine: Caffeine):
         self.s = s
+        self.caffeine = caffeine
         self.hist: list[tuple[float, float]] = []
         self.hist_at = 0.0
+        self.rec: recording.Recording | None = None
 
     def size(self):
-        return self.W, 330
+        self.rec = recording.current()  # a recording's row comes and goes: three stat()s
+        return self.W, 356 + (56 if self.rec is not None else 0)
 
     def opened(self) -> None:
         if time.time() - self.hist_at > 60:
@@ -184,3 +233,41 @@ class PowerPanel(Panel):
             x += button(cr, hits, x, y, f"cap {s.cap}%", lambda: core.menu_action("cpu-cap.sh", 3) or None,
                         glyph="󰈐") + 8
         button(cr, hits, x, y, "upower details", lambda: core.menu_action("battery.sh", 3) or True, glyph="󰂄")
+        y += 36
+        y = self.draw_caffeine(cr, hits, P, y)
+        if self.rec is not None:
+            self.draw_recording(cr, hits, P, y, self.rec)
+
+    def draw_caffeine(self, cr, hits: Hits, P: float, y: float) -> float:
+        W = self.W
+        caf = self.caffeine
+        words = caf.error or caf.words()
+        ww = text(cr, W - P, y - 2, words, 12, "hit" if caf.error else "warn", align=1) + 12 if words else 0
+        heading(cr, P, y, "keep awake", W - 2 * P - ww)
+        y += 20
+        x = P
+        x += button(cr, hits, x, y, "off", lambda: caf.set(""), on=not caf.on, tone="bg3") + 8
+        for mode, label in CAFFEINE_MODES:
+            if mode == "battery" and (not self.s.bat or caf.battery_low()):
+                continue  # no battery (the desktop), or below the mark already
+            x += button(cr, hits, x, y, label, lambda m=mode: caf.set(m), on=caf.mode == mode, tone="warn",
+                        glyph=GLYPH_CUP if mode == "on" else None) + 8
+        text(cr, x + 4, y + 4, "no lock, no screen off", 11, "dim")
+        return y + 36
+
+    def draw_recording(self, cr, hits: Hits, P: float, y: float, rec: recording.Recording) -> None:
+        W = self.W
+        tone = "warn" if rec.picking else "hit"
+        tw = text(cr, W - P, y - 3, "picking…" if rec.picking else recording.clock(rec.elapsed()), 13, tone,
+                  bold=True, align=1) + 18
+        rec_dot(cr, W - P - tw + 6, y + 6, 4.5, rec)
+        heading(cr, P, y, f"recording · {rec.mode}", W - 2 * P - tw - 4)
+        y += 20
+        label = "cancel" if rec.picking else "stop"
+        bw = core.text_w(cr, label, 12) + core.text_w(cr, GLYPH_STOP, 14, family=core.ICON_FONT) + 23
+        button(cr, hits, W - P - bw, y, label, rec.stop, on=True, tone="hit", glyph=GLYPH_STOP)
+        if rec.picking:
+            words, wtone = "choose what to record (the share dialog or the region)", "dim"
+        else:
+            words, wtone = (rec.out or "?").replace(core.REAL_HOME, "~", 1), "title"
+        text(cr, P, y + 3, words, 12, wtone, width=W - 2 * P - bw - 12)

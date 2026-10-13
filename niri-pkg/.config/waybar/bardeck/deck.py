@@ -440,5 +440,4 @@ class Deck:
             return True
         if done:
             self.area.queue_draw()
-            return True
-        return False
+        return bool(done)
