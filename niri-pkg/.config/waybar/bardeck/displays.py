@@ -1,7 +1,7 @@
 """Displays: the screens niri drives. On the strip a monitor and the count of
 screens on; in the panel the arrangement drawn to scale, the selected screen's
-settings (on / off, scale, rotation, VRR, its modes) and niri-screen-switch's
-entries as presets.
+settings (on / off, brightness, scale, rotation, VRR, its modes) and
+niri-screen-switch's entries as presets.
 
 Reading: niri's IPC socket in-process (ws.niri, the "Outputs" request, ~0.3 ms).
 niri's event stream says nothing when a screen's mode or scale changes, so the
@@ -12,6 +12,8 @@ Acting: a setting is `niri msg output <name> …` on a thread, its outcome in
 `status` on the screen's settings. A preset runs `niri-screen-switch "<entry>"`,
 so the script keeps its logic in one place: it waits for an output to go live,
 never leaves every screen off, repapers, connects the pad, starts Big Picture.
+Brightness is not niri's: the backlight or DDC/CI, on its own worker
+(brightness.py), so a slow monitor never holds a niri change back.
 
 Safety: the last screen on cannot be turned off (the chip is disabled, the key
 refused), so the laptop never goes off while no other screen is live. A new mode
@@ -27,6 +29,9 @@ import threading
 import time
 
 from . import core
+from .audio import slider
+from .brightness import STEP as BRIGHT_STEP
+from .brightness import Brightness
 from .core import Hits, button, heading, rgba, text
 from .deck import Panel
 from .ws import niri
@@ -156,6 +161,7 @@ class Displays:
         self.running = ""  # the preset entry running now
         # A mode change waiting to be kept: (output, the mode to go back to, deadline).
         self.pending: tuple[str, str, float] | None = None
+        self.bright = Brightness()
         self._busy = threading.Lock()
 
     def read(self, max_age: float = 0.0, focus: bool = False) -> None:
@@ -334,6 +340,7 @@ class DispPanel(Panel):
     ROW_H = 24
     CHIP_H = 22
     LABEL_W = 62  # the settings' and presets' label column
+    SETTINGS = 4  # rows: power, brightness, scale, rotation
     PENDING_H = 34
 
     def __init__(self, d: Displays):
@@ -343,6 +350,8 @@ class DispPanel(Panel):
         self.top = 0
         self.hovered = -1
         self.rows: list[tuple[float, float, int]] = []  # (y0, y1, mode index), for hover
+        self.hx = self.hy = -1.0
+        self.bright_row = (0.0, 0.0)  # (y0, y1) of the brightness row, for the wheel
         self._preset_rows: int | None = None
 
     # -- state -----------------------------------------------------------------
@@ -409,7 +418,7 @@ class DispPanel(Panel):
     def size(self):
         h = 52 + 20 + self.MAP_H + 14       # header, the arrangement
         h += self.PENDING_H if self.d.pending else 0
-        h += 30 + 3 * 28 + 8                 # the selected screen and its settings
+        h += 30 + self.SETTINGS * 28 + 8     # the selected screen and its settings
         h += self.list_h()
         h += 20 + self.preset_rows() * 28 + 8
         return self.W, h
@@ -456,12 +465,15 @@ class DispPanel(Panel):
                 self.pick_mode(self.sel)
         elif key == "BackSpace" and self.d.pending:
             self.d.revert()
+        elif key in ("minus", "KP_Subtract", "equal", "plus", "KP_Add"):
+            return self.step_bright(key in ("equal", "plus", "KP_Add"))
         else:
             return False
         self.follow()
         return True
 
     def hover(self, x: float, y: float) -> bool:
+        self.hx, self.hy = x, y
         idx = next((i for y0, y1, i in self.rows if y0 <= y < y1 and 0 <= x < self.W), -1)
         if idx != self.hovered:
             self.hovered = idx
@@ -469,11 +481,24 @@ class DispPanel(Panel):
         return False
 
     def scroll(self, down: bool) -> bool:
+        if self.bright_row[0] <= self.hy < self.bright_row[1]:
+            return self.step_bright(not down)
         top = max(0, min(self.top + (1 if down else -1), len(self.modes()) - self.ROWS))
         if top == self.top:
             return False
         self.top = top
         return True
+
+    def step_bright(self, up: bool) -> bool:
+        o = self.output()
+        if o is None or not live(o):
+            return False
+        self.d.bright.step(self.out, BRIGHT_STEP if up else -BRIGHT_STEP)
+        return True
+
+    def bright_from_pointer(self, x0: float, w: float) -> bool:
+        self.d.bright.set(self.out, round(max(0.0, min(1.0, (self.hx - x0) / w)) * 100))
+        return False
 
     # -- drawing ---------------------------------------------------------------
 
@@ -644,7 +669,7 @@ class DispPanel(Panel):
         o = self.output()
         if o is None:
             text(cr, P, y, "no screen", 13, "dim")
-            return y + 30 + 3 * 28 + 8
+            return y + 30 + self.SETTINGS * 28 + 8
         on = live(o)
         nw = text(cr, P, y, self.out, 15, "title", bold=True)
         model = short_model(o)
@@ -678,6 +703,8 @@ class DispPanel(Panel):
                           on=vrr == val, tone="ok" if val else "bg3", disabled=busy or not on or vrr == val,
                           why="turn it on first", key=self.out, w=44)
         y += 28
+
+        y = self.draw_bright(cr, hits, lx, x0, y, on)
 
         # scale
         text(cr, lx, y + self.CHIP_H / 2, "scale", 11, "dim", valign=0.5)
@@ -713,6 +740,28 @@ class DispPanel(Panel):
             self.chip(cr, hits, x, y, t, lambda: False, on=True, disabled=True, why="", key=self.out)
         y += 28
         return y + 8
+
+    def draw_bright(self, cr, hits: Hits, lx: float, x0: float, y: float, on: bool) -> float:
+        """The slider (click sets, the wheel steps 5 %, `-` / `=` when pinned) and the %;
+        or why there is none."""
+        W, P, mid = self.W, self.P, y + self.CHIP_H / 2
+        self.bright_row = (y - 3, y + 25)
+        text(cr, lx, mid, "bright", 11, "dim", valign=0.5)
+        if not on:
+            text(cr, x0, mid, "turn it on first", 11, "bg3", valign=0.5)
+            return y + 28
+        b = self.d.bright
+        pct = b.get(self.out, self.d.outputs)
+        if pct is None:
+            why = b.why.get(self.out, "reading…")
+            text(cr, x0, mid, why, 11, "dim", valign=0.5, width=W - P - x0)
+            return y + 28
+        sw = W - P - x0 - 58
+        slider(cr, x0 + 6, mid, sw - 12, pct, False)
+        hits.add(x0, y, sw, self.CHIP_H, lambda: self.bright_from_pointer(x0 + 6, sw - 12))
+        sending = b.busy == self.out or self.out in b.want
+        text(cr, W - P, mid, f"{pct}%", 12, "warn" if sending else "title", align=1, valign=0.5)
+        return y + 28
 
     def draw_modes(self, cr, hits: Hits, P: float, y: float) -> float:
         W = self.W
