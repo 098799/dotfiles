@@ -2,8 +2,8 @@
  *
  * Most pills are bardeck strips: pictures (the cffi modules, see config.jsonc),
  * which draw their own pill in bardeck/core.py (pill(): the theme's background at
- * 0.94, a 1 px rim of its second background, radius 7). This file gives the native
- * modules (audio, tray) the same pill, so keep the two in step.
+ * 0.94, a 1 px rim of its second background, radius 7). This file gives the one
+ * native module left (the tray) the same pill, so keep the two in step.
  *
  * The colours follow the desktop theme (~/bin/theme): theme.css, next to this
  * file, is written by bardeck from the same palette its strips use, and bardeck
@@ -29,11 +29,11 @@ window#waybar { background: transparent; color: @fg_main; }
 tooltip { background: @pill_bg; border: 1px solid @pill_rim; border-radius: 7px; }
 tooltip label { color: @title_fg; padding: 2px 4px; }
 
-/* The native pills. */
+/* The native pill: the tray (audio became a bardeck strip on 13 Oct 2026). */
 /* The same geometry as bardeck's pill: 24 px tall from y=1, 3 px of room for the
  * shadow on the sides and below (core.py PILL_Y, PILL_H, SH). That is the laptop
  * bar; the main bar is all of it 36/28 bigger (core.ZOOM), below. */
-#audio, #tray {
+#tray {
     background: alpha(@pill_bg, 0.96);
     border: 1px solid @pill_rim;
     border-radius: 7px;
@@ -43,16 +43,11 @@ tooltip label { color: @title_fg; padding: 2px 4px; }
 }
 #tray { padding: 0 9px; }
 window#waybar.main * { font-size: 15.4pt; }
-window#waybar.main #audio, window#waybar.main #tray {
+window#waybar.main #tray {
     border-radius: 9px;
     box-shadow: 0 1px 4px 0 @pill_shadow, inset 0 1px 0 0 @pill_highlight;
     margin: 1px 4px 4px 4px;
     padding: 0 13px;
 }
-window#waybar.main #pulseaudio { padding: 0 8px 0 0; }
 #tray > .needs-attention { background: alpha(@red, 0.3); border-radius: 4px; }
 
-#pulseaudio { color: @title_fg; padding: 0 6px 0 0; }
-#pulseaudio.muted { color: @red; }
-#pulseaudio.mic { color: @green; padding: 0; }
-#pulseaudio.mic.source-muted { color: @red; }

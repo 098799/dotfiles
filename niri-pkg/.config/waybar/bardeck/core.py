@@ -126,7 +126,7 @@ def load_theme() -> tuple[str, str]:
 
 
 def theme_css() -> str:
-    """The colours style.css takes for the native pills (audio, tray)."""
+    """The colours style.css takes for the native pill (the tray)."""
     p = PALETTE
     return (f"/* written by bardeck for the theme {' '.join(THEME)}; see style.css */\n"
             f"@define-color pill_bg {p['bg']};\n@define-color pill_rim {p['rim']};\n"
