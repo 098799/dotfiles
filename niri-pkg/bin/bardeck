@@ -5,6 +5,19 @@ import os
 import pwd
 import sys
 
+if len(sys.argv) == 3 and sys.argv[1] == "open":
+    # The launcher's key: a datagram, without the 0.2 s of importing cairo and Pango
+    # (main.send_open says the same in full).
+    import socket
+
+    run = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+        try:
+            s.sendto(f"open {sys.argv[2]}".encode(), f"{run}/bardeck/ctl")
+        except OSError as err:
+            sys.exit(f"bardeck: no daemon ({err})")
+    sys.exit(0)
+
 sys.path.insert(0, os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".config", "waybar"))
 
 from bardeck.main import main  # noqa: E402

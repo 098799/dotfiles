@@ -13,6 +13,9 @@ Two ways in, from bar-strip.so:
          leaves the strip and the panel. Hovering another strip swaps the panel.
   click  "click": pin it open, with the keyboard: it stays until Esc, a click
          outside it, or another click on the strip. A click inside a panel pins it.
+And one from a key (`bardeck open NAME`, a niri bind): the panel opens pinned,
+centred near the top of the focused output, under no strip (the launcher, the
+clipboard). The same command again closes it.
 """
 
 from __future__ import annotations
@@ -37,6 +40,7 @@ class Panel:
     live = 0.0          # seconds between redraws while open; 0 = only on new data
     drawn_ahead = False  # slow to draw: keep a picture ready (see Deck.prerender)
     typing = False       # a text field has the keyboard: every key goes to text_key, Esc too
+    deck: Deck | None = None  # set by the Deck: for a panel that closes itself or opens another
 
     def size(self) -> tuple[int, int]:
         raise NotImplementedError
@@ -56,8 +60,19 @@ class Panel:
         return False
 
     def text_key(self, key: str, char: str, ctrl: bool) -> bool:
-        """A key while `typing`: char is what it types ("" for none). True = redraw."""
+        """A key while `typing`: char is what it types ("" for none). True = redraw.
+        An Esc (or Ctrl+G) it does not take closes the panel."""
         return False
+
+    def close(self) -> None:
+        """Close this panel now (a key that launched something)."""
+        if self.deck is not None and self.deck.panel is self:
+            self.deck.hide()
+
+    def redraw(self) -> None:
+        """New data from a thread of the panel's own (an icon loaded): call on the main loop."""
+        if self.deck is not None:
+            self.deck.invalidate(self.name)
 
     def hover(self, x: float, y: float) -> bool:
         """The pointer moved to (x, y) on the panel ((-1, -1): it left). True = redraw."""
@@ -81,6 +96,7 @@ class Deck:
     # The pointer may cross the bar between a strip and its panel, and a strip only
     # says "enter" after resting hover-ms: wait this long before closing.
     HIDE_GRACE_MS = 160
+    FREE_TOP = 0.12  # a key-opened panel's top, as a share of the output's height under the bar
 
     def __init__(self, panels: dict[str, Panel]):
         self.panels = panels
@@ -98,6 +114,9 @@ class Deck:
         self.monitor = None
         self.scrolled = 0.0  # smooth-scroll deltas not yet a whole step
         self.zoom = 1.0  # the strip's variant's core.ZOOM: the panel is drawn that much bigger
+        self.free = False  # opened by a key (open()): centred near the top, under no strip
+        for p in panels.values():
+            p.deck = self
 
         win = self.win = Gtk.Window()
         GtkLayerShell.init_for_window(win)
@@ -176,7 +195,10 @@ class Deck:
         # The strip's centre comes in the bar window's coordinates, which start
         # core.BAR_MARGIN_X into the output.
         x = (width - pw - 8) if self.center is None else self.center + core.BAR_MARGIN_X - pw / 2
-        self.origin = (int(min(max(x, 8), max(8, width - pw - 8))), 6)
+        y = 6
+        if self.free:
+            x, y = (width - pw) / 2, max(6, round(self.win.get_allocated_height() * self.FREE_TOP))
+        self.origin = (int(min(max(x, 8), max(8, width - pw - 8))), y)
         cr.translate(*self.origin)
         cr.scale(z, z)
         if p.drawn_ahead:
@@ -252,7 +274,7 @@ class Deck:
         self.cancel_hide()
         if not self.shown:
             return
-        self.shown = self.inside = False
+        self.shown = self.inside = self.free = False
         self.win.hide()
         if self.panel is not None:
             self.panel.closed()
@@ -279,6 +301,23 @@ class Deck:
             GLib.source_remove(self.hide_timer)
             self.hide_timer = 0
 
+    def open(self, name: str, monitor=None, zoom: float | None = None) -> bool:
+        """A key-opened panel: pinned, centred near the top of `monitor` (None: where the
+        Deck is). Again while it is open: close it. False when there is no such panel."""
+        panel = self.panels.get(name)
+        if panel is None:
+            return False
+        if self.shown and self.free and self.panel is panel:
+            self.hide()
+            return True
+        if self.shown and (not self.free or self.panel is not panel):
+            self.hide()  # from another panel (the palette's "open audio"): start over in the middle
+            monitor = self.monitor if monitor is None else monitor
+        self.free = True
+        self.show(panel, None, monitor, pinned=True, zoom=zoom)
+        self.area.queue_draw()
+        return True
+
     def message(self, verb: str, strip: str, center: float | None, monitor, zoom: float = 1.0) -> bool:
         """A strip's enter / leave / click. False when the strip has no panel."""
         panel = self.panels.get(strip)
@@ -287,6 +326,9 @@ class Deck:
             return True
         if panel is None:
             return False
+        if self.free and self.shown and verb == "enter":
+            return True  # a key-opened panel has the keyboard: passing the bar does not swap it
+        self.free = False
         if verb == "enter":
             self.show(panel, center, monitor, pinned=False, zoom=zoom)
         elif verb == "click":
@@ -386,7 +428,9 @@ class Deck:
             char = chr(code) if code >= 32 and code != 127 else ""
             if self.panel.text_key(key, char, ctrl):
                 self.area.queue_draw()
-            return True
+                return True
+            if key != "Escape" and not (ctrl and key == "g"):
+                return True
         if key in ("Escape", "q") or (ctrl and key == "g"):
             self.hide()
             return True
