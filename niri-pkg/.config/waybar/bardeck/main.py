@@ -8,7 +8,7 @@
                                        (palette: the launcher, clip: the clipboard history)
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
-STRIP / PANEL: quota sys net dev audio power disp notif clock ws (ws: a strip per output; its panel,
+STRIP / PANEL: quota sys net dev audio power disp notif agents clock ws (ws: a strip per output; its panel,
 the overview, opens on a right click).
 Panels with no strip, opened by key only: palette clip.
 
@@ -65,6 +65,7 @@ def reload_waybar() -> None:
 
 def build(with_ws: bool = True):
     """Every strip and panel, wired to one sampler."""
+    from .agents import Agents, AgentsPanel, AgentsStrip
     from .audio import Audio, AudioPanel, AudioStrip
     from .caffeine import Caffeine
     from .clip import Clip, ClipPanel
@@ -90,6 +91,7 @@ def build(with_ws: bool = True):
         core.log(f"no quota strip: {err!r}")
         quota = None
     dunst = Dunst()
+    agents = Agents()
     strips = {
         "sys": (SysStrip(s), 1),
         "net": (NetStrip(s), 2),
@@ -99,10 +101,12 @@ def build(with_ws: bool = True):
         "disp": (DispStrip(disp), 2),
         "clock": (ClockStrip(), 1),
         "notif": (NotifStrip(dunst), 1),
+        "agents": (AgentsStrip(agents), 5),  # drawn on rcmon's answers too (watch)
     }
     panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine),
                                   AudioPanel(audio), ClockPanel(), DispPanel(disp), WsPanel())}
     panels["notif"] = NotifPanel(dunst)
+    panels["agents"] = AgentsPanel(agents)
     panels["clip"] = ClipPanel(Clip())
     panels["palette"] = PalettePanel()
     if quota is not None:

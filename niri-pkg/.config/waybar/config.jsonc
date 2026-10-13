@@ -1,6 +1,6 @@
 // The niri bar: floating pills on a transparent bar, drawn by bardeck.
 //
-//   [workspaces + what is open][claude quota]        [system][network][devices][audio][power][displays][tray][notifications][clock]
+//   [workspaces + what is open][claude quota]        [agents][system][network][devices][audio][power][displays][tray][notifications][clock]
 //
 // Every pill but the tray is a bardeck strip (~/bin/bardeck, code in
 // ./bardeck/): a picture bardeck draws, shown by bar-strip.so (./bar-strip.c).
@@ -35,7 +35,7 @@
     // module about. Quota follows the workspaces, as on the laptop.
     "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],
     "modules-center": [],
-    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "cffi/audio", "cffi/power", "cffi/disp", "tray", "cffi/notif", "cffi/clock"],
+    "modules-right": ["cffi/agents", "cffi/sys", "cffi/net", "cffi/dev", "cffi/audio", "cffi/power", "cffi/disp", "tray", "cffi/notif", "cffi/clock"],
     "tray": { "spacing": 10, "icon-size": 20 }
 },
 {
@@ -55,7 +55,7 @@
     // (~1350 px of pills in all), so quota follows the workspaces.
     "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],
     "modules-center": [],
-    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "cffi/audio", "cffi/power", "cffi/disp", "tray", "cffi/notif", "cffi/clock"],
+    "modules-right": ["cffi/agents", "cffi/sys", "cffi/net", "cffi/dev", "cffi/audio", "cffi/power", "cffi/disp", "tray", "cffi/notif", "cffi/clock"],
     // The compact strips: fewer words, the same signals (colour, icons, graphs).
     "cffi/ws":    { "variant": "compact", "scale": 2 },
     "cffi/clock": { "variant": "compact", "scale": 2 },
@@ -66,6 +66,7 @@
     "cffi/power": { "variant": "compact", "scale": 2 },
     "cffi/disp":  { "variant": "compact", "scale": 2 },
     "cffi/audio": { "variant": "compact", "scale": 2 },
-    "cffi/notif": { "variant": "compact", "scale": 2 }
+    "cffi/notif": { "variant": "compact", "scale": 2 },
+    "cffi/agents": { "variant": "compact", "scale": 2 }
 }
 ]
