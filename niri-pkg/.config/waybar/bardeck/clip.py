@@ -10,8 +10,9 @@ clipstore.py: what is kept, what is skipped, the index). Nothing else runs.
 The panel reads the index when it opens, and again while open when its mtime
 moves. Enter (or a click) copies an entry back with `wl-copy` (with its MIME type
 for an image), closes, and PASTES it into the window the panel was opened from
-(`paste_into`: wtype sends that app's paste key — a terminal's Ctrl+Shift+V, Thunar's
-Ctrl+Shift+V = niri-paste-image for an image, Ctrl+V elsewhere); `y` only copies.
+(`paste_into`: ydotool — or wtype without ydotoold — sends that app's paste key: a
+terminal's Ctrl+Shift+V, Thunar's Ctrl+Shift+V = niri-paste-image for an image, Ctrl+V
+elsewhere); `y` only copies.
 The watcher then sees the copy and moves it to the top.
 `p` pins an entry (it stays on top and out of the KEEP cap), `x` removes one,
 `c` twice clears all but the pinned, `/` searches (every word must appear).
@@ -43,6 +44,25 @@ TERMINALS = {"alacritty", "kitty", "foot", "footclient", "org.wezfurlong.wezterm
              "org.gnome.console", "org.gnome.terminal", "gnome-terminal-server", "org.kde.konsole",
              "konsole", "xterm", "st", "urxvt", "terminator", "tilix", "xfce4-terminal"}
 PASTE_DELAY = 0.25  # s from the panel closing to the paste key
+# ydotool's daemon writes to /dev/uinput: the keys are a real keyboard's, so every app
+# gets them — X11 ones too. wtype's virtual-keyboard keys did not reach Emacs, an X11
+# window behind xwayland-satellite (13 Oct 2026); wtype is the fallback without ydotoold.
+YDOTOOL_SOCKET = os.environ.get("YDOTOOL_SOCKET") or f"{os.environ.get('XDG_RUNTIME_DIR', '/run/user/%d' % os.getuid())}/.ydotool_socket"
+EVDEV = {"ctrl": 29, "shift": 42, "v": 47}  # KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_V
+
+
+def paste_argv(chord: list[str]) -> list[str]:
+    """The command that presses chord + V and lets go again."""
+    if os.path.exists(YDOTOOL_SOCKET):
+        keys = [f"{EVDEV[m]}:1" for m in chord] + ["47:1", "47:0"] + [f"{EVDEV[m]}:0" for m in reversed(chord)]
+        return ["ydotool", "key", *keys]
+    argv = ["wtype"]
+    for m in chord:
+        argv += ["-M", m]
+    argv += ["-k", "v"]
+    for m in reversed(chord):
+        argv += ["-m", m]
+    return argv
 GLYPH_CLOSE, GLYPH_CLEAR, GLYPH_IMAGE, GLYPH_EMPTY = "\U000f0156", "\U000f05e9", "\U000f02e9", "\U000f014c"
 
 
@@ -185,12 +205,7 @@ class Clip:
             chord = ["ctrl", "shift"] if image else ["ctrl"]
         else:
             chord = ["ctrl"]
-        argv = ["wtype"]
-        for m in chord:
-            argv += ["-M", m]
-        argv += ["-k", "v"]
-        for m in reversed(chord):
-            argv += ["-m", m]
+        argv = paste_argv(chord)
 
         def go():
             time.sleep(PASTE_DELAY)  # the overlay lets go of the keyboard, wl-copy owns the selection
