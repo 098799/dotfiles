@@ -159,9 +159,14 @@ class Weather:
         try:
             with open(CACHE) as fh:
                 cached = json.load(fh)
-            self.data, self.at = cached["data"], float(cached["at"])
-            self.loc, self.point = tuple(cached["loc"]), tuple(cached["point"])
-        except (OSError, ValueError, KeyError, TypeError):
+            # All or nothing: a cache from the Open-Meteo version has no "point", and
+            # taking only its time would make it look fresh with nothing to show.
+            data, at = cached["data"], float(cached["at"])
+            loc, point = tuple(cached["loc"]), tuple(cached["point"])
+            if not (data.get("currentWeather") or {}).get("time"):
+                return
+            self.data, self.at, self.loc, self.point = data, at, loc, point
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
             pass
 
     def fetch(self, force: bool = False) -> None:
