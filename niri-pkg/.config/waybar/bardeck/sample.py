@@ -21,7 +21,7 @@ import threading
 import time
 from collections import deque
 
-from . import bluez, core
+from . import bluez, core, procs
 from .wifi import Wifi
 
 HISTORY = 300  # seconds of graph in the panels
@@ -144,8 +144,8 @@ class Sampler:
         self.default_source = ""
         self.updates: int | None = None
         self.devices = bt_devices()
-        self.top_cpu: list[tuple[str, float]] = []
-        self.top_mem: list[tuple[str, int]] = []
+        self.top_cpu: list[procs.Proc] = []
+        self.top_mem: list[procs.Proc] = []
         self._proc: dict[int, int] = {}
         self._proc_t = 0.0
         self.want_audio = False
@@ -250,8 +250,9 @@ class Sampler:
             self._top(now)
 
     def _top(self, now: float) -> None:
-        """Top processes by CPU (since the last scan) and by memory. A scan reads every
-        /proc/<pid>/stat: ~20 ms, so not every second."""
+        """Top processes by CPU (since the last scan) and by memory, one row per process
+        (the panel acts on them: procs.py). A scan reads every /proc/<pid>/stat: ~20 ms,
+        so not every second."""
         ticks = os.sysconf("SC_CLK_TCK")
         page = os.sysconf("SC_PAGE_SIZE")
         dt = now - self._proc_t if self._proc_t else 0
@@ -259,28 +260,26 @@ class Sampler:
         for pid in os.listdir("/proc"):
             if not pid.isdigit():
                 continue
-            raw = core.read(f"/proc/{pid}/stat")
-            if not raw:
+            got = procs.stat_fields(int(pid))
+            if got is None:
                 continue
-            name = raw[raw.find("(") + 1:raw.rfind(")")]
-            f = raw[raw.rfind(")") + 2:].split()
+            name, f = got
             t = int(f[11]) + int(f[12])
-            cur[int(pid)] = t
-            rss = int(f[21]) * page
-            mem.append((name, rss))
-            if dt and int(pid) in self._proc:
-                cpu.append((name, 100.0 * (t - self._proc[int(pid)]) / ticks / dt))
+            p = int(pid)
+            cur[p] = t
+            # (pid, name, nice, threads, kernel thread, start time): procs.Proc, less the value
+            row = (p, name, int(f[16]), int(f[17]), bool(int(f[6]) & procs.PF_KTHREAD), int(f[19]))
+            mem.append((int(f[21]) * page, row))
+            if dt and p in self._proc:
+                cpu.append((100.0 * (t - self._proc[p]) / ticks / dt, row))
         self._proc, self._proc_t = cur, now
 
-        def merge(items):
-            agg: dict[str, float] = {}
-            for n, v in items:
-                agg[n] = agg.get(n, 0) + v
-            return sorted(agg.items(), key=lambda kv: -kv[1])
+        def top(items):
+            return [procs.Proc(r[0], r[1], v, *r[2:]) for v, r in sorted(items, key=lambda vr: -vr[0])[:7]]
 
         if cpu:
-            self.top_cpu = merge(cpu)[:7]
-        self.top_mem = merge(mem)[:7]
+            self.top_cpu = top(cpu)
+        self.top_mem = top(mem)
 
     # -- the worker thread -----------------------------------------------------
 

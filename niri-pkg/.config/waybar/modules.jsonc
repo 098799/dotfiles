@@ -21,11 +21,13 @@
     },
 
     // Workspaces of this bar's output, with a mark per column (an app icon, or a
-    // terminal's title). Click: a workspace or a window. Scroll: the next one. No
-    // panel, so no hover.
+    // terminal's title). Click: a workspace or a window. Scroll: the next one. Right
+    // click: the overview (every workspace and window, pinned; bardeck/ws.py WsPanel).
+    // No hover panel, so no hover.
     "cffi/ws": {
         "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
-        "strip": "ws", "variant": "full", "scale": 1, "per-output": true, "hover-ms": 0
+        "strip": "ws", "variant": "full", "scale": 1, "per-output": true, "hover-ms": 0,
+        "right-click": true
     },
     // Panel: the time to the second, UTC, two months with ISO weeks. Right click:
     // the whole year (pinned; y toggles, u/p a year). "right-click": bar-strip.so
@@ -73,8 +75,8 @@
         "on-click-middle": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
         "on-click-right": "pavucontrol"
     },
-    // Panel: the battery's 24 h, power profile and turbo boost switches.
-    // Right: power-profile.sh's menu.
+    // Panel: the battery's 24 h, power profile and turbo boost switches, keep awake
+    // (caffeine), a running recording's stop. Right: power-profile.sh's menu.
     "cffi/power": {
         "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
         "strip": "power", "variant": "full", "scale": 1,
