@@ -6,7 +6,7 @@
     bardeck panel FILE PANEL [--scale N] [--warm S]               a panel to a PNG
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
-STRIP / PANEL: quota sys net dev audio power disp clock (ws: strip only, one per output).
+STRIP / PANEL: quota sys net dev audio power disp notif clock (ws: strip only, one per output).
 
 Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
 $XDG_RUNTIME_DIR/bardeck (raw ARGB, core.write_strip) and sends hover / click / scroll to this daemon's socket
@@ -65,6 +65,7 @@ def build(with_ws: bool = True):
     from .devices import DevPanel, DevStrip
     from .displays import DispPanel, DispStrip, Displays
     from .net import NetPanel, NetStrip
+    from .notif import Dunst, NotifPanel, NotifStrip
     from .power import PowerPanel, PowerStrip
     from .sample import Sampler
     from .system import SysStrip, SystemPanel
@@ -78,6 +79,7 @@ def build(with_ws: bool = True):
     except Exception as err:
         core.log(f"no quota strip: {err!r}")
         quota = None
+    dunst = Dunst()
     strips = {
         "sys": (SysStrip(s), 1),
         "net": (NetStrip(s), 2),
@@ -86,9 +88,11 @@ def build(with_ws: bool = True):
         "audio": (AudioStrip(audio), 5),  # drawn on its own events too (watch)
         "disp": (DispStrip(disp), 2),
         "clock": (ClockStrip(), 1),
+        "notif": (NotifStrip(dunst), 1),
     }
     panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s), AudioPanel(audio),
                                   ClockPanel(), DispPanel(disp))}
+    panels["notif"] = NotifPanel(dunst)
     if quota is not None:
         panels["quota"] = QuotaPanel(quota)
     return s, quota, strips, panels

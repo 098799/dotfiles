@@ -89,5 +89,15 @@
         "on-click-right": "~/bin/niri-screen-switch"
     },
 
+    // Panel: dunst's history (newest first, by app; click one: shown again, hover: ×
+    // removes it), Do Not Disturb, clear all. Middle: Do Not Disturb on / off.
+    // Right: the last notification again.
+    "cffi/notif": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "notif", "variant": "full", "scale": 1,
+        "on-click-middle": "dunstctl set-paused toggle",
+        "on-click-right": "dunstctl history-pop"
+    },
+
     "tray": { "spacing": 8, "icon-size": 16 }
 }
