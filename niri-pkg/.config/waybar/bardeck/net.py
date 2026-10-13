@@ -1,6 +1,7 @@
 """Network: the link, its signal and traffic, the VPN on the strip; in the panel the
-link's details, the Wi-Fi networks in range (join one, like nmtui), five minutes of
-traffic, VPN switches and network.sh's actions.
+link's details, the Wi-Fi networks in range (join one, like nmtui), the tailnet's
+devices (tailnet.py: copy an address, ssh, ping), five minutes of traffic, VPN
+switches and network.sh's actions.
 
 The buttons run the i3blocks scripts' own menu entries (core.menu_action), so the
 wg-quick lines, the adapter reset and the speedtest live in one place:
@@ -10,10 +11,11 @@ from __future__ import annotations
 
 import time
 
-from . import core
+from . import core, tailnet
 from .core import Hits, button, graph, heading, text
 from .deck import Panel
 from .sample import HISTORY, Sampler
+from .tailnet import Peer
 from .wifi import Network
 
 # vpn.sh's menu entries, by interface.
@@ -57,6 +59,8 @@ def bars(cr, x: float, mid: float, pct: int, tone: str) -> float:
 GLYPH_LOCK, GLYPH_OPEN, GLYPH_SAVED = "\uf023", "\uf09c", "\uf02e"
 GLYPH_SCAN, GLYPH_OFF, GLYPH_FORGET = "󰑐", "󰖪", "\U000f01b4"
 GLYPH_EYE, GLYPH_EYE_OFF, GLYPH_CHECK = "\uf06e", "\uf070", "\uf00c"
+GLYPH_TS, GLYPH_SHELL = "\U000f0582", "\uf120"
+ME = 10_000  # the hover index of this node's own tailscale row (keys never select it)
 
 
 class NetStrip:
@@ -111,7 +115,12 @@ class NetStrip:
 class NetPanel(Panel):
     """The link, then the networks in range: a list to join one from, like nmtui's
     "Activate a connection". Click a row (or `i`/`o` and Enter when pinned) to join;
-    a secured network that is not saved yet opens a password field in its row."""
+    a secured network that is not saved yet opens a password field in its row.
+
+    Under it the tailnet: this node and each peer. The keyboard's selection runs on
+    from the last network into the peers. A click on a peer (or Enter) copies its
+    address; hovered, it shows "ping" and "ssh"; `t` pings the selected or hovered
+    peer, or with none every online one (pings run only when asked)."""
 
     name = "net"
     live = 1.0
@@ -119,6 +128,8 @@ class NetPanel(Panel):
     ROWS = 8      # rows shown; the list scrolls (wheel, keys) past that
     ROW_H = 26
     FIELD_H = 42
+    TS_ROWS = 6   # peers shown (online first); the rest are counted
+    TS_H = 24
 
     def __init__(self, s: Sampler):
         self.s = s
@@ -131,6 +142,8 @@ class NetPanel(Panel):
         self.note = ""         # a word under the field (too short, …)
         self.forgetting = ""   # an SSID whose forget button asks to be clicked again
         self.rows: list[tuple[float, float, int]] = []  # (y0, y1, index), for hover
+        self.copied: tuple[str, float] = ("", 0.0)  # the address last copied, and when
+        self.exit_asked = False  # an exit node was clicked without operator rights: say why louder
 
     # -- state -----------------------------------------------------------------
 
@@ -139,8 +152,26 @@ class NetPanel(Panel):
         return self.s.nets.networks
 
     @property
+    def peers(self) -> list[Peer]:
+        return self.s.ts.peers[:self.TS_ROWS]
+
+    @property
     def typing(self) -> bool:  # Panel.typing: the Deck sends every key to text_key
         return self.asking is not None
+
+    def ts_h(self) -> float:
+        ts = self.s.ts
+        h = 22 + self.TS_H + 8
+        if ts.state != "Running":
+            return h
+        h += max(1, len(self.peers)) * self.TS_H
+        if len(ts.peers) > self.TS_ROWS:
+            h += 14
+        if ts.exit_options or ts.exit_status:
+            h += 30 + (14 if not ts.operator else 0)
+        if ts.error:
+            h += 14
+        return h
 
     def list_h(self) -> float:
         n = len(self.nets)
@@ -152,13 +183,15 @@ class NetPanel(Panel):
         return h
 
     def size(self):
-        return self.W, 352 + self.list_h()
+        return self.W, 316 + self.list_h() + self.ts_h()
 
     def opened(self) -> None:
-        self.s.want_link = True  # iw's dBm and link rates, the network list: only while open
+        self.s.want_link = True  # iw's dBm and link rates, the networks, the tailnet: only while open
         if time.monotonic() - self.s.nets.scanned_at > 20:
             self.s.nets.want_scan = True
-        self.sel, self.top, self.hovered, self.forgetting = -1, 0, -1, ""
+        self.s.ts.read_at = 0.0
+        self.s.ts.pings, self.s.ts.via = {}, {}  # an old latency is no reading
+        self.sel, self.top, self.hovered, self.forgetting, self.exit_asked = -1, 0, -1, "", False
         self.s.nets.settle()
         self.cancel()
         self.s.poke()
@@ -174,6 +207,8 @@ class NetPanel(Panel):
         """Scroll so the selection shows."""
         n = len(self.nets)
         self.top = max(0, min(self.top, n - self.ROWS))
+        if self.sel >= n:  # a tailnet peer: the network list stays where it is
+            return
         if 0 <= self.sel < self.top:
             self.top = self.sel
         elif self.sel >= self.top + self.ROWS:
@@ -222,6 +257,38 @@ class NetPanel(Panel):
         self.s.poke()
         return False
 
+    def copy_ip(self, p: Peer) -> bool:
+        if p.ip:
+            tailnet.copy(p.ip)
+            self.copied = (p.ip, time.monotonic())
+        return False
+
+    def ping(self, p: Peer | None = None) -> bool:
+        """One peer, or every online one: only ever on demand."""
+        for peer in [p] if p is not None else [x for x in self.s.ts.peers if x.online]:
+            self.s.ts.ping(peer)
+        return False
+
+    def ssh(self, p: Peer) -> bool:
+        tailnet.ssh(p.host)
+        return True
+
+    def exit_node(self, p: Peer | None) -> bool:
+        ts = self.s.ts
+        if not ts.operator:
+            self.exit_asked = True  # the line under the chips turns yellow
+            return False
+        ts.set_exit_node(p)
+        return False
+
+    def peer_at(self, i: int) -> Peer | None:
+        """The peer behind a selection / hover index (the networks come first)."""
+        if i == ME:
+            return self.s.ts.me
+        j = i - len(self.nets)
+        peers = self.peers
+        return peers[j] if 0 <= j < len(peers) else None
+
     def paste(self) -> None:
         gi = __import__("gi")
         gi.require_version("Gtk", "3.0")
@@ -235,16 +302,25 @@ class NetPanel(Panel):
     def key(self, key: str, ctrl: bool) -> bool:
         nets = self.nets
         n = len(nets)
+        last = n + len(self.peers) - 1  # the selection runs on into the tailnet's peers
+        peer = self.peer_at(self.sel) or (self.peer_at(self.hovered) if self.hovered >= n else None)
         if key in ("i", "Down") or (ctrl and key == "n"):
-            self.sel = min(n - 1, self.sel + 1)
+            self.sel = min(last, self.sel + 1)
         elif key in ("o", "Up") or (ctrl and key == "p"):
             self.sel = max(0, self.sel - 1)
         elif key in ("k", "Page_Down") or (ctrl and key == "v"):
-            self.sel = min(n - 1, self.sel + self.ROWS // 2)
+            self.sel = min(last, self.sel + self.ROWS // 2)
         elif key in ("l", "Page_Up"):
             self.sel = max(0, self.sel - self.ROWS // 2)
         elif key in ("Return", "KP_Enter") and 0 <= self.sel < n:
             self.join(nets[self.sel])
+        elif key in ("Return", "KP_Enter", "c") and peer is not None:
+            self.copy_ip(peer)
+        elif key == "t":
+            self.ping(peer if peer is not None and not peer.me else None)
+        elif key == "s" and peer is not None and peer.shell and not peer.me:
+            self.ssh(peer)
+            return "close"
         elif key == "r":
             self.rescan()
         elif key == "d":
@@ -331,13 +407,10 @@ class NetPanel(Panel):
             text(cr, P, y, name, 12, "fg")
             text(cr, P + 110, y, ip or "no IPv4", 12, "title")
             y += 16
-        if s.tailscale:
-            text(cr, P, y, "tailscale0", 12, "fg")
-            text(cr, P + 110, y, s.tailscale, 12, "aqua")
-            y += 16
         y += 8
 
         y = self.draw_list(cr, hits, P, y)
+        y = self.draw_tailnet(cr, hits, P, y)
 
         rx = s.rx[-1] if s.rx else 0
         tx = s.tx[-1] if s.tx else 0
@@ -346,9 +419,9 @@ class NetPanel(Panel):
         text(cr, W - P, y - 2, f"↑ {core.human_bytes(tx, True)}", 12, "purple", align=1)
         y += 20
         top = max([1.0, *s.rx, *s.tx]) * 1.1
-        graph(cr, P, y, W - 2 * P, 64, [(list(s.rx), "blue"), (list(s.tx), "purple")], top=top, grid=())
+        graph(cr, P, y, W - 2 * P, 44, [(list(s.rx), "blue"), (list(s.tx), "purple")], top=top, grid=())
         text(cr, P + 6, y + 4, f"{HISTORY // 60} min · peak {core.human_bytes(top / 1.1, True)}", 10, "dim")
-        y += 76
+        y += 56
 
         heading(cr, P, y, "vpn", W - 2 * P)
         y += 20
@@ -520,3 +593,141 @@ class NetPanel(Panel):
         cr.fill()
         hint = self.note or "Enter join · Tab show · Esc cancel"
         text(cr, x0 + 4, fy + fh + 1, hint, 10, "warn" if self.note else "dim")
+
+    # -- the tailnet -----------------------------------------------------------
+
+    def draw_tailnet(self, cr, hits: Hits, P: float, y: float) -> float:
+        """This node, its peers and the exit node, from y. Returns the y under them."""
+        W = self.W
+        ts = self.s.ts
+        end = y + self.ts_h()
+        running = ts.state == "Running"
+        right = W - P
+        if running and any(p.online for p in ts.peers):
+            busy = bool(ts._pinging)
+            label = "pinging" if busy else "ping all"
+            bw = core.text_w(cr, label, 11) + 18
+            button(cr, hits, right - bw, y - 5, label, self.ping, h=20, size=11, on=busy, tone="bg3")
+            right -= bw + 8
+        if ts.tailnet:
+            right -= text(cr, right, y - 1, ts.tailnet, 11, "dim", align=1) + 8
+        heading(cr, P, y, "tailscale", right - P - 4)
+        y += 22
+        if not running:
+            words = {"": ts.error or "tailscaled does not answer", "Stopped": "stopped (tailscale up)",
+                     "NeedsLogin": "logged out (tailscale login)", "Starting": "starting…"}.get(
+                ts.state, ts.state.lower())
+            core.icon(cr, P + 8, y + self.TS_H / 2, GLYPH_TS, 13, "dim", align=0.5)
+            text(cr, P + 22, y + self.TS_H / 2, words, 12, "dim", valign=0.5)
+            return end
+        if ts.me is not None:
+            self.draw_peer(cr, hits, P, y, ME, ts.me)
+            self.rows.append((y, y + self.TS_H, ME))
+        y += self.TS_H
+        n = len(self.nets)
+        peers = self.peers
+        for j, p in enumerate(peers):
+            self.draw_peer(cr, hits, P, y, n + j, p)
+            self.rows.append((y, y + self.TS_H, n + j))
+            y += self.TS_H
+        if not peers:
+            text(cr, P + 22, y + self.TS_H / 2, "no other devices on the tailnet", 12, "dim", valign=0.5)
+            y += self.TS_H
+        rest = ts.peers[self.TS_ROWS:]
+        if rest:
+            off = sum(not p.online for p in rest)
+            words = f"+ {len(rest)} more" + (f" ({off} offline)" if off else "")
+            text(cr, W / 2, y + 1, words, 10, "dim", align=0.5)
+            y += 14
+        if ts.exit_options or ts.exit_status:
+            y += 4
+            text(cr, P, y + 11, "exit node", 12, "fg", valign=0.5)
+            x = P + 76
+            tone = "accent" if ts.operator else "bg3"
+            for label, peer, on in [("none", None, not ts.exit_status)] + [
+                    (p.name, p, p.exit_node) for p in ts.exit_options]:
+                bw = core.text_w(cr, label, 11) + 18
+                if x + bw > W - P:
+                    break
+                x += button(cr, hits, x, y, label, lambda p=peer: self.exit_node(p), h=22, size=11, on=on,
+                            tone=tone) + 6
+            y += 26
+            if not ts.operator:
+                text(cr, P, y, f"setting it needs operator rights: sudo tailscale set --operator={tailnet.USER}",
+                     10, "warn" if self.exit_asked else "dim")
+                y += 14
+        if ts.error:
+            text(cr, P, y, ts.error, 10, "warn", width=W - 2 * P)
+        return end
+
+    def draw_peer(self, cr, hits: Hits, P: float, y: float, i: int, p: Peer) -> None:
+        W, H = self.W, self.TS_H
+        ts = self.s.ts
+        x0, rw, mid = P - 6, W - 2 * P + 12, y + H / 2
+        picked = i == self.sel or i == self.hovered
+        if picked:
+            core.rrect(cr, x0, y + 1, rw, H - 2, 7)
+            cr.set_source_rgba(*core.rgba("bg1"))
+            cr.fill()
+            if i == self.sel:
+                core.rrect(cr, x0 + 1, y + 5, 3, H - 10, 1.5)
+                cr.set_source_rgba(*core.rgba("accent"))
+                cr.fill()
+        hits.add(x0, y, rw, H, lambda: self.copy_ip(p))
+
+        tone = ("accent" if p.me else "aqua") if p.online else "bg3"
+        core.icon(cr, P + 8, mid, p.glyph, 13, tone, align=0.5)
+        ipx = P + 168
+        x = P + 22
+        name_tone = "title" if (picked or p.me) else ("fg2" if p.online else "dim")
+        x += text(cr, x, mid, p.name, 13, name_tone, bold=p.me, valign=0.5, width=ipx - x - 8) + 6
+        if p.me and x < ipx - 40:
+            text(cr, x, mid, "this device", 10, "dim", valign=0.5)
+        elif p.exit_node and x < ipx - 30:
+            text(cr, x, mid, "exit", 10, "ok", valign=0.5)
+        text(cr, ipx, mid, p.ip or "no IPv4", 12, "title" if picked else ("fg" if p.online else "dim"),
+             valign=0.5)
+
+        right = W - P
+        ping = ts.pings.get(p.ip)
+        if self.copied[0] == p.ip and p.ip and time.monotonic() - self.copied[1] < 2:
+            label = "copied"
+            right -= button(cr, hits, right - self.chip_w(cr, label, GLYPH_CHECK), y + 3, label,
+                            lambda: self.copy_ip(p), h=H - 6, size=11, on=True, tone="ok",
+                            glyph=GLYPH_CHECK) + 6
+        elif picked and not p.me:
+            if p.shell:
+                bw = self.chip_w(cr, "ssh", GLYPH_SHELL)
+                right -= button(cr, hits, right - bw, y + 3, "ssh", lambda: self.ssh(p), h=H - 6, size=11,
+                                glyph=GLYPH_SHELL) + 6
+            if p.online:
+                bw = core.text_w(cr, "ping", 11) + 18
+                right -= button(cr, hits, right - bw, y + 3, "ping", lambda: self.ping(p), h=H - 6,
+                                size=11) + 6
+            if ping:
+                self.ping_words(cr, right - 2, mid, ping)
+            return
+        if p.me:
+            words = f"home {p.relay}" if p.relay else "online"
+            text(cr, right, mid, words, 11, "dim", align=1, valign=0.5)
+            return
+        if not p.online:
+            words = f"offline · {core.ago(time.time() - p.seen)} ago" if p.seen else "offline"
+            text(cr, right, mid, words, 11, "dim", align=1, valign=0.5)
+            return
+        if ping:
+            right -= self.ping_words(cr, right, mid, ping) + 4
+        via = ts.via.get(p.ip) or ("direct" if p.addr else (f"relay {p.relay}" if p.active and p.relay else ""))
+        if via and ping:
+            right -= text(cr, right, mid, "·", 11, "dim", align=1, valign=0.5) + 4
+        if via:
+            text(cr, right, mid, via, 11, "ok" if via == "direct" else "warn", align=1, valign=0.5)
+        elif not ping:
+            text(cr, right, mid, "idle", 11, "dim", align=1, valign=0.5)
+
+    @staticmethod
+    def ping_words(cr, right: float, mid: float, ping: tuple[str, str]) -> float:
+        tone, words = ping
+        if words == "pinging":
+            words += "." * (1 + int(time.monotonic()) % 3)
+        return text(cr, right, mid, words, 11, tone, align=1, valign=0.5)

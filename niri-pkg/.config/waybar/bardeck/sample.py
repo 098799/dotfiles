@@ -22,6 +22,7 @@ import time
 from collections import deque
 
 from . import bluez, core
+from .tailnet import Tailnet
 from .wifi import Wifi
 
 HISTORY = 300  # seconds of graph in the panels
@@ -137,6 +138,7 @@ class Sampler:
         self._system_bus = None
         self.want_link = False  # the network panel is open: iw for dBm and link rates, the Wi-Fi list
         self.nets = Wifi(self)
+        self.ts = Tailnet()  # the network panel's tailscale peers, read only while it is open
         self.bt = bluez.Bluez(self)  # the devices panel's list (and pairing), mirrored only while it is open
         self.sinks: list[dict] = []
         self.sources: list[dict] = []
@@ -336,6 +338,7 @@ class Sampler:
                           if os.path.isdir(f"/sys/class/net/{n}/wireless")), None)
             if radio:
                 self.nets.read(radio, wifi.get("ssid"), wifi.get("strength"))
+            self.ts.read()  # tailscaled's local API, at most every tailnet.READ_EVERY s
         vpn = sorted(n for n in os.listdir("/sys/class/net")
                      if n.startswith(("wg", "tun", "tap")) and n != "tailscale0")
         tailscale = ipv4("tailscale0") if os.path.exists("/sys/class/net/tailscale0") else ""

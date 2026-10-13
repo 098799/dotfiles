@@ -302,6 +302,18 @@ def dur(sec: float) -> str:
     return f"{m}m"
 
 
+def ago(sec: float) -> str:
+    """How long ago, in one rough unit: "now", "12 min", "3 h", "4 d"."""
+    sec = max(0, int(sec))
+    if sec < 60:
+        return "now"
+    if sec < 3600:
+        return f"{sec // 60} min"
+    if sec < 2 * 86400:
+        return f"{sec // 3600} h"
+    return f"{sec // 86400} d"
+
+
 # ── surfaces and files ───────────────────────────────────────────────────────
 
 
