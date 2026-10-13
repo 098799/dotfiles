@@ -1,6 +1,6 @@
 """The clock in the middle of the bar; in its panel the time to the second, UTC, the
 ISO week, and two months with week numbers; beside them the weather (weather.py,
-Open-Meteo) and today's and tomorrow's events (agenda.py, iCalendar feeds). Pinned:
+MeteoSwiss) and today's and tomorrow's events (agenda.py, iCalendar feeds). Pinned:
 u/p an earlier/later month, i/o an event, Enter opens its meeting link."""
 
 from __future__ import annotations
@@ -269,15 +269,15 @@ class ClockPanel(Panel):
                 f"no weather ({wx.error})" if wx.error else "no weather yet")
             text(cr, x0, y + 4, words, 12, "dim")
             return end
-        code = cur.get("weather_code", 0)
-        word, glyph = weather.wmo(code, bool(cur.get("is_day", 1)))
-        core.icon(cr, x0 + 16, y + 20, glyph, 32, weather.tone(code), align=0.5)
-        tw = text(cr, x0 + 40, y, f"{cur.get('temperature_2m', 0):.0f}°", 30, "bright", bold=True)
+        word, glyph, tone = weather.symbol(cur.get("code"))
+        core.icon(cr, x0 + 16, y + 20, glyph, 32, tone, align=0.5)
+        tw = text(cr, x0 + 40, y, f"{cur.get('temp') or 0:.0f}°", 30, "bright", bold=True)
         tx = x0 + 40 + tw + 10
         day = wx.today()
         text(cr, tx, y + 4, word, 13, "title", width=x1 - tx - 96)
-        feels = f"feels {cur.get('apparent_temperature', 0):.0f}° · wind {cur.get('wind_speed_10m', 0):.0f} km/h"
-        text(cr, tx, y + 22, feels, 11, "dim", width=x1 - tx - 96)
+        if cur.get("wind") is not None:
+            wind = f"wind {cur['wind']:.0f} km/h" + (f" · gusts {cur['gust']:.0f}" if cur.get("gust") else "")
+            text(cr, tx, y + 22, wind, 11, "dim", width=x1 - tx - 96)
         if day:
             rx = x1
             rx -= text(cr, rx, y + 2, f"{day['min']:.0f}°", 13, "blue", align=1) + 4
@@ -302,8 +302,8 @@ class ClockPanel(Panel):
                 cx = x0 + cw * i + cw / 2
                 label = "now" if i == 0 else h.at.strftime("%H")
                 text(cr, cx, y, label, 10, "accent" if i == 0 else "dim", align=0.5)
-                _, g = weather.wmo(h.code, h.day)
-                core.icon(cr, cx, y + 24, g, 15, weather.tone(h.code), align=0.5)
+                _, g, tone = weather.symbol(h.code)
+                core.icon(cr, cx, y + 24, g, 15, tone, align=0.5)
                 # The temperature rides a little higher when it is warmer.
                 ty = y + 40 + (6 * (hi_t - h.temp) / (hi_t - lo_t) if hi_t > lo_t else 3)
                 text(cr, cx, ty, f"{h.temp:.0f}°", 11, "title", align=0.5)

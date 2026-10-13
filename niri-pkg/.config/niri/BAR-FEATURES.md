@@ -29,13 +29,13 @@ opens this file. The bar shows one of these lines a day as a tip (see the end).
 - **Keep awake: power pill** — "keep awake" on / 1 h / until 20% battery: no lock, no screen off. A cup shows on the pill.
 - **Recording indicator: power pill** — while niri-record runs, a red dot and the time; the panel has a stop button.
 - **Notifications: the bell** — the badge counts new ones. Click a card to show it again, hover × to remove, "do not disturb" to hold popups. Middle-click the bell: do not disturb.
-- **Weather and today's meetings: the clock** — the next 12 h of weather (Zürich). For meetings, put your Google "Secret address in iCal format" into `~/.config/bardeck/calendar`; a meeting link gets a "join" chip.
+- **Weather and today's meetings: the clock** — the next 12 h of weather from MeteoSwiss (Zürich). For meetings, put your Google "Secret address in iCal format" into `~/.config/bardeck/calendar`; a meeting link gets a "join" chip.
 - **The whole year: right-click the clock.**
 
 ## Things to set up once
 
 - **Calendar** — `~/.config/bardeck/calendar`: one iCal URL per line (Google Calendar → Settings → your calendar → Integrate calendar → Secret address in iCal format).
-- **Weather place** — `~/.config/bardeck/location`: `lat lon name` (Zürich without it).
+- **Weather place** — `~/.config/bardeck/location`: `8001 name` (a Swiss postcode) or `lat lon name` (Zürich without it).
 - **Tailscale exit node** — needs `sudo tailscale set --operator=tgrining` once, and a peer that offers one.
 
 ## The daily tip
