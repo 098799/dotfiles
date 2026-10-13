@@ -21,7 +21,7 @@ import threading
 import time
 from collections import deque
 
-from . import core
+from . import bluez, core
 from .wifi import Wifi
 
 HISTORY = 300  # seconds of graph in the panels
@@ -137,6 +137,7 @@ class Sampler:
         self._system_bus = None
         self.want_link = False  # the network panel is open: iw for dBm and link rates, the Wi-Fi list
         self.nets = Wifi(self)
+        self.bt = bluez.Bluez(self)  # the devices panel's list (and pairing), mirrored only while it is open
         self.sinks: list[dict] = []
         self.sources: list[dict] = []
         self.default_sink = ""
@@ -424,14 +425,18 @@ class Sampler:
         return self._system_bus
 
     def watch_bluez(self) -> None:
-        """On the main loop: BlueZ's signals mark the Bluetooth reading stale."""
+        """On the main loop: BlueZ's signals mark the Bluetooth reading stale (but not
+        the stream of advertisements while something scans: bluez.noise)."""
         from gi.repository import Gio
 
-        def changed(*_args):
+        def changed(_bus, _sender, path, _iface, member, params, *_data):
+            if bluez.noise(member, path, params, self.bt_connected):
+                return
             self._bt_dirty = True
             self.poke()
 
         bus = self._bus()
+        self.bt.watch(bus)
         for iface, member in (("org.freedesktop.DBus.Properties", "PropertiesChanged"),
                               ("org.freedesktop.DBus.ObjectManager", "InterfacesAdded"),
                               ("org.freedesktop.DBus.ObjectManager", "InterfacesRemoved")):

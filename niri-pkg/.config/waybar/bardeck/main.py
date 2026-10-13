@@ -302,6 +302,8 @@ def render(argv: list[str]) -> int:
     p.opened()
     if what == "net":  # the network list is read only while the panel is open
         s._slow()
+    if what == "dev":  # the device list too, and its mirror waits for a main loop
+        s.bt.load()
     w, h = p.size()
     surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * scale, h * scale)
     surf.set_device_scale(scale, scale)
