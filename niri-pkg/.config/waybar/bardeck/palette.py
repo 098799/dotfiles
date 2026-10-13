@@ -61,6 +61,7 @@ from .ws import action as niri_action
 from .ws import niri
 
 ROFI_RUN = f"{core.REAL_HOME}/bin/rofi-run"
+FEATURES_MD = f"{core.REAL_HOME}/.config/niri/BAR-FEATURES.md"
 STATE = f"{core.REAL_HOME}/.local/state/bardeck/palette.json"
 ROFI_RUNCACHE = f"{core.REAL_HOME}/.cache/rofi-4.runcache"  # "COUNT LINE\x1fSHOWN" per line
 ROFI_DRUNCACHE = f"{core.REAL_HOME}/.cache/rofi3.druncache"  # "COUNT DESKTOP-ID" per line
@@ -566,6 +567,11 @@ class PalettePanel(Panel):
         for prof, (glyph, _short, _tone) in PROFILE.items():
             items.append(Item("action", f"act:power:{prof}", f"Power profile: {prof}", "power-profile.sh",
                               glyph=glyph, run=lambda p=prof: core.menu_action("power-profile.sh", 1, p) or True))
+        # The short list of what the bar can do (13 Oct 2026; the daily tips read it too).
+        items.append(Item("action", "act:bar-features", "Bar features: what the bar can do",
+                          "BAR-FEATURES.md · the short list", extra="help tips cheat sheet keys", glyph=GLYPH_PANEL, rank=20.0,
+                          run=lambda: run_argv(["sh", "-c", f'emacsclient -c "{FEATURES_MD}" || xdg-open "{FEATURES_MD}"'])
+                          or True))
         panels = self.deck.panels if self.deck is not None else {}
         for name, title in PANEL_TITLES:
             if name in panels or self.deck is None:

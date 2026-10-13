@@ -144,6 +144,11 @@ agent for that time; then it unregisters, and BlueZ gives the default back to
 blueman-applet. It answers only bluetoothd, gives codes only for the device being
 paired, and authorizes services only for that device and paired or trusted ones.
 
+**The short list.** `BAR-FEATURES.md` (next to this file) says in one line per
+feature what the bar can do and how to reach it; Mod+D → "bar features" opens it, and
+`bardeck/tips.py` shows one of its lines a day as a notification until each was shown
+once. What changed when, and what was verified: `BAR-LEDGER.md`.
+
 **The buttons reuse the scripts.** A panel button runs the i3blocks script's own
 menu entry (`core.menu_action`): a `rofi` shim on PATH answers the menu with the
 button's choice. So `vpn.sh` still owns the wg-quick lines, `network.sh` the

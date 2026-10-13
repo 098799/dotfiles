@@ -147,6 +147,11 @@ class Daemon:
         self.draw_ws()
         self.tick()
         GLib.timeout_add(1000, self.tick)
+        # The daily tip (tips.py): a minute after the start, then every 10 min; it
+        # sends at most one a day.
+        from . import tips
+        GLib.timeout_add_seconds(60, lambda: tips.check() and False)
+        GLib.timeout_add_seconds(tips.CHECK_EVERY_S, lambda: tips.check() or True)
 
     def variants(self):
         """Only the pictures a bar shows: compact while the laptop screen (eDP) is on,
