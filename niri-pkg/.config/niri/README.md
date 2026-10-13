@@ -120,6 +120,7 @@ i3blocks scripts' menus.
 | network | Signal (the icon's colour), traffic, the VPN, tailscale. The SSID is in the panel. | The link (signal, band, link rates, addresses); **the Wi-Fi networks in range**, nmtui's "Activate a connection" (`bardeck/wifi.py`, NetworkManager over D-Bus, read only while the panel is open): click a row to join, a new secured network opens a password field in its row (Enter join, Tab show, `Ctrl+V` paste, Esc cancel; a failed new profile is deleted again), hover a row for disconnect / forget (click twice); enterprise and WEP go to `nmtui-connect`. Pinned: `i`/`o` select, `k`/`l` half a list, Enter join, `r` scan, `d` disconnect, `x` forget. Then 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (link rates, reconnect, reset adapter, nmtui, speedtest). |
 | devices | Bluetooth, and the headphones, keyboard and mouse lit when connected. | Connect / disconnect each, Bluetooth on / off, where sound goes (click to switch output or input), mixer, bluetoothctl, restart logid, nuke bt. |
 | power | Battery, the power profile, turbo boost when on. | The battery's last 24 h (upower's history), draw, health, the charge limit; power profile and turbo boost switches. |
+| notif | A bell; a badge with the notifications that came since the panel was last opened. Do Not Disturb: a sleeping bell (yellow), the badge counts the held-back ones too. Middle: Do Not Disturb on / off. Right: the last notification again. | dunst's history (`bardeck/notif.py`, dunst's own D-Bus API): newest first, a header per run of one app, the urgency as a stripe (critical red), new ones marked. Click a card: dunst shows it again (its popup runs its action); hover it: × removes it. Do Not Disturb, clear all (click twice). Pinned: `i`/`o` select, `k`/`l` half a list, Enter show again, `x` remove, `c` clear all (twice), `z` Do Not Disturb. |
 | clock | Date and time. | Time to the second, UTC, day of the year, two months with week numbers. **Right click: the whole year.** Pinned: `y` year ⇄ two months, `u`/`p` a month (a year in the year view), `t` today. |
 
 **The buttons reuse the scripts.** A panel button runs the i3blocks script's own
@@ -133,7 +134,10 @@ block per bar every few seconds (~15% of a core after the 7 Oct sharing fix, ~70
 before). bardeck reads `/proc` and `/sys`, NetworkManager and BlueZ over D-Bus
 (BlueZ only when it signals a change), addresses by ioctl, and niri's socket. It
 starts no program in steady state: `iw` and `pactl` only while their panel is
-open, `checkupdates` once an hour on its own thread. A strip is drawn only when
+open, `checkupdates` once an hour on its own thread. dunst's history is read when
+dunst signals that a popup closed (one async D-Bus call per notification) and when
+the notif panel opens; "unread" is a timestamp in
+`$XDG_RUNTIME_DIR/bardeck/notif-seen`. A strip is drawn only when
 its inputs changed (`key()`), written only when its bytes changed, and only in
 the variant a screen shows. Strips are raw ARGB (`core.write_strip`), not PNG:
 waybar copies them on its main thread instead of decoding. Measured 7 Oct 2026

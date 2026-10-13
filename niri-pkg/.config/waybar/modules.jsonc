@@ -71,6 +71,16 @@
         "on-click-right": "~/bin/i3blocks-waybar ~/scripts/power-profile.sh 1"
     },
 
+    // Panel: dunst's history (newest first, by app; click one: shown again, hover: ×
+    // removes it), Do Not Disturb, clear all. Middle: Do Not Disturb on / off.
+    // Right: the last notification again.
+    "cffi/notif": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "notif", "variant": "full", "scale": 1,
+        "on-click-middle": "dunstctl set-paused toggle",
+        "on-click-right": "dunstctl history-pop"
+    },
+
     // Native, because they follow PulseAudio events (no key bind has to signal the
     // bar) and scroll changes the volume. One pill for both.
     "group/audio": {
