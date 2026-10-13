@@ -422,6 +422,10 @@ class Deck:
         return True
 
     def on_key(self, _w, event) -> bool:
+        if not (self.shown and self.pinned):
+            # Only a pinned panel has the keyboard. A key here otherwise is a stale GTK
+            # repeat from a pin that let go mid-press: it opened 120 qtops on a hover.
+            return False
         key = Gdk.keyval_name(event.keyval) or ""
         ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
         if self.panel is not None and self.panel.typing:

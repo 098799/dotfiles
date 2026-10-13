@@ -572,12 +572,22 @@ class QuotaPanel(Panel):
         elif key in ("p", "Right") or (ctrl and key == "f"):
             self.back = max(0, self.back - 1)
         elif key in ("Return", "KP_Enter") and 0 <= self.sel < n:
-            open_qtop(self.q.m.accounts()[self.sel])
+            # "close": the panel lets go of the keyboard. With True it kept it, and a
+            # repeating Enter opened a qtop per repeat (13 Oct 2026: 120 terminals in 3 s).
+            return "close" if open_qtop(self.q.m.accounts()[self.sel]) else True
         else:
             return False
         return True
 
 
+QTOP_GAP_S = 2.0  # one qtop per click or Enter: a burst of them opens one window
+_qtop_at = 0.0
+
+
 def open_qtop(account: str) -> bool:
-    core.spawn(["alacritty", "-e", "qtop", account])
+    global _qtop_at
+    now = time.monotonic()
+    if now - _qtop_at >= QTOP_GAP_S:
+        _qtop_at = now
+        core.spawn(["alacritty", "-e", "qtop", account])
     return True  # close the panel
