@@ -69,6 +69,7 @@ The keys that act differently from plain niri:
 | `Mod+Alt+G` / `Mod+Alt+Shift+G` | Gaps off / back on. |
 | `Mod+BackSpace` | Menu: screen layouts, theme, font size. |
 | `Mod+[` / `Mod+]` | Volume -/+10% (i3 muscle memory). niri's own use of these keys moved to `Mod+Shift+[` / `]`. |
+| `Mod+\` · `Mod+Ctrl+[` / `]` | Play / pause · previous / next track (`playerctl`, the MPRIS player). The media keys (Play, Pause, Stop, Next, Prev) do the same, also on the lock screen. |
 
 ## Helper scripts
 

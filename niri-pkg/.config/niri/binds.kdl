@@ -241,6 +241,16 @@ binds {
     // consume-or-expel-window, which now sits on Mod+Shift+[ / Mod+Shift+].
     Mod+BracketLeft  hotkey-overlay-title="volume -10%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
     Mod+BracketRight hotkey-overlay-title="volume +10%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+10%"; }
+    // Media (MPRIS, via playerctl): the media keys where a keyboard has them, and
+    // beside the volume keys for the keyboards that do not.
+    XF86AudioPlay  allow-when-locked=true hotkey-overlay-title="play / pause" { spawn "playerctl" "play-pause"; }
+    XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioStop  allow-when-locked=true { spawn "playerctl" "stop"; }
+    XF86AudioNext  allow-when-locked=true hotkey-overlay-title="next track" { spawn "playerctl" "next"; }
+    XF86AudioPrev  allow-when-locked=true hotkey-overlay-title="previous track" { spawn "playerctl" "previous"; }
+    Mod+Backslash         hotkey-overlay-title="play / pause" { spawn "playerctl" "play-pause"; }
+    Mod+Ctrl+BracketLeft  hotkey-overlay-title="previous track" { spawn "playerctl" "previous"; }
+    Mod+Ctrl+BracketRight hotkey-overlay-title="next track" { spawn "playerctl" "next"; }
     Mod+Escape { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
     Mod+Space  { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
     XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="brightness +10%" { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
