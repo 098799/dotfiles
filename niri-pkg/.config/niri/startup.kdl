@@ -13,7 +13,10 @@ spawn-at-startup "niri-hot-bottom" "daemon"  // Mod+C on the last column: next w
 spawn-at-startup "niri-minimap"             // overlay map of the scroll strip on workspace switch
 spawn-sh-at-startup "command -v copyq >/dev/null && copyq --start-server"
 spawn-at-startup "nm-applet"
-spawn-sh-at-startup "$HOME/Programs/emacs/src/emacs --daemon"
+// The Wayland (pgtk) build, since 13 Oct 2026: sharp at the laptop's 1.25, no
+// xwayland-satellite in between, and wtype/clipboard reach it. The X11 build stays
+// in ~/Programs/emacs (and /usr/local/bin) as the fallback.
+spawn-sh-at-startup "$HOME/Programs/emacs-pgtk/src/emacs --daemon"
 // Neomacs is paused while niri is under test; Mod+X opens GNU Emacs.
 // spawn-at-startup "neomacs-try" "--daemon"
 spawn-at-startup "thunar" "--daemon"
@@ -21,7 +24,7 @@ spawn-at-startup "syncthing"
 spawn-at-startup "gammastep"                // uses wlr-gamma-control on niri
 spawn-sh-at-startup "bluetoothctl power on"
 spawn-at-startup "w95-sysmon" "--hidden"
-// xsettingsd still matters: it is what tells the Xwayland apps (Emacs, the
+// xsettingsd still matters: it is what tells the Xwayland apps (the
 // espanso X11 build, anything not yet ported) their DPI, theme and fonts.
 spawn-at-startup "xsettingsd"
 // Screen sharing (Slack, Meet, OBS, and `niri-record-window`'s picker) goes
