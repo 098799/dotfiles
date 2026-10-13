@@ -92,7 +92,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `barmenu` | `i3blocks-waybar` | Bar menus that open under the block you clicked and close on a click outside. | Wayland rofi cannot do either. |
 | `niri-screen-switch` | `Mod+BackSpace` | The i3 `screen_switch` menu. It uses `niri msg output` in place of xrandr. `niri-screen-switch "<entry>"` runs one entry without the menu (the bar's displays panel does that), `--list` prints them. | Menu. |
 | `niri-record` (+ `-desktop`, `-window`, `-region`) | `Mod+Alt+Shift+L`, `;`, `R` | Start/stop screen recording with gpu-screen-recorder. Add `Ctrl` to record without audio. | ffmpeg x11grab records nothing on Wayland. |
-| `niri-screenshot-clip` | `Mod+Alt+Shift+J` | Copy a screenshot of a region to the clipboard. | Two tools in a pipe. |
+| `niri-screenshot-clip` | nothing (since 7 Oct 2026) | Copy a screenshot of a region to the clipboard (`grim` + `slurp`). | Replaced on `Mod+Alt+Shift+J` by niri's own `screenshot`: slurp's overlay takes the keyboard focus, so every open popup or menu closed **before** grim took the picture. niri freezes the frame first, then you select (drag, then `Space`); it copies to the clipboard and also saves to `~/Pictures/Screenshots`. |
 | `niri-autoclick` | `Mod+Alt+Shift+C` | Start/stop an autoclicker (ydotool). | xdotool cannot click on Wayland. |
 | `niri-lock` | `Ctrl+Alt+L`, idle | hyprlock with the current wallpaper. A finger **or** the password unlocks. Returns only when the screen is locked. | Reads the wallpaper path, and waits for the lock so that `before-sleep` does not suspend an open desktop. |
 | `niri-idle` | startup | Lock after 10 min, turn the screens off 30 s later, lock before sleep. | swayidle command line. |

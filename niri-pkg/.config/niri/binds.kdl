@@ -195,7 +195,7 @@ binds {
 
     // ---- screenshots (scrot → grim/slurp/niri) ------------------------------
     Mod+Alt+Shift+K { screenshot-screen; }                 // scrot
-    Mod+Alt+Shift+J hotkey-overlay-title="screenshot region → clipboard" { spawn "niri-screenshot-clip"; }      // screenshot-clip: region → clipboard
+    Mod+Alt+Shift+J hotkey-overlay-title="screenshot region → clipboard" { screenshot; }  // niri freezes the frame first, so open popups stay in the shot (slurp took focus and closed them)
     Mod+Alt+Shift+S { screenshot; }                        // scrot -s: niri's own picker
     Print           { screenshot; }
     Alt+Print       { screenshot-window; }
