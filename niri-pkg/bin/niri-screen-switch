@@ -232,35 +232,54 @@ if [[ ${1-} == layout-* ]]; then
     exit $?
 fi
 
-# rofi is a layer-shell surface: with every output off it has nowhere to map,
-# never takes keyboard focus, and the blind "Mod+BackSpace lap Enter" that
-# worked under i3 goes nowhere. Light the panel first so the menu can show.
-if ! niri msg -j outputs | jq -e 'any(.[]; .logical != null)' >/dev/null; then
-    niri msg output "$LAPTOP" on
-    sleep 0.5
-fi
+ENTRIES=(
+    "Game: TV + sound + pad + Big Picture"
+    "Game: end (laptop)"
+    "Screen: laptop only"
+    "Screen: external 2560x1440"
+    "Screen: external 3440x1440 (wide)"
+    "Screen: HDMI only (native)"
+    "Screen: HDMI 2560x1440"
+    "Screen: external + laptop"
+    "Sound: HDMI"
+    "Sound: laptop"
+    "Theme: w95"
+    "Theme: dark-gruv"
+    "Theme: light-gruv"
+    "Theme: dark-sele"
+    "Theme: light-sele"
+    "Font: small"
+    "Font: middle"
+    "Font: big"
+    "Font: huge"
+)
 
-choice=$(printf '%s\n' \
-    "Game: TV + sound + pad + Big Picture" \
-    "Game: end (laptop)" \
-    "Screen: laptop only" \
-    "Screen: external 2560x1440" \
-    "Screen: external 3440x1440 (wide)" \
-    "Screen: HDMI only (native)" \
-    "Screen: HDMI 2560x1440" \
-    "Screen: external + laptop" \
-    "Sound: HDMI" \
-    "Sound: laptop" \
-    "Theme: w95" \
-    "Theme: dark-gruv" \
-    "Theme: light-gruv" \
-    "Theme: dark-sele" \
-    "Theme: light-sele" \
-    "Font: small" \
-    "Font: middle" \
-    "Font: big" \
-    "Font: huge" \
-    | rofi -dmenu -i -lines 19 -font "Ubuntu 25" -p "switch")
+# An entry as the argument runs it without the menu: the bar's displays panel
+# (bardeck/displays.py) does that, so its preset buttons keep this script's
+# logic (wait for an output to go live, repaper, pad, Big Picture). `--list`
+# prints the entries.
+if [[ ${1-} == --list ]]; then
+    printf '%s\n' "${ENTRIES[@]}"
+    exit 0
+elif [[ -n ${1-} ]]; then
+    choice=$1
+    known=0
+    for e in "${ENTRIES[@]}"; do [[ $e == "$choice" ]] && known=1; done
+    if (( ! known )); then
+        echo "niri-screen-switch: no entry \"$choice\" (see --list)" >&2
+        exit 2
+    fi
+else
+    # rofi is a layer-shell surface: with every output off it has nowhere to map,
+    # never takes keyboard focus, and the blind "Mod+BackSpace lap Enter" that
+    # worked under i3 goes nowhere. Light the panel first so the menu can show.
+    if ! niri msg -j outputs | jq -e 'any(.[]; .logical != null)' >/dev/null; then
+        niri msg output "$LAPTOP" on
+        sleep 0.5
+    fi
+    choice=$(printf '%s\n' "${ENTRIES[@]}" \
+        | rofi -dmenu -i -lines ${#ENTRIES[@]} -font "Ubuntu 25" -p "switch")
+fi
 
 case "$choice" in
     "Game: TV + sound + pad + Big Picture") layout_game ;;

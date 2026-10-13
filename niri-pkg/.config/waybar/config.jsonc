@@ -64,6 +64,7 @@
     "cffi/net":   { "variant": "compact", "scale": 2 },
     "cffi/dev":   { "variant": "compact", "scale": 2 },
     "cffi/power": { "variant": "compact", "scale": 2 },
+    "cffi/disp":  { "variant": "compact", "scale": 2 },
     "pulseaudio": { "format-muted": "󰖁" }
 }
 ]

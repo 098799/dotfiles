@@ -70,6 +70,14 @@
         "strip": "power", "variant": "full", "scale": 1,
         "on-click-right": "~/bin/i3blocks-waybar ~/scripts/power-profile.sh 1"
     },
+    // Panel: the screens drawn where they are, the selected one's on / off, scale,
+    // rotation, VRR and modes, and niri-screen-switch's entries as presets.
+    // Right: niri-screen-switch's menu (Mod+BackSpace).
+    "cffi/disp": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "disp", "variant": "full", "scale": 1,
+        "on-click-right": "~/bin/niri-screen-switch"
+    },
 
     // Native, because they follow PulseAudio events (no key bind has to signal the
     // bar) and scroll changes the volume. One pill for both.
