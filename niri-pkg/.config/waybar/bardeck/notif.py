@@ -99,10 +99,14 @@ def ago(wall: float, now: float | None = None) -> str:
 def body_text(s: str) -> tuple[str, bool]:
     """(what to draw, is it markup). dunst's markup is Pango's; a body that does not
     parse (a stray "<" or "&", an <a href>, an unclosed tag) is drawn as plain text
-    with the known tags taken out, since set_markup on bad markup draws nothing."""
+    with the known tags taken out, since set_markup on bad markup draws nothing.
+
+    The lines are joined into one paragraph ("a\n\nb" -> "a · b"): Pango's
+    set_height(-n) caps the lines of each paragraph, not of the layout, so a body
+    with newlines drew past its card into the next one."""
     from gi.repository import GLib, Pango
 
-    s = s.replace("\r", "")
+    s = " · ".join(line.strip() for line in s.replace("\r", "").split("\n") if line.strip())
     try:
         Pango.parse_markup(s, -1, "\0")
         return s, True
