@@ -2,7 +2,7 @@
 //
 //   [workspaces + what is open][claude quota]        [system][network][devices][audio][power][tray][clock]
 //
-// Every pill but audio and the tray is a bardeck strip (~/bin/bardeck, code in
+// Every pill but the tray is a bardeck strip (~/bin/bardeck, code in
 // ./bardeck/): a picture bardeck draws, shown by bar-strip.so (./bar-strip.c).
 // Hover a strip and its panel opens under it; click to pin the panel. Right and
 // middle clicks are in modules.jsonc. One daemon reads /proc, /sys and niri's
@@ -14,7 +14,7 @@
 // Nerd Font icons here are raw private-use characters (U+F0000 and up). Some
 // editors and tools drop them silently and leave a plain space. After an edit,
 // check they survived:
-//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 1
+//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/config.jsonc | wc -l   # expect 0
 [
 {
     "name": "main",
@@ -35,7 +35,7 @@
     // module about. Quota follows the workspaces, as on the laptop.
     "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],
     "modules-center": [],
-    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"],
+    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "cffi/audio", "cffi/power", "cffi/disp", "tray", "cffi/clock"],
     "tray": { "spacing": 10, "icon-size": 20 }
 },
 {
@@ -55,7 +55,7 @@
     // (~1350 px of pills in all), so quota follows the workspaces.
     "modules-left": ["cffi/ws", "cffi/quota", "custom/bardeck"],
     "modules-center": [],
-    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "group/audio", "cffi/power", "tray", "cffi/clock"],
+    "modules-right": ["cffi/sys", "cffi/net", "cffi/dev", "cffi/audio", "cffi/power", "cffi/disp", "tray", "cffi/clock"],
     // The compact strips: fewer words, the same signals (colour, icons, graphs).
     "cffi/ws":    { "variant": "compact", "scale": 2 },
     "cffi/clock": { "variant": "compact", "scale": 2 },
@@ -65,6 +65,6 @@
     "cffi/dev":   { "variant": "compact", "scale": 2 },
     "cffi/power": { "variant": "compact", "scale": 2 },
     "cffi/disp":  { "variant": "compact", "scale": 2 },
-    "pulseaudio": { "format-muted": "󰖁" }
+    "cffi/audio": { "variant": "compact", "scale": 2 }
 }
 ]

@@ -21,7 +21,7 @@ Everything is in `~/dotfiles/niri-pkg/` and GNU Stow links it into `~`.
 | `~/.config/niri/binds.kdl` | All key bindings, grouped by topic. |
 | `~/.config/niri/startup.kdl` | Programs started at login (waybar after `bardeck css`, dunst, syncthing, …). |
 | `~/.config/niri/environment.kdl` | Env vars for started programs. Mostly a list of vars to remove. |
-| `~/.config/waybar/` | The bar: floating pills on a transparent bar, almost all drawn by **bardeck** (see [The bar](#the-bar-bardeck)). `config.jsonc` has the two bars (the laptop's eDP-1 takes the compact pills), `modules.jsonc` the modules, `style.css` the native pills (audio, tray), `bardeck/` the engine, `bar-strip.c` its waybar module. Font = the terminal font (UbuntuMono 12). |
+| `~/.config/waybar/` | The bar: floating pills on a transparent bar, almost all drawn by **bardeck** (see [The bar](#the-bar-bardeck)). `config.jsonc` has the two bars (the laptop's eDP-1 takes the compact pills), `modules.jsonc` the modules, `style.css` the native pill (the tray), `bardeck/` the engine, `bar-strip.c` its waybar module. Font = the terminal font (UbuntuMono 12). |
 | `~/.config/hypr/hyprlock.conf` | Lock screen: look, and the fingerprint + password setup. |
 | `pam.d/hyprlock-password` | The lock screen's password-only PAM file. It is **not** stowed: install it with `sudo cp pam.d/hyprlock-password /etc/pam.d/`. `install.sh` warns when the copy in `/etc` differs. |
 | `~/.config/swaylock/config` | Colours for swaylock, the old locker. Only a fallback now. |
@@ -104,7 +104,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 [workspaces + what is open][claude quota]        [system][network][devices][audio][power][tray][clock]
 ```
 
-Each pill but audio and the tray is a **strip**: a picture drawn by `bardeck`
+Each pill but the tray is a **strip**: a picture drawn by `bardeck`
 (`~/bin/bardeck`, code in `~/.config/waybar/bardeck/`) and shown by
 `bar-strip.so`, a waybar CFFI module (`bar-strip.c`). **Hover** a strip and its
 **panel** opens under it; it closes when the pointer leaves the strip and the
@@ -119,6 +119,7 @@ i3blocks scripts' menus.
 | system | A CPU graph of the last 40 s and %, memory (with swap under it), CPU temperature (k10temp). A disk badge at 85% full, an update count when there are updates. | 5 min of CPU, memory, swap, temperature; every core; the busiest processes by CPU and by memory; disks; updates (check / upgrade); htop, biggest dirs, boot blame. |
 | network | Signal (the icon's colour), traffic, the VPN, tailscale. The SSID is in the panel. | The link (signal, band, link rates, addresses); **the Wi-Fi networks in range**, nmtui's "Activate a connection" (`bardeck/wifi.py`, NetworkManager over D-Bus, read only while the panel is open): click a row to join, a new secured network opens a password field in its row (Enter join, Tab show, `Ctrl+V` paste, Esc cancel; a failed new profile is deleted again), hover a row for disconnect / forget (click twice); enterprise and WEP go to `nmtui-connect`. Pinned: `i`/`o` select, `k`/`l` half a list, Enter join, `r` scan, `d` disconnect, `x` forget. Then 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (link rates, reconnect, reset adapter, nmtui, speedtest). |
 | devices | Bluetooth, and the headphones, keyboard and mouse lit when connected. | Bluetooth on / off; **every device BlueZ knows**, bluetoothctl drawn (`bardeck/bluez.py`, BlueZ over D-Bus, mirrored only while the panel is open): type icon, battery, marks for connected / paired / trusted, and while a scan runs the devices found with their signal (nameless ones behind "show n unnamed"). Click a paired row to connect, a new one to pair, trust and connect; hover a row for disconnect / forget (click twice). A pairing asks for, or shows, its code in the row (PIN or passkey field, confirm / reject chips); Esc cancels it, and so does closing the panel. Scan runs 25 s, never by itself (an inquiry makes Bluetooth audio stutter). Pinned: `i`/`o` select, `k`/`l` half a list, Enter connect / pair, `r` scan, `d` disconnect, `x` forget, `a` unnamed. Then where sound goes (click to switch output or input), mixer, bluetoothctl, restart logid, nuke bt. |
+| audio | The output's volume (its icon red when muted), the mic (red when muted), and while a player plays a ♪ and its title (compact: a play mark). Scroll: ±5% on the default output; middle click: mute; right: pavucontrol. | pavucontrol, drawn (`bardeck/audio.py`): the **player** on top (MPRIS: cover, title, artist, album, a progress bar to click, previous / play-pause / next, a chip per player when there are several), then **output** and **input**, each device a row with its slider (click sets, the wheel steps 5%) and mute; click a row to make it the default (an output takes the playing streams with it). **Apps**: every stream with its own slider and mute, and which output it goes to. Pinned: `i`/`o` select, `k`/`l` half the list, `u`/`p` −/+5% (the player row: previous / next track), `m` mute, Enter default / play-pause, space play-pause, `j`/`;` previous / next player; with no row selected `u`/`p`/`m` act on the default output. |
 | displays | A monitor and the count of screens on (full: `/N` when a connected one is off). Amber while a preset runs or a new mode waits to be kept. | The screens drawn to scale where niri put them (the ones that are off greyed, beside; the focused one outlined; click one to select it), then the selected screen's power, scale, rotation, VRR and modes (`bardeck/displays.py`: niri's socket for reads, `niri msg output` for changes). The last screen on cannot be turned off. A new mode goes back after 15 s unless kept (Enter or "keep"), with the panel closed too. Then **niri-screen-switch's entries as presets** (game, screens, sound, theme, font): each runs `niri-screen-switch "<entry>"`, so the script's logic stays in one place; a screen preset whose output is not connected is disabled. Pinned: `u`/`p` (or `j`/`;`) previous/next screen, `i`/`o` a mode, `k`/`l` half a list, Enter try the mode (or keep it), BackSpace go back. Right click: the script's menu. |
 | power | Battery, the power profile, turbo boost when on. | The battery's last 24 h (upower's history), draw, health, the charge limit; power profile and turbo boost switches. |
 | clock | Date and time. | Time to the second, UTC, day of the year, two months with week numbers. **Right click: the whole year.** Pinned: `y` year ⇄ two months, `u`/`p` a month (a year in the year view), `t` today. |
@@ -139,14 +140,28 @@ the device list).
 block per bar every few seconds (~15% of a core after the 7 Oct sharing fix, ~70%
 before). bardeck reads `/proc` and `/sys`, NetworkManager and BlueZ over D-Bus
 (BlueZ only when it signals a change), addresses by ioctl, and niri's socket. It
-starts no program in steady state: `iw` and `pactl` only while their panel is
-open, `checkupdates` once an hour on its own thread. A strip is drawn only when
+starts no program in steady state but one: `iw` and the devices panel's `pactl`
+only while their panel is open, `checkupdates` once an hour on its own thread, and
+the audio strip's one long-lived `pactl subscribe` (below). A strip is drawn only when
 its inputs changed (`key()`), written only when its bytes changed, and only in
 the variant a screen shows. Strips are raw ARGB (`core.write_strip`), not PNG:
 waybar copies them on its main thread instead of decoding. Measured 7 Oct 2026
 over 90 s: **bardeck ~1.0% of a core, waybar ~0.1%, 0 child processes**, ~45 MB.
 (The first version was 7.6%: a /proc scan per signal to find waybar, and
 `bt-state.sh`/`iw`/`ip` every 4 s.)
+
+**Audio: one idle child, on purpose.** There is no pulsectl and no Python
+libpulse here, and libpulse over ctypes means copying `pa_sink_info` & co. by hand.
+So `bardeck/pulse.py` keeps ONE `pactl subscribe` running (since 13 Oct 2026, so the
+measurement above now reads "1 child process"): it prints a line per PulseAudio
+event and sleeps in poll() otherwise (~0 CPU). On a sink, source or server event
+(streams only while the panel is open) bardeck runs `pactl -f json list` for what
+changed, at most 4 times a second, and draws the strip: a volume key reaches the
+bar in ~30 ms (the native module it replaced followed the events too). The child
+dies with the daemon (PR_SET_PDEATHSIG) and is restarted when PulseAudio restarts.
+The players come over MPRIS on the session bus, in-process (`bardeck/mpris.py`);
+covers are decoded with Pillow, only while the panel shows them: GdkPixbuf would
+decode through glycin, a sandboxed loader process that lingers ~30 s.
 
 **Fast panels.** The panels live in the daemon on one hidden layer-shell
 overlay. A panel opens in ~20 ms (one map and one blit); the quota panel, which

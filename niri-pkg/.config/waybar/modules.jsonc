@@ -11,7 +11,7 @@
 // Nerd Font icons here are raw private-use characters (U+F0000 and up). Some
 // editors and tools drop them silently and leave a plain space. After an edit,
 // check they survived:
-//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/modules.jsonc | wc -l   # expect 6
+//     grep -oP '[\x{F0000}-\x{FFFFD}]' ~/.config/waybar/modules.jsonc | wc -l   # expect 0
 {
     // The engine. Prints nothing, so it takes no space; dies with waybar. Both bars
     // start one; the second waits on a lock.
@@ -63,6 +63,16 @@
         "strip": "dev", "variant": "full", "scale": 1,
         "on-click-right": "~/bin/i3blocks-waybar ~/scripts/bluetooth.sh 3"
     },
+    // Panel: the player (cover, progress, buttons; several players: pick one), every
+    // output and input with a slider and mute, every app's stream (bardeck/audio.py).
+    // Drawn on PulseAudio's and the players' own events. Scroll: ±5% on the default
+    // output. Middle: mute. Right: pavucontrol.
+    "cffi/audio": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "audio", "variant": "full", "scale": 1,
+        "on-click-middle": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
+        "on-click-right": "pavucontrol"
+    },
     // Panel: the battery's 24 h, power profile and turbo boost switches.
     // Right: power-profile.sh's menu.
     "cffi/power": {
@@ -79,28 +89,5 @@
         "on-click-right": "~/bin/niri-screen-switch"
     },
 
-    // Native, because they follow PulseAudio events (no key bind has to signal the
-    // bar) and scroll changes the volume. One pill for both.
-    "group/audio": {
-        "orientation": "horizontal",
-        "modules": ["pulseaudio", "pulseaudio#mic"]
-    },
-    "pulseaudio": {
-        "format": "{icon} {volume}%",
-        "format-muted": "󰖁 mute",
-        "format-icons": { "default": ["󰕿", "󰖀", "󰕾"] },
-        "tooltip-format": "{desc}\nleft: mute · right: pavucontrol · scroll: ±5%",
-        "on-click": "pactl set-sink-mute @DEFAULT_SINK@ toggle",
-        "on-click-right": "pavucontrol",
-        "scroll-step": 5
-    },
-    "pulseaudio#mic": {
-        "format": "{format_source}",
-        "format-source": "󰍬",
-        "format-source-muted": "󰍭",
-        "tooltip-format": "mic {source_volume}%\nclick: mute",
-        "on-click": "pactl set-source-mute @DEFAULT_SOURCE@ toggle",
-        "on-click-right": "pactl set-source-mute @DEFAULT_SOURCE@ toggle"
-    },
     "tray": { "spacing": 8, "icon-size": 16 }
 }

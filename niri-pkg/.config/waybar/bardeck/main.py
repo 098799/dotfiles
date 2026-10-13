@@ -6,7 +6,7 @@
     bardeck panel FILE PANEL [--scale N] [--warm S]               a panel to a PNG
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
-STRIP / PANEL: quota sys net dev power disp clock (ws: strip only, one per output).
+STRIP / PANEL: quota sys net dev audio power disp clock (ws: strip only, one per output).
 
 Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
 $XDG_RUNTIME_DIR/bardeck (raw ARGB, core.write_strip) and sends hover / click / scroll to this daemon's socket
@@ -60,6 +60,7 @@ def reload_waybar() -> None:
 
 def build(with_ws: bool = True):
     """Every strip and panel, wired to one sampler."""
+    from .audio import Audio, AudioPanel, AudioStrip
     from .clock import ClockPanel, ClockStrip
     from .devices import DevPanel, DevStrip
     from .displays import DispPanel, DispStrip, Displays
@@ -70,6 +71,7 @@ def build(with_ws: bool = True):
 
     s = Sampler()
     disp = Displays()
+    audio = Audio()
     try:  # quota imports ~/bin/qtop: a host without it still gets the rest of the bar
         from .quota import Quota, QuotaPanel
         quota = Quota()
@@ -81,11 +83,12 @@ def build(with_ws: bool = True):
         "net": (NetStrip(s), 2),
         "dev": (DevStrip(s), 2),
         "power": (PowerStrip(s), 5),
+        "audio": (AudioStrip(audio), 5),  # drawn on its own events too (watch)
         "disp": (DispStrip(disp), 2),
         "clock": (ClockStrip(), 1),
     }
-    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s), ClockPanel(),
-                                       DispPanel(disp))}
+    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s), AudioPanel(audio),
+                                  ClockPanel(), DispPanel(disp))}
     if quota is not None:
         panels["quota"] = QuotaPanel(quota)
     return s, quota, strips, panels
@@ -103,6 +106,11 @@ class Daemon:
         self.deck = Deck(self.panels)
         self.ws = WsStrip(self.draw_ws)
         self.s.watch_bluez()
+        # A strip with its own event feed (audio: pactl subscribe, MPRIS) is drawn when
+        # that says something changed, not on the next tick.
+        for name, (strip, _) in self.strips.items():
+            if hasattr(strip, "watch"):
+                strip.watch(lambda name=name: self.strip_changed(name))
         self.tick_n = 0
         self.dirty = False
         self.last_variants = None
@@ -183,6 +191,16 @@ class Daemon:
             core.log(f"tick {n}: {(time.perf_counter() - t0) * 1000:.1f} ms")
         return True
 
+    def strip_changed(self, name: str) -> None:
+        strip = self.strips[name][0]
+        try:
+            for variant, scale in self.last_variants or self.variants():
+                self.draw_strip(name, strip, variant, scale)
+        except Exception as err:
+            core.log(f"{name}: {err!r}")
+        self.flush()
+        self.deck.invalidate(name)
+
     def draw_ws(self) -> None:
         for output, rect, variant in self.ws.files():
             scale = dict(VARIANTS)[variant]
@@ -213,6 +231,10 @@ class Daemon:
                 self.ws.click(key, local)
             elif verb in ("scroll-up", "scroll-down"):
                 self.ws.scroll(verb == "scroll-up")
+            return
+        if verb in ("scroll-up", "scroll-down") and hasattr(self.strips.get(strip, (None,))[0], "scroll"):
+            self.strips[strip][0].scroll(verb == "scroll-up")  # audio: the volume
+            self.strip_changed(strip)
             return
         self.deck.message(verb, strip, float(cx), self.deck.monitor_at(mx, my), core.ZOOM.get(variant, 1.0))
         if verb == "click":
