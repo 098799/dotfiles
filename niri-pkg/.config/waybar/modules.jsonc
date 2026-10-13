@@ -98,6 +98,14 @@
         "on-click-middle": "dunstctl set-paused toggle",
         "on-click-right": "dunstctl history-pop"
     },
+    // Panel: the Claude agent sessions (waiting ones first; click: a terminal attached
+    // to its tmux session), slotq's queue, Tomek's open MRs (click: the browser).
+    // bardeck/agents.py; it reads rcmon (GitLab only while rcmon is down). Right: cmon.
+    "cffi/agents": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "agents", "variant": "full", "scale": 1,
+        "on-click-right": "alacritty -e ~/bin/cmon"
+    },
 
     "tray": { "spacing": 8, "icon-size": 16 }
 }

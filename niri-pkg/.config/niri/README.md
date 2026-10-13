@@ -101,7 +101,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 ## The bar (bardeck)
 
 ```
-[workspaces + what is open][claude quota]        [system][network][devices][audio][power][displays][tray][notifications][clock]
+[workspaces + what is open][claude quota]        [agents][system][network][devices][audio][power][displays][tray][notifications][clock]
 ```
 
 Each pill but the tray is a **strip**: a picture drawn by `bardeck`
@@ -116,6 +116,7 @@ i3blocks scripts' menus.
 |---|---|---|
 | workspaces | Each workspace with windows: its name, and for the visible one a mark per column, in column order: the app's icon, or for a terminal the first letters of its title. The focused column is underlined. Other workspaces show marks too while the pill stays under its width budget (`ws.BUDGET`). Click a name: that workspace; click a mark: that window; scroll: the next one. | none |
 | quota | Per Claude account a thumbnail of qtop's week chart, the 5h window as a tank, the weekly % (see `bardeck/quota.py`). | Every account's week at full size, its 5h peaks, the pool totals. Pinned: `u`/`p` earlier/later week, `i`/`o` select, Enter: `qtop <account>`. |
+| agents | A robot (filled while one works) and how many agents work; an amber badge with the ones that wait for Tomek (a permission dialog or a question on screen; red: stuck on a rate limit or an error); a red dot on the robot when the head pipeline of one of his open MRs failed. Right: cmon. | cmon's board, drawn (`bardeck/agents.py`): **agents**, waiting first (tmux session, ticket and title, state and for how long, slot or worktree; the picked one's last words under the list); click: a terminal attached to its tmux session, as cmon's `A` does. **Queue**: slotq's jobs (`~/.legartis/slotq/state.json`), Enter: the job's MR. **Merge requests**: Tomek's open MRs with pipeline, threads, approved, conflict, draft; click: the browser. Pinned: `i`/`o` select, `k`/`l` half a section, `j`/`;` previous / next section, Enter attach / open, `r` ask rcmon now, `c` cmon. |
 | system | A CPU graph of the last 40 s and %, memory (with swap under it), CPU temperature (k10temp). A disk badge at 85% full, an update count when there are updates. | 5 min of CPU, memory, swap, temperature; every core; the busiest processes by CPU and by memory; disks; updates (check / upgrade); htop, biggest dirs, boot blame. |
 | network | Signal (the icon's colour), traffic, the VPN, tailscale. The SSID is in the panel. | The link (signal, band, link rates, addresses); **the Wi-Fi networks in range**, nmtui's "Activate a connection" (`bardeck/wifi.py`, NetworkManager over D-Bus, read only while the panel is open): click a row to join, a new secured network opens a password field in its row (Enter join, Tab show, `Ctrl+V` paste, Esc cancel; a failed new profile is deleted again), hover a row for disconnect / forget (click twice); enterprise and WEP go to `nmtui-connect`. Pinned: `i`/`o` select, `k`/`l` half a list, Enter join, `r` scan, `d` disconnect, `x` forget. Then 5 min of traffic, VPN off / wg_1 / wg_2, network.sh's actions (link rates, reconnect, reset adapter, nmtui, speedtest). |
 | devices | Bluetooth, and the headphones, keyboard and mouse lit when connected. | Bluetooth on / off; **every device BlueZ knows**, bluetoothctl drawn (`bardeck/bluez.py`, BlueZ over D-Bus, mirrored only while the panel is open): type icon, battery, marks for connected / paired / trusted, and while a scan runs the devices found with their signal (nameless ones behind "show n unnamed"). Click a paired row to connect, a new one to pair, trust and connect; hover a row for disconnect / forget (click twice). A pairing asks for, or shows, its code in the row (PIN or passkey field, confirm / reject chips); Esc cancels it, and so does closing the panel. Scan runs 25 s, never by itself (an inquiry makes Bluetooth audio stutter). Pinned: `i`/`o` select, `k`/`l` half a list, Enter connect / pair, `r` scan, `d` disconnect, `x` forget, `a` unnamed. Then where sound goes (click to switch output or input), mixer, bluetoothctl, restart logid, nuke bt. |
@@ -153,6 +154,17 @@ waybar copies them on its main thread instead of decoding. Measured 7 Oct 2026
 over 90 s: **bardeck ~1.0% of a core, waybar ~0.1%, 0 child processes**, ~45 MB.
 (The first version was 7.6%: a /proc scan per signal to find waybar, and
 `bt-state.sh`/`iw`/`ip` every 4 s.)
+
+**Agents: rcmon asked on edges, not polled.** The agents panel adds no
+bookkeeping: rcmon's `/api/state` is cmon's own board plus its reading of every
+pane, and `/api/mrs` its cache of the open MRs. One `/api/state` costs rcmon ~0.18 s
+of CPU (it captures every pane) and may make it read GitLab (its MR cache lives
+60 s), so bardeck asks only on an edge: every 4 s it reads `/proc/<pid>/stat` of each
+claude process (a working one burns 4-6 ticks/s, one at a prompt ~1) and the mtime
+of cmon's lock directory, and asks when one went quiet or busy, ended, or was
+spawned: at most every 30 s, at least every 5 min, every 4 s while the panel is
+open. The last answer is kept in `$XDG_RUNTIME_DIR/bardeck/agents.json`. With rcmon
+down the MRs come from `glab api` (GET), at most every 60 s while the panel is open.
 
 **Audio: one idle child, on purpose.** There is no pulsectl and no Python
 libpulse here, and libpulse over ctypes means copying `pa_sink_info` & co. by hand.

@@ -51,7 +51,8 @@ class Panel:
         """It closed, or another panel took its place: stop costly sampling."""
 
     def key(self, key: str, ctrl: bool) -> bool:
-        """A key while pinned; True = handled (the panel redraws)."""
+        """A key while pinned; True = handled (the panel redraws), "close" = handled,
+        and it opened a window that wants the keyboard: the panel closes."""
         return False
 
     def text_key(self, key: str, char: str, ctrl: bool) -> bool:
@@ -389,7 +390,11 @@ class Deck:
         if key in ("Escape", "q") or (ctrl and key == "g"):
             self.hide()
             return True
-        if self.panel is not None and self.panel.key(key, ctrl):
+        done = self.panel.key(key, ctrl) if self.panel is not None else False
+        if done == "close":  # the key opened a window (a terminal, the browser): make way for it
+            self.hide()
+            return True
+        if done:
             self.area.queue_draw()
             return True
         return False

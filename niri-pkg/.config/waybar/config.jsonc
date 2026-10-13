@@ -66,6 +66,7 @@
     "cffi/power": { "variant": "compact", "scale": 2 },
     "cffi/disp":  { "variant": "compact", "scale": 2 },
     "cffi/audio": { "variant": "compact", "scale": 2 },
-    "cffi/notif": { "variant": "compact", "scale": 2 }
+    "cffi/notif": { "variant": "compact", "scale": 2 },
+    "cffi/agents": { "variant": "compact", "scale": 2 }
 }
 ]
