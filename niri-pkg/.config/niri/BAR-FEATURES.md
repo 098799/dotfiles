@@ -26,6 +26,8 @@ opens this file. The bar shows one of these lines a day as a tip (see the end).
 - **Pair Bluetooth: devices pill** — "scan" for 25 s, click a new device to pair, trust and connect. A PIN or a code to confirm shows in the device's row.
 - **Audio and media: speaker pill** — scroll on it for volume, middle-click to mute. The panel has the player (cover, seek, previous/play/next), every output and mic with a slider, and every app's own volume.
 - **Displays: monitor pill** — the screens to scale; change brightness (the laptop and an external monitor, by DDC/CI: click the slider or scroll on it), scale, rotation, mode (a new mode goes back after 15 s unless you keep it), and the niri-screen-switch presets (game mode, layouts, sound, theme, font).
+- **Charge limit: power pill** — 60 / 80 / 100%, kept after a reboot; "full once" charges to 100% until the next boot (for a day away from the charger).
+- **Keyboard light: power pill** — off / low / high.
 - **Keep awake: power pill** — "keep awake" on / 1 h / until 20% battery: no lock, no screen off. A cup shows on the pill.
 - **Recording indicator: power pill** — while niri-record runs, a red dot and the time; the panel has a stop button.
 - **Notifications: the bell** — the badge counts new ones. Click a card to show it again, hover × to remove, "do not disturb" to hold popups. Middle-click the bell: do not disturb.

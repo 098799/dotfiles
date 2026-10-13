@@ -84,3 +84,15 @@ Asked by Tomek: "monitor brightness in niri bar popups?" One Claude Code session
 - Side effects on the real machine: `sudo pacman -S ddcutil` (2.2.7-1; it created the `i2c` group and its udev rule `60-ddcutil-i2c.rules`), `sudo udevadm trigger --subsystem-match=i2c-dev` (uaccess ACLs on the video adapters' buses). The laptop backlight was set to 40, 45, 1 and back to 62% by the test.
 - Verified: the panel rendered (`bardeck panel … disp`); live after `pkill -USR2 -x waybar`, opened by `bardeck open disp` and screenshotted on eDP-1; the laptop set / step / clamp / restore against the real backlight; an output with no DDC/CI ("DP-1" while unplugged) gives the "no DDC/CI" reason; `parse_detect` / `parse_vcp` on ddcutil 2.x output.
 - **Not verified: a real external monitor** (none was connected). The DDC/CI path ran only up to `ddcutil detect`. On p340 (if it runs this bar) ddcutil is not installed: its external rows say so.
+
+## 14 Oct 2026 — charge limit and keyboard light in the power panel
+
+Asked by Tomek: "add charge limit and keybord backlit" (from the list of gaps after the brightness row). Same session, on master.
+
+| Commit | What |
+|---|---|
+| (this commit) | New `bardeck/charge.py`, two rows in the power panel (`power.py`). **Charge limit**: chips 60 / 80 / 100% (start 5 below) rewrite `/etc/tlp.d/95-w95-charge-limit.conf` — the w95 System Monitor's file, so the two agree; its header now names both — and apply it with `sudo -n tlp setcharge START STOP BAT0`; "full once" = `tlp setcharge 95 100` without the file (TLP: temporary until the next boot), then "back to N%" = `tlp setcharge BAT0` (no thresholds: TLP restores the configured ones). Not `tlp fullcharge`: it refuses on battery ("fullcharge is possible on AC power only"). The limit in use is sysfs `charge_control_end_threshold`; a difference from the file shows as "full charge until reboot". **Keyboard light**: `/sys/class/leds/*kbd_backlight` (ThinkPad: 0..2 → off / low / high), set with brightnessctl (no root). |
+
+- Side effects on the real machine: the drop-in rewritten with the same 75/80 and the new header; thresholds set to 95/100 and back to 75/80 (end state checked in sysfs: 75 / 80); the keyboard light set to 1 and back to 0.
+- Verified: both rows rendered (limit state and full-once state); each action run from Python against the real battery and LED; the live panel after `pkill -USR2 -x waybar`.
+- **Not verified**: TLP keeping the new limit across a real reboot (it reads the drop-in at boot, as the w95 toggle already relies on).

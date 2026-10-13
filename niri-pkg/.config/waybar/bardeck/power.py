@@ -1,6 +1,7 @@
 """Power: battery and power profile on the strip; in the panel the battery's last 24 h
 (upower's own history), its draw and health, and the profile and boost switches.
-Also what keeps the machine awake or busy: caffeine (caffeine.py: a cup on the strip)
+The battery's charge limit and the keyboard light (charge.py). Also what keeps the
+machine awake or busy: caffeine (caffeine.py: a cup on the strip)
 and a screen recording that runs (recording.py: a red dot and its time on the strip,
 the file and a stop button in the panel).
 
@@ -12,9 +13,10 @@ import glob
 import os
 import time
 
-from . import core, recording
+from . import charge, core, recording
 from .caffeine import MODES as CAFFEINE_MODES
 from .caffeine import Caffeine
+from .charge import Charge
 from .core import Hits, button, heading, rgba, text
 from .deck import Panel
 from .sample import Sampler
@@ -145,10 +147,14 @@ class PowerPanel(Panel):
         self.hist: list[tuple[float, float]] = []
         self.hist_at = 0.0
         self.rec: recording.Recording | None = None
+        self.charge = Charge()
 
     def size(self):
         self.rec = recording.current()  # a recording's row comes and goes: three stat()s
-        return self.W, 356 + (56 if self.rec is not None else 0)
+        h = 356 + (56 if self.rec is not None else 0)
+        h += 56 if self.charge.stop() is not None else 0
+        h += 56 if charge.kbd() is not None else 0
+        return self.W, h
 
     def opened(self) -> None:
         if time.time() - self.hist_at > 60:
@@ -234,9 +240,51 @@ class PowerPanel(Panel):
                         glyph="󰈐") + 8
         button(cr, hits, x, y, "upower details", lambda: core.menu_action("battery.sh", 3) or True, glyph="󰂄")
         y += 36
+        y = self.draw_charge(cr, hits, P, y)
+        y = self.draw_kbd(cr, hits, P, y)
         y = self.draw_caffeine(cr, hits, P, y)
         if self.rec is not None:
             self.draw_recording(cr, hits, P, y, self.rec)
+
+    def draw_charge(self, cr, hits: Hits, P: float, y: float) -> float:
+        """The stop thresholds (each saved for TLP, so it outlasts a reboot), and a full
+        charge until the next boot."""
+        W, ch = self.W, self.charge
+        stop = ch.stop()
+        if stop is None:
+            return y
+        saved = ch.saved()
+        full = saved is not None and stop != saved  # a fullcharge (or a hand-run setcharge)
+        st = ch.status
+        words, tone = (st[1], st[0]) if st else (f"full charge until reboot · then {saved}%", "warn") if full \
+            else ("saved for TLP: it stays after a reboot", "dim")
+        ww = text(cr, W - P, y - 2, words, 12 if st or full else 11, tone, align=1) + 12
+        heading(cr, P, y, "charge limit", W - 2 * P - ww)
+        y += 20
+        x = P
+        limits = sorted(set(charge.LIMITS) | ({saved} if saved else set()))
+        for lim in limits:
+            x += button(cr, hits, x, y, f"{lim}%", lambda v=lim: ch.set_limit(v) or self.s.poke(),
+                        on=lim == saved and not full, tone="ok" if lim < 100 else "warn") + 8
+        x += 8
+        if full:
+            button(cr, hits, x, y, f"back to {saved}%", lambda: ch.restore() or self.s.poke(), glyph="󰁹")
+        elif stop < 100:
+            button(cr, hits, x, y, "full once", lambda: ch.full_once() or self.s.poke(), tone="warn", glyph="󰂅")
+        return y + 36
+
+    def draw_kbd(self, cr, hits: Hits, P: float, y: float) -> float:
+        k = charge.kbd()
+        if k is None:
+            return y
+        cur, top = k
+        heading(cr, P, y, "keyboard light", self.W - 2 * P)
+        y += 20
+        x = P
+        for level, label in charge.kbd_levels(top):
+            x += button(cr, hits, x, y, label, lambda v=level: charge.set_kbd(v), on=level == cur,
+                        tone="bg3" if level == 0 else "accent", glyph="󰌌" if level == top else None) + 8
+        return y + 36
 
     def draw_caffeine(self, cr, hits: Hits, P: float, y: float) -> float:
         W = self.W
