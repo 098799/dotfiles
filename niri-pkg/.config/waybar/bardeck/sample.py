@@ -22,6 +22,7 @@ import time
 from collections import deque
 
 from . import core
+from .wifi import Wifi
 
 HISTORY = 300  # seconds of graph in the panels
 WORKER_EVERY = 4.0
@@ -134,7 +135,8 @@ class Sampler:
         self.bt_battery: dict[str, int] = {}  # MAC -> %, from BlueZ
         self._bt_dirty, self._bt_at = True, 0.0
         self._system_bus = None
-        self.want_link = False  # the network panel is open: iw for dBm and link rates
+        self.want_link = False  # the network panel is open: iw for dBm and link rates, the Wi-Fi list
+        self.nets = Wifi(self)
         self.sinks: list[dict] = []
         self.sources: list[dict] = []
         self.default_sink = ""
@@ -326,6 +328,13 @@ class Sampler:
                         if m:
                             wifi[key] = m.group(1)
                 break
+        if self.want_link:
+            # The list wants the radio, connected or not (a link that is down has no
+            # entry in ifaces).
+            radio = next((n for n in sorted(os.listdir("/sys/class/net"))
+                          if os.path.isdir(f"/sys/class/net/{n}/wireless")), None)
+            if radio:
+                self.nets.read(radio, wifi.get("ssid"), wifi.get("strength"))
         vpn = sorted(n for n in os.listdir("/sys/class/net")
                      if n.startswith(("wg", "tun", "tap")) and n != "tailscale0")
         tailscale = ipv4("tailscale0") if os.path.exists("/sys/class/net/tailscale0") else ""

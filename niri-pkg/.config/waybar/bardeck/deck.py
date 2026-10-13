@@ -36,6 +36,7 @@ class Panel:
     name = ""
     live = 0.0          # seconds between redraws while open; 0 = only on new data
     drawn_ahead = False  # slow to draw: keep a picture ready (see Deck.prerender)
+    typing = False       # a text field has the keyboard: every key goes to text_key, Esc too
 
     def size(self) -> tuple[int, int]:
         raise NotImplementedError
@@ -51,6 +52,18 @@ class Panel:
 
     def key(self, key: str, ctrl: bool) -> bool:
         """A key while pinned; True = handled (the panel redraws)."""
+        return False
+
+    def text_key(self, key: str, char: str, ctrl: bool) -> bool:
+        """A key while `typing`: char is what it types ("" for none). True = redraw."""
+        return False
+
+    def hover(self, x: float, y: float) -> bool:
+        """The pointer moved to (x, y) on the panel ((-1, -1): it left). True = redraw."""
+        return False
+
+    def scroll(self, down: bool) -> bool:
+        """The wheel over the panel. True = redraw."""
         return False
 
     def state(self) -> tuple:
@@ -82,6 +95,7 @@ class Deck:
         self.asked = 0.0
         self.inside = False  # the pointer is on the panel: nothing may close it but a click or Esc
         self.monitor = None
+        self.scrolled = 0.0  # smooth-scroll deltas not yet a whole step
         self.zoom = 1.0  # the strip's variant's core.ZOOM: the panel is drawn that much bigger
 
         win = self.win = Gtk.Window()
@@ -101,12 +115,14 @@ class Deck:
         win.add(self.area)
         self.area.connect("draw", self.on_draw)
         win.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK
-                       | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK)
+                       | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_PRESS_MASK
+                       | Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.SMOOTH_SCROLL_MASK)
         win.connect("enter-notify-event", self.on_enter)
         win.connect("leave-notify-event", self.on_leave)
         win.connect("motion-notify-event", self.on_motion)
         win.connect("button-press-event", self.on_press)
         win.connect("key-press-event", self.on_key)
+        win.connect("scroll-event", self.on_scroll)
         win.connect("delete-event", lambda *_: self.hide() or True)
 
     # -- drawing ---------------------------------------------------------------
@@ -299,6 +315,11 @@ class Deck:
         self.inside = self.in_panel(ex, ey)
         if self.inside:
             self.cancel_hide()
+            ox, oy = self.origin
+            if self.panel.hover((ex - ox) / self.zoom, (ey - oy) / self.zoom):
+                self.area.queue_draw()
+        elif self.panel is not None and self.panel.hover(-1, -1):
+            self.area.queue_draw()
         elif not self.pinned:
             self.hide_soon()
 
@@ -309,6 +330,8 @@ class Deck:
     def on_leave(self, _w, event) -> bool:
         if event.detail != Gdk.NotifyType.INFERIOR:
             self.inside = False
+            if self.panel is not None and self.panel.hover(-1, -1):
+                self.area.queue_draw()
             self.hide_soon()  # up to the bar: maybe onto a strip, which says "enter"
         return False
 
@@ -329,15 +352,40 @@ class Deck:
         if close:
             self.hide()
         else:
+            if self.panel is not None and self.panel.typing and not self.pinned:
+                self.show(self.panel, None, None, pinned=True)  # the field needs the keyboard
             # The action changed state (a profile, a VPN): show it soon.
             GLib.timeout_add(400, lambda: self.area.queue_draw() and False)
             if self.panel is not None and self.panel.drawn_ahead:
                 self.invalidate(self.panel.name)
         return True
 
+    def on_scroll(self, _w, event) -> bool:
+        if self.panel is None or not self.in_panel(event.x, event.y):
+            return False
+        if event.direction == Gdk.ScrollDirection.SMOOTH:
+            # A touchpad sends small deltas: a step per whole notch's worth.
+            self.scrolled += event.get_scroll_deltas()[2]
+            steps = int(self.scrolled)
+            self.scrolled -= steps
+        else:
+            steps = 1 if event.direction == Gdk.ScrollDirection.DOWN else -1
+        redraw = False
+        for _ in range(abs(steps)):
+            redraw = self.panel.scroll(steps > 0) or redraw
+        if redraw:
+            self.area.queue_draw()
+        return True
+
     def on_key(self, _w, event) -> bool:
         key = Gdk.keyval_name(event.keyval) or ""
         ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        if self.panel is not None and self.panel.typing:
+            code = Gdk.keyval_to_unicode(event.keyval)
+            char = chr(code) if code >= 32 and code != 127 else ""
+            if self.panel.text_key(key, char, ctrl):
+                self.area.queue_draw()
+            return True
         if key in ("Escape", "q") or (ctrl and key == "g"):
             self.hide()
             return True

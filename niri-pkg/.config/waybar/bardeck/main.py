@@ -296,6 +296,8 @@ def render(argv: list[str]) -> int:
         time.sleep(1)
         s._top(time.monotonic())
     p.opened()
+    if what == "net":  # the network list is read only while the panel is open
+        s._slow()
     w, h = p.size()
     surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * scale, h * scale)
     surf.set_device_scale(scale, scale)
