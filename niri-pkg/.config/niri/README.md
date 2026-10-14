@@ -67,7 +67,8 @@ The keys that act differently from plain niri:
 | `Mod+Tab` | Overview of all workspaces. |
 | `Mod+Shift+C` | All keys, fullscreen, in columns. Type to filter, `Esc` closes. niri's own overlay is on `Mod+Ctrl+Shift+C`. |
 | `Mod+Alt+G` / `Mod+Alt+Shift+G` | Gaps off / back on. |
-| `Mod+BackSpace` | Menu: screen layouts, theme, font size. |
+| `Mod+BackSpace` | Menu: screen layouts, theme, font size, font face. |
+| `Mod+Alt+;` / `Mod+Alt+J` · `Mod+Alt+B` · `Mod+Alt+F` | Font trial (`termfont`, Alacritty + Emacs together): next / previous font · back to the font before (A/B) · rofi menu with each row in its own font. |
 | `Mod+[` / `Mod+]` | Volume -/+10% (i3 muscle memory). niri's own use of these keys moved to `Mod+Shift+[` / `]`. |
 | `Mod+\` · `Mod+Ctrl+[` / `]` | Play / pause · previous / next track (`playerctl`, the MPRIS player). The media keys (Play, Pause, Stop, Next, Prev) do the same, also on the lock screen. |
 
@@ -93,6 +94,7 @@ anything. When a key needs two actions, or a check first, it runs a script.
 | `i3blocks-waybar` | right clicks on the bar | Runs an i3blocks script and converts its output for waybar. One run serves both bars (2 s shared answer, a lock per script), at `nice 10`; a timeout kills the script's whole process group and shows the last answer. The bt blocks share one `bluetoothctl` query too (`~/scripts/bt-state.sh`, 3 s). | So that the two bars share one set of scripts. The sharing and the nice exist because the blocks cost ~70% of a core on a loaded box (7 Oct 2026); now ~15%. |
 | `barmenu` | `i3blocks-waybar` | Bar menus that open under the block you clicked and close on a click outside. | Wayland rofi cannot do either. |
 | `niri-screen-switch` | `Mod+BackSpace` | The i3 `screen_switch` menu. It uses `niri msg output` in place of xrandr. `niri-screen-switch "<entry>"` runs one entry without the menu (the bar's displays panel does that), `--list` prints them. | Menu. |
+| `termfont` (`bin-pkg`) | `Mod+Alt+;` `J` `B` `F`, menu "Font: face…", the `*-font` scripts | Sets the monospace family of Alacritty (`active-family.toml`) and Emacs (`~/.config/termfont/emacs.el` + live `emacsclient`), and scales the size so every font keeps Ubuntu Mono's column count. `termfont help` lists the commands. | Two programs, a size table and a state file. |
 | `niri-record` (+ `-desktop`, `-window`, `-region`) | `Mod+Alt+Shift+L`, `;`, `R` | Start/stop screen recording with gpu-screen-recorder. Add `Ctrl` to record without audio. | ffmpeg x11grab records nothing on Wayland. |
 | `niri-screenshot-clip` | nothing (since 7 Oct 2026) | Copy a screenshot of a region to the clipboard (`grim` + `slurp`). | Replaced on `Mod+Alt+Shift+J` by niri's own `screenshot`: slurp's overlay takes the keyboard focus, so every open popup or menu closed **before** grim took the picture. niri freezes the frame first, then you select (drag, then `Space`); it copies to the clipboard and also saves to `~/Pictures/Screenshots`. |
 | `niri-paste-image` | Thunar: `Ctrl+Shift+V`, right-click → "Paste image here" | Write the clipboard image to `clipboard_<date>_<time>.png` in the current folder (or the selected folder). It never overwrites a file. | Thunar's own paste takes files only. The custom action is in `~/.config/Thunar/uca.xml`, the key in `accels.scm`. Thunar rewrites `accels.scm` when it quits: run `thunar -q` before you edit it. Neither file is stowed. |

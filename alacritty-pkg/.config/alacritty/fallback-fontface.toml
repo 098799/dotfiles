@@ -1,0 +1,20 @@
+# Default font family, used when ~/.config/alacritty/active-family.toml is
+# missing (`termfont` writes that file). It must not live inline in
+# alacritty.toml: an inline value beats every import, so `termfont` and `w95`
+# could never change the face. Styles are set here once; the overlays name only
+# the family and keep these styles.
+[font.normal]
+family = "UbuntuMono"
+style = "Regular"
+
+[font.bold]
+family = "UbuntuMono"
+style = "Bold"
+
+[font.italic]
+family = "UbuntuMono"
+style = "Italic"
+
+[font.bold_italic]
+family = "UbuntuMono"
+style = "Bold Italic"

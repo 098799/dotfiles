@@ -1,3 +1,4 @@
 #!/bin/bash
-printf '[font]\nsize = 24\n' > ~/.config/alacritty/active-font.toml
-emacsclient -e '(big-font)'
+# Size and family live in `termfont`: it scales the size to the current font
+# and updates Alacritty and Emacs together.
+exec "$HOME/bin/termfont" size big

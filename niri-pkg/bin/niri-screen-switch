@@ -252,6 +252,7 @@ ENTRIES=(
     "Font: middle"
     "Font: big"
     "Font: huge"
+    "Font: face…"
 )
 
 # An entry as the argument runs it without the menu: the bar's displays panel
@@ -301,5 +302,6 @@ case "$choice" in
     "Font: middle") "$HOME/bin/middle-font" ;;
     "Font: big")    "$HOME/bin/big-font" ;;
     "Font: huge")   "$HOME/bin/huge-font" ;;
+    "Font: face…")  "$HOME/bin/termfont" pick ;;
     *) exit 0 ;;
 esac

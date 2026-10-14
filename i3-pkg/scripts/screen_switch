@@ -14,4 +14,5 @@ $HOME/scripts/reattach-laptop-inputs
 $HOME/bin/small-font
 $HOME/bin/middle-font
 $HOME/bin/big-font
-$HOME/bin/huge-font" | rofi -dmenu -lines 17 -font "Ubuntu 25" | sh
+$HOME/bin/huge-font
+$HOME/bin/termfont pick" | rofi -dmenu -lines 18 -font "Ubuntu 25" | sh
