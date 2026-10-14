@@ -1,0 +1,33 @@
+#!/bin/bash
+# url-router — the default web browser (url-router.desktop, set with
+# `xdg-settings set default-web-browser url-router.desktop`).
+#
+# Chrome hands a link to its LAST-USED profile, which is often the personal Gmail
+# one, so a GitLab MR from the bar, Slack or a terminal opened logged out or in the
+# wrong account. Work links go to the Legartis profile (chrome-legartis pins it);
+# everything else goes to Chrome as before.
+#
+#   url-router URL     open URL in the right profile
+#   url-router -n URL  print which profile it would use, open nothing
+set -euo pipefail
+
+# Work: any legartis.ai / legartis.ch host (GitLab, the apps, the local slots),
+# Legartis' Linear workspace and Sentry org.
+WORK='^https?://([^/@]*\.)?legartis\.(ai|ch)(:[0-9]+)?([/?#]|$)'
+WORK+='|^https?://linear\.app/legartis([/?#]|$)'
+WORK+='|^https?://legartis\.sentry\.io([/?#]|$)'
+WORK+='|^https?://([^/]*\.)?sentry\.io/organizations/legartis([/?#]|$)'
+
+dry=
+[[ ${1-} == -n ]] && { dry=1; shift; }
+url=${1-}
+
+if [[ -n $url && ${url,,} =~ $WORK ]]; then
+    [[ -n $dry ]] && { echo work; exit 0; }
+    # chrome-legartis pins the profile (kubelogin uses it too); it is not in
+    # dotfiles, so a host without it gets the same profile directly.
+    [[ -x $HOME/bin/chrome-legartis ]] && exec "$HOME/bin/chrome-legartis" "$url"
+    exec /usr/bin/google-chrome-stable --profile-directory=Default "$url"
+fi
+[[ -n $dry ]] && { echo default; exit 0; }
+exec /usr/bin/google-chrome-stable "$@"

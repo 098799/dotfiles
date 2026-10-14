@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Chrome (work links in the Legartis profile)
+Comment=Opens Legartis links in the Legartis Chrome profile, the rest in Chrome as usual (~/bin/url-router)
+Exec=/home/tgrining/bin/url-router %u
+Icon=google-chrome
+NoDisplay=true
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;
