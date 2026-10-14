@@ -65,6 +65,17 @@
         "strip": "dev", "variant": "full", "scale": 1,
         "on-click-right": "~/bin/i3blocks-waybar ~/scripts/bluetooth.sh 3"
     },
+    // Legartis Cam (~/fakecam): red "live" while a call has the camera; an ear while
+    // Listen is on, a hand while Gestures are. Panel: Turn on / Turn off, which real
+    // camera (Source), scene, mirror / framing / close / blur, Listen, Gestures, looks,
+    // bursts (bardeck/cam.py). No pill on a host without ~/fakecam. Middle: the web
+    // panel. Right: cam's board (every effect, rofi).
+    "cffi/cam": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "cam", "variant": "full", "scale": 1,
+        "on-click-middle": "xdg-open https://cam.p14s.grining.eu",
+        "on-click-right": "~/bin/cam"
+    },
     // Panel: the player (cover, progress, buttons; several players: pick one), every
     // output and input with a slider and mute, every app's stream (bardeck/audio.py).
     // Drawn on PulseAudio's and the players' own events. Scroll: ±5% on the default

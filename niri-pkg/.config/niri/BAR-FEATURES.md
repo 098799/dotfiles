@@ -24,6 +24,7 @@ opens this file. The bar shows one of these lines a day as a tip (see the end).
 - **Join a Wi-Fi network: network pill** — click a network to join; a new one asks for its password in its row. Hover for disconnect or forget.
 - **Tailscale peers: network pill** — click a peer to copy its IP; hover it for ping and ssh.
 - **Pair Bluetooth: devices pill** — "scan" for 25 s, click a new device to pair, trust and connect. A PIN or a code to confirm shows in the device's row.
+- **Legartis Cam: camera pill** — red "live" while a call has the camera. The panel has Turn on / Turn off, which webcam to use (auto = external first, or pick one), scene, mirror / framing / blur, Listen, Gestures, looks and bursts. Right-click: `cam`'s board with every effect.
 - **Audio and media: speaker pill** — scroll on it for volume, middle-click to mute. The panel has the player (cover, seek, previous/play/next), every output and mic with a slider, and every app's own volume.
 - **Displays: monitor pill** — the screens to scale; change brightness (the laptop and an external monitor, by DDC/CI: click the slider or scroll on it), scale, rotation, mode (a new mode goes back after 15 s unless you keep it), and the niri-screen-switch presets (game mode, layouts, sound, theme, font).
 - **Charge limit: power pill** — 60 / 80 / 100%, kept after a reboot; "full once" charges to 100% until the next boot (for a day away from the charger).

@@ -96,3 +96,15 @@ Asked by Tomek: "add charge limit and keybord backlit" (from the list of gaps af
 - Side effects on the real machine: the drop-in rewritten with the same 75/80 and the new header; thresholds set to 95/100 and back to 75/80 (end state checked in sysfs: 75 / 80); the keyboard light set to 1 and back to 0.
 - Verified: both rows rendered (limit state and full-once state); each action run from Python against the real battery and LED; the live panel after `pkill -USR2 -x waybar`.
 - **Not verified**: TLP keeping the new limit across a real reboot (it reads the drop-in at boot, as the w95 toggle already relies on).
+
+## 14 Oct 2026 — the camera pill (Legartis Cam)
+
+Asked by Tomek: "consider cam.p14s. Please port it's controls to niri bar" → "at least the useful ones like turn on", and "it now chooses my laptop cam instead of my external one, it should prob. be able to choose them". One Claude Code session (Opus 5.5), on master; the camera choice itself is in the fakecam repo (`~/fakecam`, branch `camera-source`, merged to its master).
+
+| Commit | What |
+|---|---|
+| (this commit) | New strip and panel **cam** (`bardeck/cam.py`), between devices and audio on both bars. Reads fakecam's HTTP API on a thread of its own (GET /api/listen every 3 s, /api/state every 30 s and every 1.5 s while the panel is open; never `?preview=1`, which would wake the camera). Strip: webcam glyph by power state (red dot + "live" on air, amber "preview", plain standby, crossed out off / not answering), ear for Listen, hand for Gestures; a 1 px empty picture on a host without `~/fakecam`. Panel: Turn on / Turn off (off while on air takes a second click), source (auto or one camera by its label), scene, mirror / frame / close / blur, Listen, Gestures, looks (toggle, all off), bursts; "effects" runs `~/bin/cam` (the rofi board), "web" opens https://cam.p14s.grining.eu. Middle click: the web panel; right click: `cam`. `main.py`: wired in; `bardeck render/panel … cam` read fakecam once first. |
+
+- Why the laptop camera: the external one (PC-LM1E) was not plugged in. The FC660C keyboard has used its USB port (3-2) since 09:23, and "auto" correctly fell back to the laptop's camera. The fix is a choice, not a change to "auto".
+- Verified: strip renders (full, compact) and the panel against a second fakecam (a git worktree, `--port 7799 --no-camera`, Chrome with two fake cameras via `FAKECAM_CHROME_ARGS`); every kind of click run from Python against that instance (source, two-click turn off, turn on, a look, a burst); the thread → GLib.idle_add callback in a main loop.
+- **Not verified on the live camera**: it was on air in a call the whole time, so nothing was clicked on 127.0.0.1:7788. Its server runs the old code until `systemctl --user restart fakecam`; until then the source row offers only "auto" (the old server refuses `source`).

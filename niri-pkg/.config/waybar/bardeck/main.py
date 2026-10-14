@@ -8,7 +8,7 @@
                                        (palette: the launcher, clip: the clipboard history)
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
-STRIP / PANEL: quota sys net dev audio power disp notif agents clock ws (ws: a strip per output; its panel,
+STRIP / PANEL: quota sys net dev cam audio power disp notif agents clock ws (ws: a strip per output; its panel,
 the overview, opens on a right click).
 Panels with no strip, opened by key only: palette clip.
 
@@ -68,6 +68,7 @@ def build(with_ws: bool = True):
     from .agents import Agents, AgentsPanel, AgentsStrip
     from .audio import Audio, AudioPanel, AudioStrip
     from .caffeine import Caffeine
+    from .cam import Cam, CamPanel, CamStrip
     from .clip import Clip, ClipPanel
     from .clock import ClockPanel, ClockStrip
     from .devices import DevPanel, DevStrip
@@ -92,6 +93,7 @@ def build(with_ws: bool = True):
         quota = None
     dunst = Dunst()
     agents = Agents()
+    cam = Cam()
     strips = {
         "sys": (SysStrip(s), 1),
         "net": (NetStrip(s), 2),
@@ -102,11 +104,13 @@ def build(with_ws: bool = True):
         "clock": (ClockStrip(), 1),
         "notif": (NotifStrip(dunst), 1),
         "agents": (AgentsStrip(agents), 5),  # drawn on rcmon's answers too (watch)
+        "cam": (CamStrip(cam), 5),  # drawn on fakecam's answers (watch: its own thread)
     }
     panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine),
                                   AudioPanel(audio), ClockPanel(), DispPanel(disp), WsPanel())}
     panels["notif"] = NotifPanel(dunst)
     panels["agents"] = AgentsPanel(agents)
+    panels["cam"] = CamPanel(cam)
     panels["clip"] = ClipPanel(Clip())
     panels["palette"] = PalettePanel()
     if quota is not None:
@@ -359,6 +363,8 @@ def render(argv: list[str]) -> int:
             name = next(iter(w.outputs))
             surf, _ = w.draw(name, variant, scale)
         else:
+            if what == "cam":
+                strips[what][0].cam.read_now()
             surf = strips[what][0].draw(variant, scale)
         surf.write_to_png(out)
         return 0
@@ -377,6 +383,8 @@ def render(argv: list[str]) -> int:
         s._slow()
     if what == "dev":  # the device list too, and its mirror waits for a main loop
         s.bt.load()
+    if what == "cam":  # fakecam is read on the daemon's thread: once, here
+        p.cam.read_now()
     w, h = p.size()
     surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, w * scale, h * scale)
     surf.set_device_scale(scale, scale)
