@@ -1,0 +1,83 @@
+# Custom Iosevka builds for the terminal and Emacs. Docs:
+# https://github.com/be5invis/Iosevka/blob/main/doc/custom-build.md
+# Build: see ~/dotfiles/iosevka/build (copies this file into the source tree).
+#
+# Both plans start from stock Iosevka Term (spacing "term"). Change glyphs in
+# the `variants.design` table; the Customizer at typeof.net/Iosevka/customizer
+# shows the shapes and writes the TOML.
+
+[buildPlans.IosevkaTomekTerm]
+family = "Iosevka Tomek Term"
+spacing = "term"
+serifs = "sans"
+noCvSs = false
+exportGlyphNames = false   # true only for ligatures in Kitty; Alacritty draws none
+
+[buildPlans.IosevkaTomekTerm.variants.design]
+asterisk = "hex-mid"       # centred: a * b, **kwargs, *ptr
+
+[buildPlans.IosevkaTomekTerm.ligations]
+inherits = "default-calt"
+
+[buildPlans.IosevkaTomekTerm.weights.Light]
+shape = 300
+menu = 300
+css = 300
+
+[buildPlans.IosevkaTomekTerm.weights.Regular]
+shape = 400
+menu = 400
+css = 400
+
+[buildPlans.IosevkaTomekTerm.weights.Medium]
+shape = 500
+menu = 500
+css = 500
+
+[buildPlans.IosevkaTomekTerm.weights.SemiBold]
+shape = 600
+menu = 600
+css = 600
+
+[buildPlans.IosevkaTomekTerm.weights.Bold]
+shape = 700
+menu = 700
+css = 700
+
+[buildPlans.IosevkaTomekTerm.widths.Normal]
+shape = 500                # stock Iosevka: 0.5 em, same cell as Ubuntu Mono
+menu = 5
+css = "normal"
+
+[buildPlans.IosevkaTomekTerm.slopes.Upright]
+angle = 0
+shape = "upright"
+menu = "upright"
+css = "normal"
+
+[buildPlans.IosevkaTomekTerm.slopes.Italic]
+angle = 9.4
+shape = "italic"
+menu = "italic"
+css = "italic"
+
+# Same shapes, a wider cell (0.55 em) for more air between letters.
+[buildPlans.IosevkaTomekWideTerm]
+family = "Iosevka Tomek Wide Term"
+spacing = "term"
+serifs = "sans"
+noCvSs = false
+exportGlyphNames = false
+weights.inherits = "buildPlans.IosevkaTomekTerm"
+slopes.inherits = "buildPlans.IosevkaTomekTerm"
+
+[buildPlans.IosevkaTomekWideTerm.variants]
+inherits = "buildPlans.IosevkaTomekTerm"
+
+[buildPlans.IosevkaTomekWideTerm.ligations]
+inherits = "default-calt"
+
+[buildPlans.IosevkaTomekWideTerm.widths.Normal]
+shape = 550
+menu = 5
+css = "normal"

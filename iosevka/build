@@ -1,0 +1,41 @@
+#!/bin/bash
+# build — build the custom Iosevka families from private-build-plans.toml and
+# install them to ~/.local/share/fonts/IosevkaTomek. Needs Node >= 18.
+#
+#   build                    latest release, unpacked to ~/Programs/iosevka-<tag>
+#   build v34.9.0            a given release tag
+#
+# The source comes from the GitHub API tarball (github.com itself answers 403
+# here; api.github.com and codeload work). Unhinted TTF only: ttfautohint is not
+# installed, and hinting does nothing visible on these screens.
+
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO=be5invis/Iosevka
+PLANS=(IosevkaTomekTerm IosevkaTomekWideTerm)
+DEST="$HOME/.local/share/fonts/IosevkaTomek"
+
+tag="${1:-$(curl -sS "https://api.github.com/repos/$REPO/releases/latest" |
+    python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')}"
+src="$HOME/Programs/iosevka-$tag"
+
+if [[ ! -e $src ]]; then
+    mkdir -p "$src"
+    curl -sSL "https://api.github.com/repos/$REPO/tarball/$tag" | tar -xz -C "$src" --strip-components=1
+fi
+
+cp "$HERE/private-build-plans.toml" "$src/private-build-plans.toml"
+cd "$src"
+[[ -d node_modules ]] || npm ci --no-audit --no-fund
+
+# Each job can take over 1 GB at its peak; 10 jobs leave room for the desktop.
+targets=()
+for p in "${PLANS[@]}"; do targets+=("ttf-unhinted::$p"); done
+npm run build -- "${targets[@]}" --jCmd=10
+
+mkdir -p "$DEST"
+rm -f "$DEST"/*.ttf
+for p in "${PLANS[@]}"; do cp "dist/$p/TTF-Unhinted/"*.ttf "$DEST/"; done
+fc-cache -f "$DEST"
+fc-list : family style file | grep -F "$DEST" | sort

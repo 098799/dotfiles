@@ -33,6 +33,8 @@ FONTS=(
     "ubuntu|Ubuntu Mono|0.500|the 16-year default; narrow, short line|Ubuntu Mono"
     "ubuntu-sans|Ubuntu Sans Mono|0.560|Canonical's 2023 redesign of Ubuntu Mono|Ubuntu Sans Mono"
     "iosevka|IosevkaTerm Nerd Font Mono|0.500|narrow like Ubuntu Mono, larger x-height|Iosevka Term"
+    "tomek|Iosevka Tomek Term|0.500|custom Iosevka Term, centred * (~/dotfiles/iosevka)|Iosevka Tomek"
+    "tomek-wide|Iosevka Tomek Wide Term|0.550|the same, in a 0.55 em cell|Iosevka Tomek Wide"
     "adwaita|Adwaita Mono|0.600|GNOME's Iosevka build, normal width|Adwaita Mono"
     "jetbrains|JetBrainsMono Nerd Font Mono|0.600|tall x-height, plain shapes|JetBrains Mono"
     "fira|FiraCode Nerd Font Mono|0.615|humanist, from Fira Sans|Fira Code"

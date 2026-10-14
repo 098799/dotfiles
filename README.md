@@ -20,6 +20,7 @@ Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
 | `vim` | `.vimrc`, `.vim/` |
 | `bash` | `.bashrc`, `.bash_aliases` |
 | `alacritty` | Color schemes (gruvbox, selenized) and theme switcher |
+| `iosevka` | Not a stow package. `private-build-plans.toml` (custom Iosevka families "Iosevka Tomek Term" and "Iosevka Tomek Wide Term") and `build`, which downloads the Iosevka source to `~/Programs/iosevka-<tag>`, builds unhinted TTFs and installs them to `~/.local/share/fonts/IosevkaTomek`. Switch to them with `termfont set tomek` / `tomek-wide`. Nerd icons come from the fontconfig fallback (`ttf-nerd-fonts-symbols-mono`), so the build is not patched |
 
 ## Theme Scripts
 
@@ -92,6 +93,7 @@ stow -t ~ zsh git alacritty-pkg i3-pkg bin-pkg
 │   ├── .screenlayout/
 │   └── scripts/
 ├── bin-pkg/
+├── iosevka/              # custom font build, see the table above
 ├── espanso-pkg/
 ├── logid-pkg/
 ├── emacs/
