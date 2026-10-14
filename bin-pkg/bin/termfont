@@ -100,6 +100,8 @@ apply() {
         done
     } >"$ALA/active-family.toml"
     printf '[font]\nsize = %s\n' "$pt" >"$ALA/active-font.toml"
+    # The menu name, for the bar's displays panel (it lights the current face).
+    printf '%s\n' "$(field "$key" 5)" >"$STATE/name"
 
     # Emacs gets the family and the scale; its own small/middle/big/huge-font
     # keep their heights and multiply by the scale (see tg/font-apply in elisp.el).

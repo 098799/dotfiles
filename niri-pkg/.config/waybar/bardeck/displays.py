@@ -50,7 +50,8 @@ SCALES = (1.0, 1.25, 1.5, 2.0)
 TRANSFORMS = (("normal", "normal"), ("90", "90°"), ("180", "180°"), ("270", "270°"))
 RATIOS = ((16, 9), (16, 10), (4, 3), (5, 4), (3, 2), (21, 9), (32, 9), (5, 3))
 
-# niri-screen-switch's menu entries, as the panel's presets: (row, ((label, glyph,
+# niri-screen-switch's menu entries, as the panel's presets (presets() adds the
+# font faces): (row, ((label, glyph,
 # entry, the output it needs or None), …)). The entries must match the script's
 # ENTRIES (it refuses an unknown one with exit 2, which shows as "failed").
 # A screen preset whose output is not connected is disabled: the script would turn
@@ -73,6 +74,34 @@ PRESETS = (
     ("font", (("small", None, "Font: small", None), ("middle", None, "Font: middle", None),
               ("big", None, "Font: big", None), ("huge", None, "Font: huge", None))),
 )
+TERMFONT = f"{core.REAL_HOME}/bin/termfont"
+TERMFONT_STATE = f"{core.REAL_HOME}/.config/termfont"
+_presets: tuple | None = None
+
+
+def presets() -> tuple:
+    """PRESETS plus a "face" row: one chip per font termfont finds installed
+    (the script's "Font: <name>" entries). Asked once: fonts change rarely."""
+    global _presets
+    if _presets is None:
+        try:
+            out = subprocess.run([TERMFONT, "names"], capture_output=True, text=True, timeout=3).stdout
+            names = [n.strip() for n in out.splitlines() if n.strip()]
+        except (OSError, subprocess.TimeoutExpired):
+            names = []
+        faces = tuple((n, None, f"Font: {n}", None) for n in names)
+        if faces:
+            faces += (("A/B", None, "Font: the one before (A/B)", None),)
+        _presets = PRESETS + ((("face", faces),) if faces else ())
+    return _presets
+
+
+def termfont_state(name: str, default: str) -> str:
+    try:
+        with open(f"{TERMFONT_STATE}/{name}") as f:
+            return f.read().strip() or default
+    except OSError:
+        return default
 
 
 # ── an output (niri's dict) ──────────────────────────────────────────────────
@@ -282,6 +311,10 @@ class Displays:
             m = current(self.outputs.get(name) or {})
             return (m["width"], m["height"]) if m else None
 
+        if entry.startswith("Font: "):
+            # termfont's state: the face's menu name and the size name.
+            want = entry[len("Font: "):]
+            return want in (termfont_state("name", "Ubuntu Mono"), termfont_state("size", "small"))
         return {
             "Screen: laptop only": on == {LAPTOP},
             "Screen: external 2560x1440": on == {EXTERNAL} and size(EXTERNAL) == (2560, 1440),
@@ -399,7 +432,7 @@ class DispPanel(Panel):
             import cairo
 
             cr = cairo.Context(cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, 1))
-            self._preset_rows = sum(len(self.flow(cr, chips)) for _, chips in PRESETS)
+            self._preset_rows = sum(len(self.flow(cr, chips)) for _, chips in presets())
         return self._preset_rows
 
     def flow(self, cr, chips) -> list[list[tuple[float, tuple]]]:
@@ -539,7 +572,7 @@ class DispPanel(Panel):
 
         heading(cr, P, y, "presets · niri-screen-switch", W - 2 * P)
         y += 20
-        for label, chips in PRESETS:
+        for label, chips in presets():
             for li, line in enumerate(self.flow(cr, chips)):
                 if li == 0:
                     text(cr, P, y + self.CHIP_H / 2, label, 11, "dim", valign=0.5)
