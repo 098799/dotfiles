@@ -265,11 +265,4 @@ binds {
     // and half theme/font switches; the niri port keeps the switches as they
     // were and re-expresses the layouts with `niri msg output`.
     Mod+BackSpace hotkey-overlay-title="screen / theme / font" { spawn "/home/tgrining/bin/niri-screen-switch"; }
-
-    // ---- font trial (termfont): Alacritty + Emacs together ---------------------
-    // j / ; are left / right in the kit dialect: previous / next installed font.
-    Mod+Alt+J         hotkey-overlay-title="font: previous" { spawn "/home/tgrining/bin/termfont" "prev"; }
-    Mod+Alt+Semicolon hotkey-overlay-title="font: next" { spawn "/home/tgrining/bin/termfont" "next"; }
-    Mod+Alt+F         hotkey-overlay-title="font: pick (menu)" { spawn "/home/tgrining/bin/termfont" "pick"; }
-    Mod+Alt+B         hotkey-overlay-title="font: back to the one before (A/B)" { spawn "/home/tgrining/bin/termfont" "flip"; }
 }

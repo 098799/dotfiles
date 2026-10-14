@@ -4,7 +4,8 @@
 #
 #   termfont                 current font, size and mode
 #   termfont list            all fonts (* = current, - = not installed)
-#   termfont set KEY         switch to KEY (see `list`)
+#   termfont set KEY|NAME    switch to KEY or menu NAME (see `list`)
+#   termfont names           menu names of the installed fonts (niri-screen-switch)
 #   termfont next | prev     the next / previous installed font
 #   termfont flip            back to the font before this one (A/B test)
 #   termfont pick            rofi menu, every row drawn in its own font
@@ -26,25 +27,25 @@ STATE="$HOME/.config/termfont"
 ALA="$HOME/.config/alacritty"
 
 # key | fontconfig family | advance width of "0" in em (measured with fontTools,
-# Oct 2026) | short note. The width gives the scale in `cols` mode: Ubuntu Mono
+# Oct 2026) | short note | name in menus. The width gives the scale in `cols` mode: Ubuntu Mono
 # is 0.5 em, so a 0.6 em font is drawn at 0.5/0.6 of the size.
 FONTS=(
-    "ubuntu|Ubuntu Mono|0.500|the 16-year default; narrow, short line"
-    "ubuntu-sans|Ubuntu Sans Mono|0.560|Canonical's 2023 redesign of Ubuntu Mono"
-    "iosevka|IosevkaTerm Nerd Font Mono|0.500|narrow like Ubuntu Mono, larger x-height"
-    "adwaita|Adwaita Mono|0.600|GNOME's Iosevka build, normal width"
-    "jetbrains|JetBrainsMono Nerd Font Mono|0.600|tall x-height, plain shapes"
-    "fira|FiraCode Nerd Font Mono|0.615|humanist, from Fira Sans"
-    "cascadia|CaskaydiaMono Nerd Font Mono|0.586|Windows Terminal's face"
-    "plex|BlexMono Nerd Font Mono|0.600|IBM Plex Mono, slab serifs"
-    "hack|Hack Nerd Font Mono|0.602|DejaVu Sans Mono, re-hinted"
-    "commit|CommitMono Nerd Font Mono|0.600|neutral, very regular"
-    "monaspace|Monaspace Neon|0.620|GitHub's, wide; Argon/Xenon/Radon/Krypton too"
-    "victor|VictorMono Nerd Font Mono|0.545|narrow, cursive italics"
-    "geist|GeistMono Nerd Font Mono|0.600|Vercel's, geometric"
-    "0xproto|0xProto Nerd Font Mono|0.620|made for small sizes, wide"
-    "maple|Maple Mono NF|0.600|rounded, cursive italics"
-    "googlesans|GoogleSansCode Nerd Font Mono|0.600|Google's 2024 code face (Android Studio)"
+    "ubuntu|Ubuntu Mono|0.500|the 16-year default; narrow, short line|Ubuntu Mono"
+    "ubuntu-sans|Ubuntu Sans Mono|0.560|Canonical's 2023 redesign of Ubuntu Mono|Ubuntu Sans Mono"
+    "iosevka|IosevkaTerm Nerd Font Mono|0.500|narrow like Ubuntu Mono, larger x-height|Iosevka Term"
+    "adwaita|Adwaita Mono|0.600|GNOME's Iosevka build, normal width|Adwaita Mono"
+    "jetbrains|JetBrainsMono Nerd Font Mono|0.600|tall x-height, plain shapes|JetBrains Mono"
+    "fira|FiraCode Nerd Font Mono|0.615|humanist, from Fira Sans|Fira Code"
+    "cascadia|CaskaydiaMono Nerd Font Mono|0.586|Windows Terminal's face|Cascadia Mono"
+    "plex|BlexMono Nerd Font Mono|0.600|IBM Plex Mono, slab serifs|IBM Plex Mono"
+    "hack|Hack Nerd Font Mono|0.602|DejaVu Sans Mono, re-hinted|Hack"
+    "commit|CommitMono Nerd Font Mono|0.600|neutral, very regular|Commit Mono"
+    "monaspace|Monaspace Neon|0.620|GitHub's, wide; Argon/Xenon/Radon/Krypton too|Monaspace Neon"
+    "victor|VictorMono Nerd Font Mono|0.545|narrow, cursive italics|Victor Mono"
+    "geist|GeistMono Nerd Font Mono|0.600|Vercel's, geometric|Geist Mono"
+    "0xproto|0xProto Nerd Font Mono|0.620|made for small sizes, wide|0xProto"
+    "maple|Maple Mono NF|0.600|rounded, cursive italics|Maple Mono"
+    "googlesans|GoogleSansCode Nerd Font Mono|0.600|Google's 2024 code face (Android Studio)|Google Sans Code"
 )
 
 # size name -> Alacritty points, Emacs height (1/10 pt). The pairs are the ones
@@ -110,8 +111,17 @@ apply() {
     fi
 }
 
+key_of() { # key or menu name -> key
+    local e
+    for e in "${FONTS[@]}"; do
+        [[ ${e%%|*} == "$1" || ${e##*|} == "$1" ]] && { printf '%s\n' "${e%%|*}"; return 0; }
+    done
+    printf '%s\n' "$1"
+}
+
 set_font() {
-    local key=$1 old
+    local key old
+    key=$(key_of "$1")
     field "$key" 1 >/dev/null || { echo "termfont: no font '$key' (see: termfont list)" >&2; exit 2; }
     installed "$key" || {
         say "termfont" "$(field "$key" 2) is not installed on $(hostname -s)"
@@ -122,7 +132,7 @@ set_font() {
     printf '%s\n' "$key" >"$STATE/font"
     apply
     log "set $key"
-    say "Font: $(field "$key" 2)" "$(read_state size small), $(read_state match cols) mode — $(field "$key" 4)"
+    say "Font: $(field "$key" 5)" "$(read_state size small), $(read_state match cols) mode — $(field "$key" 4)"
 }
 
 step() { # step +1 | -1, over installed fonts only
@@ -164,7 +174,10 @@ case ${1-} in
             printf '%s %-12s %-30s %s\n' "$mark" "$key" "$(field "$key" 2)" "$(field "$key" 4)"
         done
         ;;
-    set) set_font "${2:?usage: termfont set KEY}" ;;
+    set) set_font "${2:?usage: termfont set KEY|NAME}" ;;
+    names)
+        for e in "${FONTS[@]}"; do installed "${e%%|*}" && printf '%s\n' "${e##*|}"; done
+        ;;
     next) step 1 ;;
     prev) step -1 ;;
     flip)

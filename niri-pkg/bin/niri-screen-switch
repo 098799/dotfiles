@@ -252,8 +252,13 @@ ENTRIES=(
     "Font: middle"
     "Font: big"
     "Font: huge"
-    "Font: face…"
 )
+
+# One entry per installed font face, from termfont (Alacritty + Emacs together).
+# The bar palette's "actions" tab lists these too, through --list.
+mapfile -t FACES < <("$HOME/bin/termfont" names 2>/dev/null)
+for f in "${FACES[@]}"; do ENTRIES+=("Font: $f"); done
+ENTRIES+=("Font: the one before (A/B)")
 
 # An entry as the argument runs it without the menu: the bar's displays panel
 # (bardeck/displays.py) does that, so its preset buttons keep this script's
@@ -279,7 +284,7 @@ else
         sleep 0.5
     fi
     choice=$(printf '%s\n' "${ENTRIES[@]}" \
-        | rofi -dmenu -i -lines ${#ENTRIES[@]} -font "Ubuntu 25" -p "switch")
+        | rofi -dmenu -i -lines $((${#ENTRIES[@]} < 20 ? ${#ENTRIES[@]} : 20)) -font "Ubuntu 25" -p "switch")
 fi
 
 case "$choice" in
@@ -302,6 +307,7 @@ case "$choice" in
     "Font: middle") "$HOME/bin/middle-font" ;;
     "Font: big")    "$HOME/bin/big-font" ;;
     "Font: huge")   "$HOME/bin/huge-font" ;;
-    "Font: face…")  "$HOME/bin/termfont" pick ;;
+    "Font: the one before (A/B)") "$HOME/bin/termfont" flip ;;
+    "Font: "*)      "$HOME/bin/termfont" set "${choice#Font: }" ;;
     *) exit 0 ;;
 esac
