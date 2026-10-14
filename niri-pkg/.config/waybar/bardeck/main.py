@@ -196,12 +196,14 @@ class Daemon:
         variants = self.variants()
         fresh = variants != self.last_variants  # a screen came or went: draw its bar now
         self.last_variants = variants
-        outputs = tuple(sorted(self.ws.outputs))
+        outputs = tuple(sorted((n, (o.get("logical") or {}).get("width"), (o.get("logical") or {}).get("height"))
+                               for n, o in self.ws.outputs.items()))
         if outputs != self.last_outputs:
             if self.last_outputs is not None and outputs:
-                # Each output's wallpaper has the frosted band behind the bar baked in
-                # at its own size (~/bin/niri-wallpaper): a new screen needs its own.
-                core.spawn([f"{core.REAL_HOME}/bin/niri-wallpaper"])
+                # A screen came or went, or changed size: the wallpaper's version for
+                # its shape (wallpaper-pick --keep: the same design), and the frosted
+                # band behind the bar at its size (niri-wallpaper, which it calls).
+                core.spawn([f"{core.REAL_HOME}/bin/wallpaper-pick", "--keep"])
             self.last_outputs = outputs
         if fresh and self.quota is not None:
             self.quota.seen = None

@@ -14,6 +14,9 @@
 #                    without unplugging anything)
 #   --pin N          keep design N (<palette>-<mode>-N-*) for this theme from now on
 #   --unpin          back to a random design on every pick
+#   --keep           keep the design on screen (from ~/.fehbg) when there is no pin:
+#                    a new screen shape gets its version, not a new design. What
+#                    the bar and the layout presets call; a plain call re-rolls.
 # mode/palette default to ~/.config/theme/state.
 #
 # A pin (~/.config/theme/wallpaper-pin, one "<palette>-<mode> N" line per theme;
@@ -30,13 +33,14 @@ wallpaper_dir=$HOME/Pictures/wallpapers
 state=$HOME/.config/theme/state
 
 pin_file=$HOME/.config/theme/wallpaper-pin
-dry_run= force_geom= set_pin= unpin=
+dry_run= force_geom= set_pin= unpin= keep=
 while [[ $# -gt 0 ]]; do
     case $1 in
         -n | --dry-run) dry_run=1; shift ;;
         -a | --aspect) force_geom=$2; shift 2 ;;
         --pin) set_pin=$2; shift 2 ;;
         --unpin) unpin=1; shift ;;
+        --keep) keep=1; shift ;;
         *) break ;;
     esac
 done
@@ -61,6 +65,11 @@ fi
 pin=$(awk -v t="$palette-$mode" '$1 == t { print $2 }' "$pin_file" 2>/dev/null || true)
 [[ -n $dry_run && -n $set_pin ]] && pin=$set_pin
 [[ -n $dry_run && -n $unpin ]] && pin=
+if [[ -z $pin && -n $keep ]]; then
+    # Not a pin (nothing is written): the design that is on screen now.
+    shown=$(grep -o "[^/' ]*\.\(png\|jpg\|jpeg\)" "$HOME/.fehbg" 2>/dev/null | tail -1 || true)
+    [[ $shown =~ ^$palette-$mode-([0-9]+)[-.] ]] && pin=${BASH_REMATCH[1]}
+fi
 
 # Win95 has no wallpaper -- it is a flat teal root with icons on top, and feh
 # would paint straight over both.

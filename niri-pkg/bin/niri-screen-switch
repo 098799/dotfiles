@@ -18,10 +18,11 @@ PAD=AC:8E:BD:4C:5E:21   # Xbox Wireless Controller (BLE, bonded + trusted)
 
 # The wallpaper set is mixed 16:9 / 21:9 and the scaler ignores aspect, so a
 # layout change without this leaves the previous ratio squashed on the new
-# screen. Re-pick against the geometry niri has just set.
+# screen. Re-pick against the geometry niri has just set (--keep: the same design,
+# in its version for the new shape).
 repaper() {
     sleep 0.3
-    "$HOME/bin/wallpaper-pick" 2>/dev/null || true
+    "$HOME/bin/wallpaper-pick" --keep 2>/dev/null || true
     # niri-wallpaper execs swaybg in the foreground; detach it or this script
     # (and any shell waiting on it) never returns.
     setsid -f "$HOME/bin/niri-wallpaper" >/dev/null 2>&1 </dev/null

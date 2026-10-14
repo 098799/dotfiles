@@ -40,6 +40,7 @@ SWITCH = f"{core.REAL_HOME}/bin/niri-screen-switch"
 # niri-screen-switch's outputs.
 LAPTOP, EXTERNAL, HDMI = "eDP-1", "DP-1", "HDMI-A-1"
 REVERT_S = 15
+RESHAPE = {"mode", "scale", "transform", "on", "off"}  # output changes that change a screen's shape
 
 GLYPH_MONITOR, GLYPH_MULTI, GLYPH_LAPTOP, GLYPH_TV = "\U000f0379", "\U000f037a", "\U000f0322", "\U000f0502"
 GLYPH_PAD, GLYPH_EXIT, GLYPH_SOUND = "\U000f0297", "\U000f0206", "\U000f057e"
@@ -241,6 +242,11 @@ class Displays:
                 ok = r.returncode == 0
                 if ok:
                     self.status.pop(key, None)
+                    if argv[:3] == ["niri", "msg", "output"] and argv[4:5] and argv[4] in RESHAPE:
+                        # niri's event stream says nothing about a new mode: the
+                        # wallpaper's version for the new shape is asked for here.
+                        time.sleep(0.4)
+                        core.spawn([f"{core.REAL_HOME}/bin/wallpaper-pick", "--keep"])
                 else:
                     err = (r.stderr or r.stdout).strip().splitlines()
                     self.status[key] = ("hit", (err[-1] if err else f"failed (exit {r.returncode})")[:60])

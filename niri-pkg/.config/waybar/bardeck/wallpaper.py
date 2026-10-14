@@ -7,8 +7,11 @@ design N of a theme, in one version per screen shape. The panel shows the curren
 theme's designs, each in the version for the focused screen (as wallpaper-pick
 would choose it), the one on screen outlined. A click (or Enter) PINS that design
 for this theme: `wallpaper-pick --pin N` writes ~/.config/theme/wallpaper-pin and
-applies it, and from then on a layout change shows the same design in the new
-shape instead of a random one. "shuffle" (`s`) unpins and picks at random again.
+applies it. "shuffle" (`s`) unpins and rolls a random design. Pinned or not, a
+screen change (plugged, removed, a new mode) keeps the design and shows its version
+for the new shape (wallpaper-pick --keep, from the daemon and the displays panel),
+and niri-wallpaper gives each screen its own version of it. The pin matters on a
+theme change: back on this theme, the pinned design comes back.
 
 Thumbnails: made once with PIL on a thread, cached in ~/.cache/bardeck/wallthumbs
 (keyed by path, mtime and size), loaded with cairo's own PNG reader.
@@ -313,7 +316,8 @@ class WallPanel(Panel):
         button(cr, hits, W - P - sw, y + 1, "shuffle", self.shuffle, glyph=GLYPH_SHUFFLE, size=11,
                on=not pin, tone="accent")
         y += 28
-        how = f"design {pin} pinned: a new screen shape keeps it" if pin else "shuffle: a random design on every change"
+        how = (f"design {pin} pinned for this theme" if pin
+               else "not pinned: a screen change keeps the design, shuffle rolls a new one")
         text(cr, P + 28, y, f"{self.mode} {self.palette} · {how}", 12, "dim", width=W - 2 * P - 28)
         y += 24
 

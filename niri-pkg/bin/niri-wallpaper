@@ -14,6 +14,11 @@ fade into the image over FADE px. Done per output at its exact pixel size (swayb
 scales the same image differently per screen), cached in ~/.cache/niri-wallpaper.
 Other outputs get the plain image. ~/.fehbg and niri-lock keep the plain one.
 
+Per screen: ~/.fehbg names one file, picked for the focused screen. A design comes
+in versions per shape (<palette>-<mode>-N-laptop / -wide / -uw), so each output
+gets the version of the SAME design closest to its own shape (an original before a
+"-gpt" extension). With the laptop beside a wide monitor, each shows its own.
+
     niri-wallpaper            set the wallpaper (what wallpaper-pick and bardeck call)
     niri-wallpaper --plain    without the band
 """
@@ -92,6 +97,35 @@ def outputs() -> dict:
     return res
 
 
+def aspect(path: str) -> float | None:
+    try:
+        from PIL import Image
+
+        with Image.open(path) as img:  # reads the header only
+            return img.width / img.height
+    except Exception:
+        return None
+
+
+def version_for(path: str, w: int, h: int) -> str:
+    """The version of path's design closest to a w×h screen; path when it has none."""
+    base = os.path.basename(path)
+    m = re.match(r"((?:gruvbox|selenized|solarized)-(?:dark|light)-\d+)[-.]", base)
+    if not m:
+        return path
+    sibs = [f for f in glob.glob(f"{os.path.dirname(path)}/{m.group(1)}*")
+            if re.match(rf"{re.escape(m.group(1))}[-.]", os.path.basename(f))
+            and f.endswith((".png", ".jpg", ".jpeg"))]
+    scored = [(abs(a - w / h), f) for f in sibs if (a := aspect(f))]
+    if not scored:
+        return path
+    best = min(d for d, _ in scored)
+    group = [f for d, f in sorted(scored) if d <= best + 0.06]
+    if path in group:  # wallpaper-pick's choice fits this screen too: keep it
+        return path
+    return next((f for f in group if "-gpt." not in f), group[0])
+
+
 def band_of(output: str) -> int:
     return BAND["eDP"] if output.startswith("eDP") else BAND["*"]
 
@@ -141,7 +175,8 @@ def main() -> int:
     if "--plain" not in sys.argv:
         for name, (w, h, scale) in outputs().items():
             try:
-                args += ["-o", name, "-i", banded(wp, w, h, scale, band_of(name)), "-m", "stretch"]
+                src = version_for(wp, w, h)
+                args += ["-o", name, "-i", banded(src, w, h, scale, band_of(name)), "-m", "stretch"]
             except Exception as err:  # a broken image: that output keeps the plain one
                 print(f"niri-wallpaper: {name}: {err!r}", file=sys.stderr)
     subprocess.run(["pkill", "-x", "swaybg"], check=False)
