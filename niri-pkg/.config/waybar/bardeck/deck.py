@@ -97,6 +97,9 @@ class Deck:
     # The pointer may cross the bar between a strip and its panel, and a strip only
     # says "enter" after resting hover-ms: wait this long before closing.
     HIDE_GRACE_MS = 160
+    # A pinned panel lets the keyboard go before it unmaps, and unmaps on the focus-out
+    # (see hide()). This long at most when no focus-out comes.
+    UNMAP_LATE_MS = 400
     FREE_TOP = 0.12  # a key-opened panel's top, as a share of the output's height under the bar
 
     def __init__(self, panels: dict[str, Panel]):
@@ -108,6 +111,7 @@ class Deck:
         self.hits = core.Hits()
         self.cache: dict[tuple, cairo.ImageSurface] = {}
         self.hide_timer = 0
+        self.unmap_timer = 0
         self.live_timer = 0
         self.live_at = 0.0
         self.asked = 0.0
@@ -144,6 +148,7 @@ class Deck:
         win.connect("button-press-event", self.on_press)
         win.connect("key-press-event", self.on_key)
         win.connect("scroll-event", self.on_scroll)
+        win.connect("focus-out-event", lambda *_: self._unmap() and False)
         win.connect("delete-event", lambda *_: self.hide() or True)
 
     # -- drawing ---------------------------------------------------------------
@@ -256,6 +261,10 @@ class Deck:
             GtkLayerShell.set_monitor(self.win, monitor)
             self.monitor = monitor
         self.shown, self.asked, self.inside = True, time.perf_counter(), False
+        if self.unmap_timer:  # opened again before the last close unmapped: still mapped
+            GLib.source_remove(self.unmap_timer)
+            self.unmap_timer = 0
+            self.area.queue_draw()
         self.win.show_all()
         if not self.live_timer:
             self.live_timer = GLib.timeout_add(1000, self._live)
@@ -276,16 +285,36 @@ class Deck:
         if not self.shown:
             return
         self.shown = self.inside = self.free = False
-        self.win.hide()
-        if self.panel is not None:
-            self.panel.closed()
         if self.pinned:
+            # Let the keyboard go first and unmap on the focus-out (_unmap). A pinned panel
+            # closes on a key PRESS (Esc, Enter); unmapped at once, it dies holding the
+            # keyboard, niri's leave names a surface that is gone, GTK 3 drops it, and
+            # GTK's own repeat of that key never stops (40 a second, for the daemon's
+            # life). The next pinned opening took the first repeat as a real key: a stuck
+            # Enter ran the palette's top row (Slack, so its workspace) and closed it again.
             self.pinned = False
             GtkLayerShell.set_keyboard_mode(self.win, GtkLayerShell.KeyboardMode.NONE)
+            self.area.queue_draw()  # clear now: the unmap comes a round trip later
+            if not self.unmap_timer:
+                self.unmap_timer = GLib.timeout_add(self.UNMAP_LATE_MS, self._unmap, True)
+        else:
+            self.win.hide()
+        if self.panel is not None:
+            self.panel.closed()
         p = self.panel
         if p is not None and p.drawn_ahead:
             # Browsing (a past week) changed the state: have the default picture ready again.
             GLib.idle_add(lambda: self.invalidate(p.name) or False)
+
+    def _unmap(self, timeout: bool = False) -> bool:
+        """The unmap after a pinned close: on the focus-out, or UNMAP_LATE_MS later."""
+        if self.unmap_timer:
+            if not timeout:
+                GLib.source_remove(self.unmap_timer)
+            self.unmap_timer = 0
+            if not self.shown:
+                self.win.hide()
+        return False
 
     def hide_soon(self) -> None:
         if self.shown and not self.pinned and not self.inside and not self.hide_timer:

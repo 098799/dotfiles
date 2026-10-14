@@ -122,8 +122,8 @@ binds {
 
     // ---- launchers (same keys as i3) --------------------------------------
     // The bar's launcher (bardeck/palette.py); rofi only when the bar's daemon is down.
-    Mod+D hotkey-overlay-title="launcher" { spawn-sh "bardeck open palette || rofi -show combi -combi-modes run,drun -modes combi,drun,run,window -terminal alacritty"; }
-    Mod+Shift+V hotkey-overlay-title="clipboard history" { spawn "bardeck" "open" "clip"; }
+    Mod+D repeat=false hotkey-overlay-title="launcher" { spawn-sh "bardeck open palette || rofi -show combi -combi-modes run,drun -modes combi,drun,run,window -terminal alacritty"; }
+    Mod+Shift+V repeat=false hotkey-overlay-title="clipboard history" { spawn "bardeck" "open" "clip"; }
     Mod+Z hotkey-overlay-title="alacritty" { spawn "alacritty"; }
     // niri opens every new window as a new column on the right; this one opens
     // the terminal under the focused window instead, in the same column.
@@ -265,5 +265,5 @@ binds {
     // and half theme/font switches; the niri port keeps the switches as they
     // were and re-expresses the layouts with `niri msg output`. Its entries show
     // in the bar's palette ("switch" filter); rofi only when bardeck is down.
-    Mod+BackSpace hotkey-overlay-title="screen / theme / font / wallpaper" { spawn-sh "bardeck open palette:switch || /home/tgrining/bin/niri-screen-switch"; }
+    Mod+BackSpace repeat=false hotkey-overlay-title="screen / theme / font / wallpaper" { spawn-sh "bardeck open palette:switch || /home/tgrining/bin/niri-screen-switch"; }
 }
