@@ -236,7 +236,7 @@ binds {
     XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="volume +5%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+5%"; }
     XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="volume -5%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-5%"; }
     XF86AudioMute        allow-when-locked=true hotkey-overlay-title="mute" { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
-    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="mic mute" { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
+    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="mic mute (all mics)" { spawn "niri-mic-mute"; }
     // i3: $mod+bracketleft / $mod+bracketright. Reclaimed from niri's default
     // consume-or-expel-window, which now sits on Mod+Shift+[ / Mod+Shift+].
     Mod+BracketLeft  hotkey-overlay-title="volume -10%" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-10%"; }
@@ -252,7 +252,7 @@ binds {
     Mod+Ctrl+BracketLeft  hotkey-overlay-title="previous track" { spawn "playerctl" "previous"; }
     Mod+Ctrl+BracketRight hotkey-overlay-title="next track" { spawn "playerctl" "next"; }
     Mod+Escape { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
-    Mod+Space  { spawn "pactl" "set-source-mute" "@DEFAULT_SOURCE@" "toggle"; }
+    Mod+Space  hotkey-overlay-title="mic mute (all mics)" { spawn "niri-mic-mute"; }
     XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="brightness +10%" { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
     XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="brightness -10%" { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
 

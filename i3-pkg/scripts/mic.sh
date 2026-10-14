@@ -4,7 +4,7 @@
 
 # Handle click events
 case $BLOCK_BUTTON in
-    1|3) pactl set-source-mute @DEFAULT_SOURCE@ toggle ;;  # click - toggle mute
+    1|3) ~/bin/niri-mic-mute ;;  # click - mute/unmute all mics
 esac
 
 # Get mic info

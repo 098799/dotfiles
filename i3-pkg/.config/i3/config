@@ -418,7 +418,7 @@ bindsym $mod+Shift+b move container to workspace back_and_forth; workspace back_
 bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5% && pkill -RTMIN+10 i3blocks
 bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -5% && pkill -RTMIN+10 i3blocks
 bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && pkill -RTMIN+10 i3blocks
-bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && pkill -RTMIN+11 i3blocks
+bindsym XF86AudioMicMute exec --no-startup-id ~/bin/niri-mic-mute && pkill -RTMIN+11 i3blocks
 bindsym XF86MonBrightnessUp exec xbacklight -inc 10
 bindsym XF86MonBrightnessDown exec xbacklight -dec 10
 
@@ -494,7 +494,7 @@ bindsym $mod+bracketright exec --no-startup-id pactl set-sink-volume @DEFAULT_SI
 bindsym $mod+Escape exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && pkill -RTMIN+10 i3blocks
 
 # Microphone mute toggle with i3blocks refresh
-bindsym $mod+space exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && pkill -RTMIN+11 i3blocks
+bindsym $mod+space exec --no-startup-id ~/bin/niri-mic-mute && pkill -RTMIN+11 i3blocks
 # bindsym $mod+space exec pactl set-source-mute 0 toggle
 
 # exec_always --no-startup-id setxkbmap -layout pl

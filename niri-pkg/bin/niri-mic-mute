@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""niri-mic-mute — mute or unmute ALL microphones together.
+
+`pactl set-source-mute @DEFAULT_SOURCE@ toggle` toggles one mic only: the
+default one. The default moves when a USB mic (the PC-LM1E webcam) comes or
+goes. So: mute with the laptop mic as default, plug in the webcam, unmute —
+that unmuted the webcam, and the laptop's Digital Microphone stayed muted.
+WirePlumber restores it muted, even after a reboot.
+
+This script uses one state for all mics. The default source decides it:
+
+  default muted     -> unmute every input source
+  default unmuted   -> mute every input source
+
+When the default is no mic, "all mics muted" takes its place.
+
+Monitor sources (the "Monitor of ..." of each output) are not mics and are
+left alone.
+"""
+import json
+import subprocess
+
+
+def pactl(*args):
+    return subprocess.run(["pactl", *args], check=True, capture_output=True, text=True).stdout
+
+
+def main():
+    default = pactl("get-default-source").strip()
+    sources = json.loads(pactl("-f", "json", "list", "sources"))
+    mics = [s for s in sources if s["properties"].get("device.class") != "monitor"]
+    # The default can be a monitor (a recording setup): then all mics decide.
+    default_muted = next((s["mute"] for s in mics if s["name"] == default), all(s["mute"] for s in mics))
+    target = "0" if default_muted else "1"
+    for s in mics:
+        pactl("set-source-mute", s["name"], target)
+
+
+if __name__ == "__main__":
+    main()
