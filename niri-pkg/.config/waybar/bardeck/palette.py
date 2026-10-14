@@ -19,7 +19,9 @@ rofi3.druncache for apps) add to the palette's own (palette.json), so what was u
 most under rofi comes first here too. Both files are read again when they change
 (rofi still runs as Mod+D's fallback). Commands start in the home directory, as
 rofi's did (its history has lines like "android/bin/down").
-  actions   niri-screen-switch's entries (screens, sound, theme, font), network.sh's,
+  switch    niri-screen-switch's entries alone, in its order, all of them (they scroll):
+            Mod+BackSpace opens the palette on it (`bardeck open palette:switch`)
+  actions   niri-screen-switch's entries (screens, sound, theme, font, wallpaper), network.sh's,
             vpn.sh's and power-profile.sh's menu entries (core.menu_action), and
             "Open <panel>" for every bardeck panel
   `=`       a calculator (also when the line is plain arithmetic): numbers, + - * / // %
@@ -82,9 +84,13 @@ GLYPH_VPN, GLYPH_NOTHING = "\U000f099d", "\U000f0349"
 # A row's chip: what the kind is called, and its colour.
 KINDS = {"app": ("app", "accent"), "window": ("window", "blue"), "cmd": ("command", "purple"),
          "action": ("action", "orange"), "panel": ("panel", "aqua"), "calc": ("calc", "ok"),
-         "web": ("web", "info")}
+         "web": ("web", "info"), "switch": ("switch", "orange")}
 FILTERS = (("all", None), ("apps", {"app"}), ("windows", {"window"}), ("commands", {"cmd"}),
-           ("actions", {"action", "panel"}))
+           ("actions", {"action", "panel", "switch"}), ("switch", {"switch"}))
+# The "switch" filter is Mod+BackSpace (`bardeck open palette:switch`): only
+# niri-screen-switch's entries, in the script's order, all of them, scrolled.
+SWITCH_FILTER = len(FILTERS) - 1
+SWITCH_ROWS = 16  # rows shown at once in the switch filter; the rest scroll
 PANEL_TITLES = (("audio", "Audio"), ("net", "Network"), ("dev", "Devices"), ("disp", "Displays"),
                 ("sys", "System"), ("power", "Power"), ("notif", "Notifications"), ("clock", "Calendar"),
                 ("quota", "Claude quota"), ("clip", "Clipboard"), ("wallpaper", "Wallpaper"))
@@ -466,7 +472,9 @@ class PalettePanel(Panel):
         self.icons = Icons(lambda: self.redraw())
         self.buf = ""
         self.filter = 0
+        self.start_filter = ""  # `bardeck open palette:<filter>`: the filter to open on
         self.sel = 0
+        self.top = 0  # the first row shown (the switch filter scrolls)
         self.hovered = -1
         self.note = ""
         self.apps: list[Item] = []
@@ -483,6 +491,8 @@ class PalettePanel(Panel):
 
     def opened(self) -> None:
         self.buf, self.filter, self.sel, self.hovered, self.note = "", 0, 0, -1, ""
+        self.filter = next((i for i, (label, _) in enumerate(FILTERS) if label == self.start_filter), 0)
+        self.start_filter, self.top = "", 0
         self.usage.load()
         try:
             self.apps = self.load_apps()
@@ -555,7 +565,7 @@ class PalettePanel(Panel):
                 self.switch_entries = []
         items = []
         for entry in self.switch_entries:
-            items.append(Item("action", f"act:{entry}", entry, "niri-screen-switch",
+            items.append(Item("switch", f"act:{entry}", entry, "niri-screen-switch",
                               glyph=SWITCH_GLYPHS.get(entry.split(":")[0], GLYPH_MONITOR),
                               run=lambda e=entry: core.spawn([SWITCH, e]) or True))
         for label, glyph in NET_ACTIONS:
@@ -663,6 +673,10 @@ class PalettePanel(Panel):
         pool = [i for i in (*self.apps, *self.windows, *self.actions, *self.history)
                 if kinds is None or i.kind in kinds]
         out: list[Item] = []
+        if self.filter == SWITCH_FILTER and not q:
+            for i in pool:
+                i.score, i.pos = 0, []
+            return pool  # the menu as the script lists it: game, screens, sound, theme, font, wallpaper
         if not q:
             # Nothing typed: the most used first, then the windows, then the apps by name.
             for i in pool:
@@ -708,7 +722,7 @@ class PalettePanel(Panel):
                 out.append(it)
         if not out and kinds is None:
             out = self.web_items(q)
-        return out[:ROWS]
+        return out if self.filter == SWITCH_FILTER else out[:ROWS]
 
     def command_items(self, line: str) -> list[Item]:
         if not line:  # `>` alone: the history, most run first
@@ -776,7 +790,20 @@ class PalettePanel(Panel):
     # -- input -----------------------------------------------------------------
 
     def edited(self) -> None:
-        self.sel, self.hovered, self.note = 0, -1, ""
+        self.sel, self.top, self.hovered, self.note = 0, 0, -1, ""
+
+    def visible(self) -> int:
+        return SWITCH_ROWS if self.filter == SWITCH_FILTER else ROWS
+
+    def follow(self) -> None:
+        """Scroll so the selected row shows."""
+        vis = self.visible()
+        n = len(self.results())
+        if self.sel < self.top:
+            self.top = self.sel
+        elif self.sel >= self.top + vis:
+            self.top = self.sel - vis + 1
+        self.top = max(0, min(self.top, max(0, n - vis)))
 
     def text_key(self, key: str, char: str, ctrl: bool) -> bool:
         n = len(self.results())
@@ -793,6 +820,7 @@ class PalettePanel(Panel):
         elif key in ("Tab", "ISO_Left_Tab"):
             self.filter = (self.filter + (-1 if key == "ISO_Left_Tab" else 1)) % len(FILTERS)
             self.edited()
+            return True
         elif ctrl and key in ("BackSpace", "w"):
             self.buf = re.sub(r"\S*\s*$", "", self.buf.rstrip()) if self.buf.strip() else ""
             self.edited()
@@ -810,6 +838,7 @@ class PalettePanel(Panel):
             self.edited()
         else:
             return False  # Esc: the Deck closes the panel
+        self.follow()
         return True
 
     def paste(self) -> None:
@@ -834,6 +863,7 @@ class PalettePanel(Panel):
         if sel == self.sel:
             return False
         self.sel = sel
+        self.follow()
         return True
 
     def click(self, item: Item) -> bool:
@@ -847,7 +877,7 @@ class PalettePanel(Panel):
     # -- drawing ---------------------------------------------------------------
 
     def size(self):
-        n = max(1, len(self.results()))
+        n = max(1, min(len(self.results()), self.visible()))
         return self.W, self.TOP + n * self.ROW_H + 8 + 24
 
     def draw(self, cr, hits: Hits) -> None:
@@ -875,10 +905,17 @@ class PalettePanel(Panel):
         if not res:
             text(cr, W / 2, y + self.ROW_H / 2, "nothing matches", 12, "dim", align=0.5, valign=0.5)
         dev = abs(cr.user_to_device_distance(1, 0)[0]) or 1.0
-        for i, item in enumerate(res):
-            self.draw_row(cr, hits, P, y, i, item, dev)
+        vis = self.visible()
+        self.top = max(0, min(self.top, max(0, len(res) - vis)))
+        for i in range(self.top, min(len(res), self.top + vis)):
+            self.draw_row(cr, hits, P, y, i, res[i], dev)
             self.rows.append((y, y + self.ROW_H, i))
             y += self.ROW_H
+        if len(res) > vis:
+            above, below = self.top, len(res) - self.top - vis
+            words = " · ".join(w for w in (f"▴ {above} above" if above else "",
+                                           f"▾ {below} more" if below else "") if w)
+            text(cr, W - P, y + 2, words, 10, "dim", align=1)
         hint = "Enter run · Tab filter · ↑↓ Ctrl+n/p · > command · = calc · : web · Esc close"
         text(cr, W / 2, H - 20, hint, 10, "dim", align=0.5)
 
@@ -899,7 +936,9 @@ class PalettePanel(Panel):
             shown = shown[1:]  # the end of a long line stays in sight
         tw = text(cr, tx, mid, shown, 17, "title", valign=0.5) if shown else 0
         if not shown:
-            text(cr, tx + 4, mid, "run, open, find a window…", 15, "dim", valign=0.5)
+            hint = ("screen, sound, theme, font, wallpaper…" if self.filter == SWITCH_FILTER
+                    else "run, open, find a window…")
+            text(cr, tx + 4, mid, hint, 15, "dim", valign=0.5)
         cr.rectangle(tx + tw + 1, y + 9, 1.5, fh - 18)  # the caret
         cr.set_source_rgba(*rgba("accent"))
         cr.fill()

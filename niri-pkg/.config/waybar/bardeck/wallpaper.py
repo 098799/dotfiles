@@ -1,5 +1,6 @@
-"""The wallpaper, chosen on purpose. A key-opened panel (no strip): `bardeck open
-wallpaper`, the palette's "Open Wallpaper", or niri-screen-switch's "Wallpaper: choose…".
+"""The wallpaper, chosen on purpose. The bar's wallpaper pill (the design on screen,
+a pin mark when pinned; hover opens the panel, a click pins it), and also `bardeck
+open wallpaper`, the palette's "Open Wallpaper", niri-screen-switch's "Wallpaper: choose…".
 
 The pictures are ~/Pictures/wallpapers/<palette>-<mode>-N[-laptop|-wide|-uw][-gpt].png:
 design N of a theme, in one version per screen shape. The panel shows the current
@@ -183,6 +184,33 @@ class Thumbs:
                 core.log(f"wallpaper thumb {path}: {err!r}")
                 self.surfaces[path] = None
             GLib.idle_add(lambda: self.ready() or False)
+
+
+class WallStrip:
+    """The pill: a picture icon, the design on screen, and a pin when it is pinned.
+    Hover: the panel; click: pinned open."""
+
+    name = "wallpaper"
+
+    @staticmethod
+    def state() -> tuple[str, str, str]:
+        mode, palette = theme()
+        m = re.match(rf"{re.escape(palette)}-{re.escape(mode)}-(\d+)[-.]", os.path.basename(current_file()))
+        return palette, m.group(1) if m else "", pin_of(palette, mode)
+
+    def key(self, variant: str):
+        return self.state()
+
+    def draw(self, variant: str, scale: int):
+        palette, design, pin = self.state()
+        cv = core.StripCanvas(scale)
+        cv.icon(GLYPH_WALL, "fg", 15, after=4 if design else 0)
+        if design:
+            cv.text(design, "fg2", 12)
+        if pin:
+            cv.gap(4)
+            cv.icon(GLYPH_PIN, "accent", 12, after=0)
+        return cv.finish()
 
 
 class WallPanel(Panel):

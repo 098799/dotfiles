@@ -263,6 +263,7 @@ binds {
 
     // i3 had this on ~/scripts/screen_switch. That menu is half xrandr layouts
     // and half theme/font switches; the niri port keeps the switches as they
-    // were and re-expresses the layouts with `niri msg output`.
-    Mod+BackSpace hotkey-overlay-title="screen / theme / font" { spawn "/home/tgrining/bin/niri-screen-switch"; }
+    // were and re-expresses the layouts with `niri msg output`. Its entries show
+    // in the bar's palette ("switch" filter); rofi only when bardeck is down.
+    Mod+BackSpace hotkey-overlay-title="screen / theme / font / wallpaper" { spawn-sh "bardeck open palette:switch || /home/tgrining/bin/niri-screen-switch"; }
 }

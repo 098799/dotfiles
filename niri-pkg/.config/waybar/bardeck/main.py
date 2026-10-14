@@ -79,7 +79,7 @@ def build(with_ws: bool = True):
     from .power import PowerPanel, PowerStrip
     from .sample import Sampler
     from .system import SysStrip, SystemPanel
-    from .wallpaper import WallPanel
+    from .wallpaper import WallPanel, WallStrip
     from .ws import WsPanel
 
     s = Sampler()
@@ -106,6 +106,7 @@ def build(with_ws: bool = True):
         "notif": (NotifStrip(dunst), 1),
         "agents": (AgentsStrip(agents), 5),  # drawn on rcmon's answers too (watch)
         "cam": (CamStrip(cam), 5),  # drawn on fakecam's answers (watch: its own thread)
+        "wallpaper": (WallStrip(), 5),  # two small file reads; key() skips a redraw when unchanged
     }
     panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine),
                                   AudioPanel(audio), ClockPanel(), DispPanel(disp), WsPanel())}
@@ -251,8 +252,13 @@ class Daemon:
             core.signal_waybar()
 
     def open(self, name: str) -> None:
-        """`bardeck open NAME`: the panel on the focused output, at that bar's zoom."""
+        """`bardeck open NAME[:FILTER]`: the panel on the focused output, at that bar's
+        zoom. FILTER: the palette's filter to open on (`palette:switch` = Mod+BackSpace)."""
         from .ws import niri
+
+        name, _, start = name.partition(":")
+        if start and hasattr(self.panels.get(name), "start_filter"):
+            self.panels[name].start_filter = start
 
         out = niri("FocusedOutput") or {}
         logical = out.get("logical") or {}

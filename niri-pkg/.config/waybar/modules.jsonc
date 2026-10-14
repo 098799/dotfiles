@@ -95,11 +95,17 @@
     },
     // Panel: the screens drawn where they are, the selected one's on / off, scale,
     // rotation, VRR and modes, and niri-screen-switch's entries as presets.
-    // Right: niri-screen-switch's menu (Mod+BackSpace).
+    // Right: niri-screen-switch's entries in the palette (Mod+BackSpace).
     "cffi/disp": {
         "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
         "strip": "disp", "variant": "full", "scale": 1,
-        "on-click-right": "~/bin/niri-screen-switch"
+        "on-click-right": "~/bin/bardeck open palette:switch || ~/bin/niri-screen-switch"
+    },
+    // The design on screen, a pin when pinned (bardeck/wallpaper.py). Panel: the
+    // theme's designs as thumbnails; a click pins one, "shuffle" unpins.
+    "cffi/wallpaper": {
+        "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
+        "strip": "wallpaper", "variant": "full", "scale": 1
     },
 
     // Panel: dunst's history (newest first, by app; click one: shown again, hover: ×
