@@ -73,6 +73,7 @@ PRESETS = (
                ("light sele", None, "Theme: light-sele", None))),
     ("font", (("small", None, "Font: small", None), ("middle", None, "Font: middle", None),
               ("big", None, "Font: big", None), ("huge", None, "Font: huge", None))),
+    ("wallpaper", (("choose…", None, "Wallpaper: choose…", None), ("shuffle", None, "Wallpaper: shuffle", None))),
 )
 TERMFONT = f"{core.REAL_HOME}/bin/termfont"
 TERMFONT_STATE = f"{core.REAL_HOME}/.config/termfont"

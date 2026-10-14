@@ -87,9 +87,9 @@ FILTERS = (("all", None), ("apps", {"app"}), ("windows", {"window"}), ("commands
            ("actions", {"action", "panel"}))
 PANEL_TITLES = (("audio", "Audio"), ("net", "Network"), ("dev", "Devices"), ("disp", "Displays"),
                 ("sys", "System"), ("power", "Power"), ("notif", "Notifications"), ("clock", "Calendar"),
-                ("quota", "Claude quota"), ("clip", "Clipboard"))
+                ("quota", "Claude quota"), ("clip", "Clipboard"), ("wallpaper", "Wallpaper"))
 SWITCH_GLYPHS = {"Game": GLYPH_PAD, "Screen": GLYPH_MONITOR, "Sound": GLYPH_SOUND, "Theme": GLYPH_THEME,
-                 "Font": GLYPH_FONT}
+                 "Font": GLYPH_FONT, "Wallpaper": GLYPH_THEME}
 TILE_TONES = ("blue", "aqua", "purple", "orange", "ok", "warn")
 FIELD_CODES = {"%f", "%F", "%u", "%U", "%d", "%D", "%n", "%N", "%v", "%m"}
 ARITHMETIC = re.compile(r"^[\d\s.+\-*/%^()]*\d[\d\s.+\-*/%^()]*$")

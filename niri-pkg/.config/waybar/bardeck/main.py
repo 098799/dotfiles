@@ -79,6 +79,7 @@ def build(with_ws: bool = True):
     from .power import PowerPanel, PowerStrip
     from .sample import Sampler
     from .system import SysStrip, SystemPanel
+    from .wallpaper import WallPanel
     from .ws import WsPanel
 
     s = Sampler()
@@ -113,6 +114,7 @@ def build(with_ws: bool = True):
     panels["cam"] = CamPanel(cam)
     panels["clip"] = ClipPanel(Clip())
     panels["palette"] = PalettePanel()
+    panels["wallpaper"] = WallPanel()
     if quota is not None:
         panels["quota"] = QuotaPanel(quota)
     return s, quota, strips, panels

@@ -259,6 +259,7 @@ ENTRIES=(
 mapfile -t FACES < <("$HOME/bin/termfont" names 2>/dev/null)
 for f in "${FACES[@]}"; do ENTRIES+=("Font: $f"); done
 ENTRIES+=("Font: the one before (A/B)")
+ENTRIES+=("Wallpaper: choose…" "Wallpaper: shuffle")
 
 # An entry as the argument runs it without the menu: the bar's displays panel
 # (bardeck/displays.py) does that, so its preset buttons keep this script's
@@ -307,6 +308,8 @@ case "$choice" in
     "Font: middle") "$HOME/bin/middle-font" ;;
     "Font: big")    "$HOME/bin/big-font" ;;
     "Font: huge")   "$HOME/bin/huge-font" ;;
+    "Wallpaper: choose…") "$HOME/bin/bardeck" open wallpaper ;;
+    "Wallpaper: shuffle") "$HOME/bin/wallpaper-pick" --unpin ;;
     "Font: the one before (A/B)") "$HOME/bin/termfont" flip ;;
     "Font: "*)      "$HOME/bin/termfont" set "${choice#Font: }" ;;
     *) exit 0 ;;

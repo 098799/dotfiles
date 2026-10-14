@@ -8,11 +8,18 @@
 # score every candidate by how close its aspect is to the live primary output,
 # keep the closest group, and rotate at random inside that group only.
 #
-# usage: wallpaper-pick [-n] [-a WxH] [mode palette]
+# usage: wallpaper-pick [-n] [-a WxH] [--pin N | --unpin] [mode palette]
 #   -n / --dry-run   print the pick, change nothing
 #   -a / --aspect    pretend the screen is WxH (for checking the other layouts
 #                    without unplugging anything)
+#   --pin N          keep design N (<palette>-<mode>-N-*) for this theme from now on
+#   --unpin          back to a random design on every pick
 # mode/palette default to ~/.config/theme/state.
+#
+# A pin (~/.config/theme/wallpaper-pin, one "<palette>-<mode> N" line per theme;
+# the bar's wallpaper panel sets it) narrows the candidates to that design, so a
+# layout or theme change shows the SAME picture in the version for the new
+# screen, not a new random one. A pin whose files are gone is ignored.
 #
 # Called by `theme` and by the ~/.screenlayout/*.sh scripts -- a layout change
 # alters the aspect without touching the theme, and that is exactly the case
@@ -22,14 +29,18 @@ set -euo pipefail
 wallpaper_dir=$HOME/Pictures/wallpapers
 state=$HOME/.config/theme/state
 
-dry_run= force_geom=
+pin_file=$HOME/.config/theme/wallpaper-pin
+dry_run= force_geom= set_pin= unpin=
 while [[ $# -gt 0 ]]; do
     case $1 in
         -n | --dry-run) dry_run=1; shift ;;
         -a | --aspect) force_geom=$2; shift 2 ;;
+        --pin) set_pin=$2; shift 2 ;;
+        --unpin) unpin=1; shift ;;
         *) break ;;
     esac
 done
+[[ -z $set_pin || $set_pin =~ ^[0-9]+$ ]] || { echo "bad --pin: $set_pin (a design number)" >&2; exit 2; }
 
 if [[ $# -eq 2 ]]; then
     mode=$1 palette=$2
@@ -38,6 +49,18 @@ elif [[ -f $state ]]; then
 else
     mode=dark palette=gruvbox
 fi
+
+# --pin / --unpin rewrite this theme's line and keep the other themes' lines
+# (with -n they only change this run).
+if [[ -n $set_pin || -n $unpin ]] && [[ -z $dry_run ]]; then
+    mkdir -p "$(dirname "$pin_file")"
+    { grep -v -- "^$palette-$mode " "$pin_file" 2>/dev/null || true
+      [[ -n $set_pin ]] && printf '%s %s\n' "$palette-$mode" "$set_pin"; } >"$pin_file.tmp"
+    mv "$pin_file.tmp" "$pin_file"
+fi
+pin=$(awk -v t="$palette-$mode" '$1 == t { print $2 }' "$pin_file" 2>/dev/null || true)
+[[ -n $dry_run && -n $set_pin ]] && pin=$set_pin
+[[ -n $dry_run && -n $unpin ]] && pin=
 
 # Win95 has no wallpaper -- it is a flat teal root with icons on top, and feh
 # would paint straight over both.
@@ -112,6 +135,14 @@ for ext in png jpg jpeg; do
     done
 done
 
+pinned=()
+if [[ -n $pin ]]; then
+    for cand in "${variants[@]}"; do
+        [[ ${cand##*/} =~ ^$palette-$mode-$pin[-.] ]] && pinned+=("$cand")
+    done
+    (( ${#pinned[@]} )) && variants=("${pinned[@]}")
+fi
+
 wallpaper=""
 if (( ${#variants[@]} )); then
     if [[ -n $screen_aspect ]]; then
@@ -140,7 +171,16 @@ if (( ${#variants[@]} )); then
     else
         matched=("${variants[@]}")
     fi
-    wallpaper="${matched[RANDOM % ${#matched[@]}]}"
+    if (( ${#pinned[@]} )); then
+        # Pinned: the same file every time. A "-gpt" file is an extended version
+        # made where the original had none for this shape; prefer the original.
+        for cand in "${matched[@]}"; do
+            [[ $cand == *-gpt.* ]] || { wallpaper=$cand; break; }
+        done
+        [[ -n $wallpaper ]] || wallpaper=${matched[0]}
+    else
+        wallpaper="${matched[RANDOM % ${#matched[@]}]}"
+    fi
 fi
 
 # legacy single file $palette-$mode.<ext>, then a per-mode one, then the default
