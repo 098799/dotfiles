@@ -76,6 +76,18 @@ layout_wide() {
     repaper
 }
 
+# The external monitor alone, at its preferred mode: the one niri-hotplug picks
+# on a plug-in, so it fits the office 1440p and the wide 3440x1440 alike.
+layout_external() {
+    niri msg output "$HDMI" off 2>/dev/null
+    niri msg output "$EXTERNAL" on
+    external_live "$EXTERNAL" || return 1
+    niri msg output "$EXTERNAL" mode auto
+    niri msg output "$EXTERNAL" position set 0 0
+    niri msg output "$LAPTOP" off
+    repaper
+}
+
 layout_hdmi() {
     niri msg output "$EXTERNAL" off
     niri msg output "$HDMI" on
