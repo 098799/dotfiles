@@ -37,7 +37,9 @@ from .deck import Panel
 from .ws import niri
 
 SWITCH = f"{core.REAL_HOME}/bin/niri-screen-switch"
-# niri-screen-switch's outputs.
+# niri-screen-switch's outputs. EXTERNAL stands for whichever USB-C port the
+# monitor is on (DP-1 or DP-2, the charging port): Displays.external() resolves it
+# the way the script does.
 LAPTOP, EXTERNAL, HDMI = "eDP-1", "DP-1", "HDMI-A-1"
 REVERT_S = 15
 RESHAPE = {"mode", "scale", "transform", "on", "off"}  # output changes that change a screen's shape
@@ -212,6 +214,10 @@ class Displays:
                     key=lambda n: (self.outputs[n]["logical"]["x"], self.outputs[n]["logical"]["y"]))
         return on + sorted(n for n, o in self.outputs.items() if not live(o))
 
+    def external(self) -> str:
+        """The connected DP-* output (the lowest), else DP-1: as niri-screen-switch picks it."""
+        return min((n for n in self.outputs if n.startswith("DP-")), default=EXTERNAL)
+
     def live_names(self) -> list[str]:
         return [n for n, o in self.outputs.items() if live(o)]
 
@@ -313,6 +319,7 @@ class Displays:
     def preset_on(self, entry: str) -> bool:
         """Whether the screens are as the script's layout leaves them."""
         on = set(self.live_names())
+        ext = self.external()
 
         def size(name):
             m = current(self.outputs.get(name) or {})
@@ -324,9 +331,9 @@ class Displays:
             return want in (termfont_state("name", "Ubuntu Mono"), termfont_state("size", "small"))
         return {
             "Screen: laptop only": on == {LAPTOP},
-            "Screen: external 2560x1440": on == {EXTERNAL} and size(EXTERNAL) == (2560, 1440),
-            "Screen: external 3440x1440 (wide)": on == {EXTERNAL} and size(EXTERNAL) == (3440, 1440),
-            "Screen: external + laptop": on == {EXTERNAL, LAPTOP},
+            "Screen: external 2560x1440": on == {ext} and size(ext) == (2560, 1440),
+            "Screen: external 3440x1440 (wide)": on == {ext} and size(ext) == (3440, 1440),
+            "Screen: external + laptop": on == {ext, LAPTOP},
             "Screen: HDMI only (native)": on == {HDMI} and bool((current(self.outputs[HDMI]) or {}).get("is_preferred")),
             "Screen: HDMI 2560x1440": on == {HDMI} and size(HDMI) == (2560, 1440),
         }.get(entry, False)
@@ -584,6 +591,7 @@ class DispPanel(Panel):
                 if li == 0:
                     text(cr, P, y + self.CHIP_H / 2, label, 11, "dim", valign=0.5)
                 for x, (name, glyph, entry, needs) in line:
+                    needs = d.external() if needs == EXTERNAL else needs
                     ok = needs is None or needs in d.outputs
                     self.chip(cr, hits, x, y, name, lambda e=entry: d.preset(e) or False, glyph=glyph,
                               on=d.preset_on(entry) or d.running == entry, tone="accent",
