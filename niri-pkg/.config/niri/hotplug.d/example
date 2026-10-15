@@ -1,0 +1,12 @@
+#!/bin/sh
+# niri-hotplug runs every EXECUTABLE file in this folder once per screen plugged
+# in or pulled out, after its own layout switch:
+#     <script> connect|disconnect <output> <description>
+# e.g. connect DP-2 "Lenovo Group Limited LEN P27h-10 0x01010101"
+# This file is not executable, so it never runs. Copy it, chmod +x the copy.
+# Output goes nowhere; failures land in `journalctl --user -t niri-hotplug`.
+
+case "$1:$3" in
+    "connect:Lenovo Group Limited LEN P27h-10"*) notify-send "screen" "Office monitor on $2" ;;
+    disconnect:*)                               notify-send "screen" "$2 removed" ;;
+esac
