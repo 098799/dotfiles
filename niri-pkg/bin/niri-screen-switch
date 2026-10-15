@@ -200,11 +200,25 @@ tv_for_game() {
         || notify-send -u critical "game" "The TV did not answer - switch it on and pick HDMI 1 with the remote."
 }
 
+# ~/bin/game-mode frees RAM/CPU/GPU for the game: it stops the slot queue, the
+# Legartis slots and the background timers, and `off` starts again only what
+# `on` stopped. Taking the slots down takes a minute, so it runs detached and
+# the screens do not wait for it. A host without the script skips it.
+GAME_MODE=/home/tgrining/bin/game-mode
+GAME_MODE_LOG=/home/tgrining/.local/state/game-mode.log
+
+game_mode() {
+    [[ -x $GAME_MODE ]] || return 0
+    mkdir -p "${GAME_MODE_LOG%/*}"
+    setsid -f "$GAME_MODE" "$1" >>"$GAME_MODE_LOG" 2>&1 </dev/null
+}
+
 # Game mode: TV on HDMI, sound on the TV, pad connected, Steam Big Picture.
 # AntiMicroX turns the pad into a mouse; with Big Picture also reading the pad,
 # every stick move would drive both the menu and the cursor. Stop it here and
 # start it again in game_end.
 layout_game() {
+    game_mode on
     tv_for_game
     layout_hdmi_native || return 1
     sound_hdmi
@@ -241,6 +255,7 @@ layout_game_end() {
     systemctl --user start antimicrox
     layout_laptop
     sound_laptop
+    game_mode off
 }
 
 if [[ ${1-} == layout-* ]]; then
