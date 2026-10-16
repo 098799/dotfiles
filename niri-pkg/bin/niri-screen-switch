@@ -250,11 +250,22 @@ bigpicture_fullscreen() {
         || niri msg action fullscreen-window --id "$id"
 }
 
+# Game mode at the desk, played with keyboard and mouse: only game-mode frees
+# RAM/CPU/GPU. The screens, the sound, the pad and AntiMicroX stay as they are.
+layout_game_here() {
+    game_mode on
+    notify-send "game" "Game mode on. Screens and sound stay as they are."
+}
+
+# Ends both game modes. Only when the TV is live (the TV game) do Big Picture,
+# the screens and the sound go back to the laptop; after "Game: here" they stay.
 layout_game_end() {
-    setsid -f steam steam://close/bigpicture >/dev/null 2>&1 </dev/null
     systemctl --user start antimicrox
-    layout_laptop
-    sound_laptop
+    if niri msg -j outputs | jq -e --arg o "$HDMI" '.[$o].logical != null' >/dev/null 2>&1; then
+        setsid -f steam steam://close/bigpicture >/dev/null 2>&1 </dev/null
+        layout_laptop
+        sound_laptop
+    fi
     game_mode off
 }
 
@@ -265,7 +276,8 @@ fi
 
 ENTRIES=(
     "Game: TV + sound + pad + Big Picture"
-    "Game: end (laptop)"
+    "Game: here (no TV)"
+    "Game: end"
     "Screen: laptop only"
     "Screen: external 2560x1440"
     "Screen: external 3440x1440 (wide)"
@@ -321,7 +333,8 @@ fi
 
 case "$choice" in
     "Game: TV + sound + pad + Big Picture") layout_game ;;
-    "Game: end (laptop)")                   layout_game_end ;;
+    "Game: here (no TV)")                   layout_game_here ;;
+    "Game: end")                            layout_game_end ;;
     "Sound: HDMI")       sound_hdmi ;;
     "Sound: laptop")     sound_laptop ;;
     "Screen: laptop only")                layout_laptop ;;

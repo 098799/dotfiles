@@ -62,7 +62,8 @@ RATIOS = ((16, 9), (16, 10), (4, 3), (5, 4), (3, 2), (21, 9), (32, 9), (5, 3))
 # wakes on its way (tv.py) and only then shows up on HDMI.
 PRESETS = (
     ("game", (("game mode", GLYPH_PAD, "Game: TV + sound + pad + Big Picture", None),
-              ("game end", GLYPH_EXIT, "Game: end (laptop)", LAPTOP))),
+              ("game here", GLYPH_PAD, "Game: here (no TV)", None),
+              ("game end", GLYPH_EXIT, "Game: end", None))),
     ("screens", (("laptop", GLYPH_LAPTOP, "Screen: laptop only", LAPTOP),
                  ("ext 1440p", GLYPH_MONITOR, "Screen: external 2560x1440", EXTERNAL),
                  ("ext wide", GLYPH_MONITOR, "Screen: external 3440x1440 (wide)", EXTERNAL),
