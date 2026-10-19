@@ -422,7 +422,7 @@ class ClipPanel(Panel):
             return False
         return True
 
-    def text_key(self, key: str, char: str, ctrl: bool) -> bool:
+    def text_key(self, key: str, char: str, ctrl: bool, alt: bool) -> bool:
         if self.move(key, ctrl):
             return True
         if key == "Escape" or (ctrl and key == "g"):

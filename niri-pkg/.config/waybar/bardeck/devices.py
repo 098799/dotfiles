@@ -218,7 +218,7 @@ class DevPanel(Panel):
         self.follow()
         return True
 
-    def text_key(self, key: str, char: str, ctrl: bool) -> bool:
+    def text_key(self, key: str, char: str, ctrl: bool, alt: bool) -> bool:
         """A pairing runs: answer its question, or Esc to cancel it."""
         r = self.bt.request
         if key == "Escape" or (ctrl and key == "g"):

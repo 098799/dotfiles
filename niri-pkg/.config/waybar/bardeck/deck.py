@@ -60,8 +60,9 @@ class Panel:
         and close the panel (it opened a window that wants the keyboard)."""
         return False
 
-    def text_key(self, key: str, char: str, ctrl: bool) -> bool:
-        """A key while `typing`: char is what it types ("" for none). True = redraw.
+    def text_key(self, key: str, char: str, ctrl: bool, alt: bool) -> bool:
+        """A key while `typing`: char is what it types ("" for none; "" also with Ctrl
+        or Alt held). True = redraw.
         An Esc (or Ctrl+G) it does not take closes the panel."""
         return False
 
@@ -458,9 +459,10 @@ class Deck:
         key = Gdk.keyval_name(event.keyval) or ""
         ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
         if self.panel is not None and self.panel.typing:
+            alt = bool(event.state & Gdk.ModifierType.MOD1_MASK)
             code = Gdk.keyval_to_unicode(event.keyval)
-            char = chr(code) if code >= 32 and code != 127 else ""
-            if self.panel.text_key(key, char, ctrl):
+            char = chr(code) if code >= 32 and code != 127 and not (ctrl or alt) else ""
+            if self.panel.text_key(key, char, ctrl, alt):
                 self.area.queue_draw()
                 return True
             if key != "Escape" and not (ctrl and key == "g"):

@@ -334,7 +334,7 @@ class NetPanel(Panel):
         self.follow()
         return True
 
-    def text_key(self, key: str, char: str, ctrl: bool) -> bool:
+    def text_key(self, key: str, char: str, ctrl: bool, alt: bool) -> bool:
         if key == "Escape" or (ctrl and key == "g"):
             self.cancel()
         elif key in ("Return", "KP_Enter"):

@@ -32,9 +32,11 @@ Launching goes through niri (its Spawn action, on its socket): the program is
 niri's child, with niri's environment and priority. core.spawn would make it the
 daemon's, at the daemon's nice 5, which every child inherits.
 
-Keys (the field has them all): Enter run, Ctrl+n / Ctrl+p or the arrows move,
-Tab / Shift+Tab the filter, Ctrl+u clear, Ctrl+w or Ctrl+BackSpace a word back,
-Ctrl+v paste, Esc close.
+Keys (the field has them all): Enter run, Ctrl+n / Ctrl+p or Up / Down move,
+Tab / Shift+Tab the filter, Ctrl+v paste, Esc close. The field edits as readline
+does (field.py lists the keys): Ctrl+b / Ctrl+f, Alt+b / Alt+f, Ctrl+a / Ctrl+e
+move; Ctrl+k, Ctrl+u, Ctrl+w, Alt+d, Alt+BackSpace kill; Ctrl+y yanks the last
+kill (the clipboard when nothing was killed); Ctrl+t, Ctrl+/ undo.
 """
 
 from __future__ import annotations
@@ -57,6 +59,7 @@ from . import core
 from .core import Hits, button, rgba, text
 from .deck import Panel
 from .displays import GLYPH_MONITOR, GLYPH_PAD, GLYPH_SOUND, SWITCH
+from .field import Line
 from .net import NET_ACTIONS, VPN_CHOICES
 from .power import PROFILE
 from .ws import action as niri_action
@@ -470,7 +473,8 @@ class PalettePanel(Panel):
     def __init__(self, usage: Usage | None = None):
         self.usage = usage or Usage()
         self.icons = Icons(lambda: self.redraw())
-        self.buf = ""
+        self.field = Line()
+        self.scrolled = 0  # the first character the field shows (a line longer than the field)
         self.filter = 0
         self.start_filter = ""  # `bardeck open palette:<filter>`: the filter to open on
         self.sel = 0
@@ -486,6 +490,15 @@ class PalettePanel(Panel):
         self._results: tuple[tuple, list[Item]] | None = None
         self.rows: list[tuple[float, float, int]] = []
         self.gen = 0  # bumped when the sources change: the results are worked out again
+
+    @property
+    def buf(self) -> str:
+        return self.field.text
+
+    @buf.setter
+    def buf(self, text: str) -> None:
+        self.field.set(text)
+        self.scrolled = 0
 
     # -- sources ---------------------------------------------------------------
 
@@ -805,7 +818,7 @@ class PalettePanel(Panel):
             self.top = self.sel - vis + 1
         self.top = max(0, min(self.top, max(0, n - vis)))
 
-    def text_key(self, key: str, char: str, ctrl: bool) -> bool:
+    def text_key(self, key: str, char: str, ctrl: bool, alt: bool) -> bool:
         n = len(self.results())
         if key in ("Return", "KP_Enter"):
             self.enter()
@@ -821,23 +834,17 @@ class PalettePanel(Panel):
             self.filter = (self.filter + (-1 if key == "ISO_Left_Tab" else 1)) % len(FILTERS)
             self.edited()
             return True
-        elif ctrl and key in ("BackSpace", "w"):
-            self.buf = re.sub(r"\S*\s*$", "", self.buf.rstrip()) if self.buf.strip() else ""
-            self.edited()
-        elif key == "BackSpace":
-            self.buf = self.buf[:-1]
-            self.edited()
-        elif ctrl and key == "u":
-            self.buf = ""
-            self.edited()
         elif ctrl and key in ("v", "y"):
-            self.paste()
-            self.edited()
-        elif char and not ctrl:
-            self.buf += char
+            if not (key == "y" and self.field.yank()):
+                self.paste()
             self.edited()
         else:
-            return False  # Esc: the Deck closes the panel
+            changed = self.field.key(key, char, ctrl, alt)
+            if changed is None:
+                return False  # Esc: the Deck closes the panel
+            if changed:
+                self.edited()
+            return True
         self.follow()
         return True
 
@@ -848,7 +855,7 @@ class PalettePanel(Panel):
         from gi.repository import Gdk, Gtk
 
         got = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text() or ""
-        self.buf += " ".join(got.split())
+        self.field.insert(" ".join(got.split()))
 
     def hover(self, x: float, y: float) -> bool:
         idx = next((i for y0, y1, i in self.rows if y0 <= y < y1 and 0 <= x < self.W), -1)
@@ -916,7 +923,7 @@ class PalettePanel(Panel):
             words = " · ".join(w for w in (f"▴ {above} above" if above else "",
                                            f"▾ {below} more" if below else "") if w)
             text(cr, W - P, y + 2, words, 10, "dim", align=1)
-        hint = "Enter run · Tab filter · ↑↓ Ctrl+n/p · > command · = calc · : web · Esc close"
+        hint = "Enter run · Tab filter · ↑↓ Ctrl+n/p · Ctrl+a/e/b/f/k/u/y Alt+b/f/d · > command · = calc · : web · Esc"
         text(cr, W / 2, H - 20, hint, 10, "dim", align=0.5)
 
     def draw_field(self, cr, P: float, y: float) -> None:
@@ -931,15 +938,22 @@ class PalettePanel(Panel):
         glyph = {"=": GLYPH_CALC, ":": GLYPH_WEB, ">": GLYPH_CMD}.get(self.buf[:1], GLYPH_SEARCH)
         core.icon(cr, x0 + 12, mid, glyph, 17, "accent")
         tx, room = x0 + 40, fw - 52
-        shown = self.buf
-        while len(shown) > 1 and core.text_w(cr, shown, 17) > room - 4:
-            shown = shown[1:]  # the end of a long line stays in sight
-        tw = text(cr, tx, mid, shown, 17, "title", valign=0.5) if shown else 0
-        if not shown:
+        line, pos = self.field.text, self.field.pos
+        # A line longer than the field scrolls so the caret stays in sight.
+        self.scrolled = min(self.scrolled, pos)
+        while self.scrolled < pos and core.text_w(cr, line[self.scrolled:pos], 17) > room - 4:
+            self.scrolled += 1
+        shown = line[self.scrolled:]
+        while len(shown) > pos - self.scrolled and core.text_w(cr, shown, 17) > room:
+            shown = shown[:-1]
+        if shown:
+            text(cr, tx, mid, shown, 17, "title", valign=0.5)
+        else:
             hint = ("screen, sound, theme, font, wallpaper…" if self.filter == SWITCH_FILTER
                     else "run, open, find a window…")
             text(cr, tx + 4, mid, hint, 15, "dim", valign=0.5)
-        cr.rectangle(tx + tw + 1, y + 9, 1.5, fh - 18)  # the caret
+        cx = core.text_w(cr, line[self.scrolled:pos], 17) if pos > self.scrolled else 0
+        cr.rectangle(tx + cx + 1, y + 9, 1.5, fh - 18)  # the caret
         cr.set_source_rgba(*rgba("accent"))
         cr.fill()
 

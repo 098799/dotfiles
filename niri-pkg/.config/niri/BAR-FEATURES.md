@@ -9,7 +9,7 @@ opens this file. The bar shows one of these lines a day as a tip (see the end).
 
 ## Keys
 
-- **Launcher on Mod+D** — apps, windows, your old rofi commands with their arguments (`susp` → `systemctl suspend`, `cam h` → `cam help`), `>` any command, `=` a calculator, `:` a web search. Tab changes the filter.
+- **Launcher on Mod+D** — apps, windows, your old rofi commands with their arguments (`susp` → `systemctl suspend`, `cam h` → `cam help`), `>` any command, `=` a calculator, `:` a web search. Tab changes the filter; the field takes the Emacs keys (Ctrl+a/e/b/f/k/u/y, Alt+b/f/d).
 - **Clipboard history on Mod+Shift+V** — Enter pastes the entry into the window you came from (terminal, Emacs, Thunar: an image becomes a file in the folder). `y` copies only, `p` pins, `/` searches.
 
 ## Left side
