@@ -476,15 +476,19 @@ claw() {
 
   # --dangerously-skip-permissions does not skip the folder-trust dialog; this does.
   local cmd="CLAUDE_CODE_SANDBOXED=1 claude --dangerously-skip-permissions"
+  [[ -n "$chome" ]] && cmd="HOME=${(q)chome} $cmd"
   # Join first, then quote each word: inside "…" a bare ${(q)@} flattens all args
   # into ONE escaped word, so claude saw "-c --model x" as a single option.
   (( $# )) && cmd+=" ${(j: :)${(q)@}}"
 
-  # -e keeps HOME set for every pane of the session, not just the first command.
-  # Must be a real array: "${chome:+-e HOME=$chome}" collapses into one word,
+  # HOME is set on the claude command only, NOT on the session: a session-wide
+  # HOME made every new pane start zsh in ~/claude-<home>, which has no .zshrc,
+  # so it ran zsh-newuser-install. New panes get CLAW_HOME instead, and the
+  # claude() wrapper below puts `claude` typed there back on the session's account.
+  # Must be a real array: "${chome:+-e CLAW_HOME=$chome}" collapses into one word,
   # which tmux ignores silently instead of rejecting.
   local -a envopt
-  [[ -n "$chome" ]] && envopt=(-e "HOME=$chome")
+  [[ -n "$chome" ]] && envopt=(-e "CLAW_HOME=$chome")
 
   tmux new-session -d -s "$name" -c "$PWD" "${envopt[@]}" "$cmd" || return
   if [[ -n "$TMUX" ]]; then
@@ -493,6 +497,11 @@ claw() {
     tmux attach-session -t "=$name"
   fi
 }
+
+# In a pane of a claw session, `claude` runs on that session's account.
+if [[ -n "$CLAW_HOME" ]]; then
+  claude() { HOME="$CLAW_HOME" command claude "$@" }
+fi
 
 _claw() {
   local -a homes
