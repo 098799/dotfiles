@@ -233,6 +233,25 @@ layout_game() {
     fi
 }
 
+# One Game run at a time. The phone's PC / Steam button is often tapped twice
+# while the first run still waits for the TV; two runs then toggle Big Picture's
+# fullscreen on and off again, and the second mode set drops the HDMI sound
+# back to the laptop. A pid file, not flock: Steam and game-mode are started
+# from inside the run and would inherit a lock fd for hours.
+GAME_PID=${XDG_RUNTIME_DIR:-/tmp}/niri-screen-switch-game.pid
+
+game_once() {
+    local pid
+    pid=$(cat "$GAME_PID" 2>/dev/null)
+    if [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+        notify-send "game" "Game is already starting - wait for it."
+        return 0
+    fi
+    echo $$ >"$GAME_PID"
+    "$@"
+    rm -f "$GAME_PID"
+}
+
 # Big Picture opens as an ordinary tiled column on the TV. Wait for its window
 # (Steam may still be starting), focus it and make it fullscreen. niri's
 # fullscreen-window toggles, so skip it when the window already fills the output.
@@ -332,7 +351,7 @@ else
 fi
 
 case "$choice" in
-    "Game: TV + sound + pad + Big Picture") layout_game ;;
+    "Game: TV + sound + pad + Big Picture") game_once layout_game ;;
     "Game: here (no TV)")                   layout_game_here ;;
     "Game: end")                            layout_game_end ;;
     "Sound: HDMI")       sound_hdmi ;;
