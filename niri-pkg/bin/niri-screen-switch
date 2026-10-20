@@ -200,6 +200,13 @@ tv_for_game() {
         || notify-send -u critical "game" "The TV did not answer - switch it on and pick HDMI 1 with the remote."
 }
 
+# The TV game is over: the TV goes off. Already off means nothing to do, so a
+# failure stays silent.
+tv_off() {
+    [[ -x $TV_CLI ]] || return 0
+    timeout 15 "$TV_CLI" off >/dev/null 2>&1
+}
+
 # ~/bin/game-mode frees RAM/CPU/GPU for the game: it stops the slot queue, the
 # Legartis slots and the background timers, and `off` starts again only what
 # `on` stopped. Taking the slots down takes a minute, so it runs detached and
@@ -277,13 +284,15 @@ layout_game_here() {
 }
 
 # Ends both game modes. Only when the TV is live (the TV game) do Big Picture,
-# the screens and the sound go back to the laptop; after "Game: here" they stay.
+# the screens and the sound go back to the laptop and the TV go off; after
+# "Game: here" they stay.
 layout_game_end() {
     systemctl --user start antimicrox
     if niri msg -j outputs | jq -e --arg o "$HDMI" '.[$o].logical != null' >/dev/null 2>&1; then
         setsid -f steam steam://close/bigpicture >/dev/null 2>&1 </dev/null
         layout_laptop
         sound_laptop
+        tv_off
     fi
     game_mode off
 }
