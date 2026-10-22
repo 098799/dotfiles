@@ -9,7 +9,7 @@ Listen is on, a hand while Gestures are on.
 The panel: what the cam app's panel (https://cam.p14s.grining.eu) and `cam` (rofi)
 can do that is worth a click in a meeting: Turn on / Turn off, which real camera
 (Source), the scene, the camera settings (mirror, framing, close, blur), Listen and
-Gestures, the looks and the bursts. Face and text effects stay in `cam`'s board and
+Gestures, the looks, the backdrop (one at a time; "room" = none) and the bursts. Face and text effects stay in `cam`'s board and
 the web panel (buttons for both).
 
 How: fakecam's HTTP API on 127.0.0.1:7788 (the same calls `cam` makes), on a
@@ -46,6 +46,7 @@ GLYPH_POWER = "\U000f0425"
 GLYPH_WEB = "\U000f059f"  # web
 GLYPH_WAND = "\U000f0068"  # auto-fix: cam's board
 LOOKS_PER_ROW = 4
+BACKDROPS_PER_ROW = 6  # "room" and the five backdrops: one row
 BURSTS_PER_ROW = 10
 
 # power state -> (glyph, tone, strip word, panel words)
@@ -61,6 +62,12 @@ CAMERA_ROWS = (
     ("close", (("normal", "normal"), ("close", "close"), ("extra", "extra"))),
     ("blur", (("on", "on"), ("off", "off"))),
 )
+
+
+def split_looks(st: dict) -> tuple[list[dict], list[dict]]:
+    """(looks, backdrops): the catalogue's looks, with the ones marked "backdrop" apart."""
+    every = (st.get("fx") or {}).get("catalogue", {}).get("looks", [])
+    return [e for e in every if not e.get("backdrop")], [e for e in every if e.get("backdrop")]
 
 
 def cam_name(label: str) -> str:
@@ -243,9 +250,11 @@ class CamPanel(Panel):
         h += 56 + 30 * (self.scene_rows(st) - 1)  # scene
         h += 20 + self.ROW * len(CAMERA_ROWS) + 10  # camera
         h += 56  # listen + gestures
-        looks = (st.get("fx") or {}).get("catalogue", {}).get("looks", [])
+        looks, backdrops = split_looks(st)
         bursts = (st.get("fx") or {}).get("catalogue", {}).get("bursts", [])
         h += 20 + 30 * -(-len(looks) // LOOKS_PER_ROW) + 6
+        if backdrops:
+            h += 20 + 30 * -(-(len(backdrops) + 1) // BACKDROPS_PER_ROW) + 6
         h += 20 + 32 * -(-len(bursts) // BURSTS_PER_ROW) + 12
         return self.W, h
 
@@ -367,15 +376,34 @@ class CamPanel(Panel):
             button(cr, hits, W - P - 52, y - 5, "all off", lambda: c.post("/api/fx", {"looks": []}), h=18, size=11,
                    w=52)
         y += 20
+        looks, backdrops = split_looks(st)
+        behind = {e["name"] for e in backdrops}
         bw = (W - 2 * P - (LOOKS_PER_ROW - 1) * 6) / LOOKS_PER_ROW
-        for i, e in enumerate(fx.get("catalogue", {}).get("looks", [])):
+        for i, e in enumerate(looks):
             x = P + (i % LOOKS_PER_ROW) * (bw + 6)
             yy = y + (i // LOOKS_PER_ROW) * 30
             name = e["name"]
             new = [n for n in on_looks if n != name] if name in on_looks else on_looks + [name]
             button(cr, hits, x, yy, f"{e['icon']} {name}", lambda v=new: c.post("/api/fx", {"looks": v}),
                    on=name in on_looks, tone="purple", w=bw, size=11)
-        y += 30 * -(-len(fx.get("catalogue", {}).get("looks", [])) // LOOKS_PER_ROW) + 6
+        y += 30 * -(-len(looks) // LOOKS_PER_ROW) + 6
+
+        # backdrop: a picture behind you instead of the room, one at a time
+        if backdrops:
+            heading(cr, P, y, "backdrop", W - 2 * P)
+            y += 20
+            bw = (W - 2 * P - (BACKDROPS_PER_ROW - 1) * 6) / BACKDROPS_PER_ROW
+            room = [n for n in on_looks if n not in behind]
+            choices = [("🏠", "room", room, not any(n in behind for n in on_looks))]
+            for e in backdrops:
+                name = e["name"]
+                choices.append((e["icon"], name, room if name in on_looks else room + [name], name in on_looks))
+            for i, (icon, name, new, on) in enumerate(choices):
+                x = P + (i % BACKDROPS_PER_ROW) * (bw + 6)
+                yy = y + (i // BACKDROPS_PER_ROW) * 30
+                button(cr, hits, x, yy, f"{icon} {name}", lambda v=new: c.post("/api/fx", {"looks": v}),
+                       on=on, tone="purple", w=bw, size=11)
+            y += 30 * -(-len(choices) // BACKDROPS_PER_ROW) + 6
 
         # bursts: a few seconds, then gone
         heading(cr, P, y, "bursts", W - 2 * P)
