@@ -38,3 +38,5 @@ node_modules/
 *.dylib
 
 **/.claude/settings.local.json
+
+**/.claude/.cc-writes/
