@@ -9,8 +9,10 @@ Listen is on, a hand while Gestures are on.
 The panel: what the cam app's panel (https://cam.p14s.grining.eu) and `cam` (rofi)
 can do that is worth a click in a meeting: Turn on / Turn off, which real camera
 (Source), the scene, the camera settings (mirror, framing, close, blur), Listen and
-Gestures, the looks, the backdrop (one at a time; "room" = none) and the bursts. Face and text effects stay in `cam`'s board and
-the web panel (buttons for both).
+Gestures, the looks, the backdrop (one at a time; "room" = none), the bursts, and the
+face and text effects (a text effect fires with its own line: "hi!", a random headline,
+a 1-minute timer — typing a line is for `cam`'s board and the web panel). The effect
+grids are emoji only; the one under the pointer is named next to its heading.
 
 How: fakecam's HTTP API on 127.0.0.1:7788 (the same calls `cam` makes), on a
 thread of its own, never on the main loop. GET /api/listen (the power state and
@@ -47,7 +49,7 @@ GLYPH_WEB = "\U000f059f"  # web
 GLYPH_WAND = "\U000f0068"  # auto-fix: cam's board
 LOOKS_PER_ROW = 4
 BACKDROPS_PER_ROW = 6  # "room" and the five backdrops: one row
-BURSTS_PER_ROW = 10
+BURSTS_PER_ROW = 13  # bursts, and face + text: emoji-only grids, two and three rows
 
 # power state -> (glyph, tone, strip word, panel words)
 POWER = {
@@ -230,6 +232,18 @@ class CamPanel(Panel):
 
     def __init__(self, cam: Cam):
         self.cam = cam
+        self.cells: list[tuple[float, float, float, float, dict]] = []  # the emoji grids, for the hover label
+        self.hovered: dict | None = None
+
+    def hover(self, x: float, y: float) -> bool:
+        at = next((e for x0, y0, w, h, e in self.cells if x0 <= x < x0 + w and y0 <= y < y0 + h), None)
+        if at is self.hovered:
+            return False
+        self.hovered = at
+        return True
+
+    def state(self) -> tuple:
+        return (self.hovered and self.hovered["name"],)
 
     def opened(self) -> None:
         self.cam.panel_open = True
@@ -251,12 +265,16 @@ class CamPanel(Panel):
         h += 20 + self.ROW * len(CAMERA_ROWS) + 10  # camera
         h += 56  # listen + gestures
         looks, backdrops = split_looks(st)
-        bursts = (st.get("fx") or {}).get("catalogue", {}).get("bursts", [])
+        catalogue = (st.get("fx") or {}).get("catalogue", {})
+        bursts = catalogue.get("bursts", [])
+        faces = catalogue.get("face", []) + catalogue.get("text", [])
         h += 20 + 30 * -(-len(looks) // LOOKS_PER_ROW) + 6
         if backdrops:
             h += 20 + 30 * -(-(len(backdrops) + 1) // BACKDROPS_PER_ROW) + 6
-        h += 20 + 32 * -(-len(bursts) // BURSTS_PER_ROW) + 12
-        return self.W, h
+        h += 20 + 32 * -(-len(bursts) // BURSTS_PER_ROW) + 6
+        if faces:
+            h += 20 + 32 * -(-len(faces) // BURSTS_PER_ROW) + 6
+        return self.W, h + 6
 
     def scene_rows(self, st: dict) -> int:
         rows, x = 1, 0.0
@@ -405,13 +423,26 @@ class CamPanel(Panel):
                        on=on, tone="purple", w=bw, size=11)
             y += 30 * -(-len(choices) // BACKDROPS_PER_ROW) + 6
 
-        # bursts: a few seconds, then gone
-        heading(cr, P, y, "bursts", W - 2 * P)
+        # bursts: a few seconds, then gone; face and text effects: the same, on your face or with a line
+        catalogue = fx.get("catalogue", {})
+        self.cells = []
+        y = self.grid(cr, hits, y, "bursts", catalogue.get("bursts", []))
+        self.grid(cr, hits, y, "face · text", catalogue.get("face", []) + catalogue.get("text", []))
+
+    def grid(self, cr, hits: Hits, y: float, title: str, effects: list[dict]) -> float:
+        """Emoji buttons, BURSTS_PER_ROW a row, under `title`; the hovered one is named beside it. Returns y below."""
+        if not effects:
+            return y
+        c, W, P = self.cam, self.W, 16
+        hovered = self.hovered if self.hovered in effects else None
+        note = f"{hovered['icon']} {hovered['label']} · cam {hovered['name']}" if hovered else ""
+        heading(cr, P, y, title, W - 2 * P - (text(cr, W - P, y - 2, note, 11, "title", align=1) + 10 if note else 0))
         y += 20
-        bursts = fx.get("catalogue", {}).get("bursts", [])
-        bw = (W - 2 * P - (BURSTS_PER_ROW - 1) * 4) / BURSTS_PER_ROW
-        for i, e in enumerate(bursts):
-            x = P + (i % BURSTS_PER_ROW) * (bw + 4)
+        bw = (W - 2 * P - (BURSTS_PER_ROW - 1) * 3) / BURSTS_PER_ROW
+        for i, e in enumerate(effects):
+            x = P + (i % BURSTS_PER_ROW) * (bw + 3)
             yy = y + (i // BURSTS_PER_ROW) * 32
             button(cr, hits, x, yy, e["icon"], lambda n=e["name"]: c.post("/api/fx", {"burst": n, "text": ""}),
-                   w=bw, h=28, size=15)
+                   w=bw, h=28, size=15, on=e is hovered, tone="bg2")
+            self.cells.append((x, yy, bw, 28, e))
+        return y + 32 * -(-len(effects) // BURSTS_PER_ROW) + 6
