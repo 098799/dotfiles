@@ -368,7 +368,7 @@ _claw_help() {
   local root="$(_claw_root)" h
   print -r -- "claw — claude --dangerously-skip-permissions in a fresh tmux session"
   print -r -- ""
-  print -r -- "usage: claw [home|main] [claude args...]"
+  print -r -- "usage: claw [--chrome|--no-chrome] [home|main] [claude args...]"
   print -r -- "       claw --help | -h"
   print -r -- ""
   print -r -- "The session is named after the current directory plus the account tag the i3"
@@ -403,6 +403,8 @@ _claw_help() {
   print -r -- "       -c, --continue             resume the last session in this directory"
   print -r -- "       -r, --resume               pick a session from the list"
   print -r -- "       claw \"fix the flaky test\"  start on a prompt"
+  print -r -- "       --chrome / --no-chrome     Claude in Chrome connection on / off; may"
+  print -r -- "                                  come before the account: claw --chrome builder"
   print -r -- "Full set: \`claude --help\`."
 }
 
@@ -424,6 +426,14 @@ claw() {
     _claw_help
     return 0
   fi
+
+  # --chrome / --no-chrome (Claude in Chrome connection) may come before the
+  # account, so `claw --chrome builder` lands on builder instead of sending
+  # "builder" as a prompt. They go to claude in front of the other args.
+  local -a chromeopt
+  while [[ "$1" == (--chrome|--no-chrome) ]]; do
+    chromeopt+=("$1"); shift
+  done
 
   # Only the first word can name the account. It used to be picked out anywhere
   # in the line, which cut a word like "sales" out of the middle of a prompt.
@@ -479,6 +489,7 @@ claw() {
   [[ -n "$chome" ]] && cmd="HOME=${(q)chome} $cmd"
   # Join first, then quote each word: inside "…" a bare ${(q)@} flattens all args
   # into ONE escaped word, so claude saw "-c --model x" as a single option.
+  set -- "${chromeopt[@]}" "$@"
   (( $# )) && cmd+=" ${(j: :)${(q)@}}"
 
   # HOME is set on the claude command only, NOT on the session: a session-wide
@@ -522,7 +533,8 @@ fable() {
     return 0
   fi
   local -a acct
-  _claw_is_home "$1" && { acct=("$1"); shift }
+  while [[ "$1" == (--chrome|--no-chrome) ]]; do acct+=("$1"); shift; done
+  _claw_is_home "$1" && { acct+=("$1"); shift }
   claw "${acct[@]}" --model claude-fable-5-1 --effort low "$@"
 }
 (( $+functions[compdef] )) && compdef _claw fable
@@ -540,7 +552,8 @@ foreman() {
     return 0
   fi
   local -a acct
-  _claw_is_home "$1" && { acct=("$1"); shift }
+  while [[ "$1" == (--chrome|--no-chrome) ]]; do acct+=("$1"); shift; done
+  _claw_is_home "$1" && { acct+=("$1"); shift }
   claw "${acct[@]}" "/foreman${*:+ $*}"
 }
 (( $+functions[compdef] )) && compdef _claw foreman
