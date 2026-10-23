@@ -403,8 +403,9 @@ _claw_help() {
   print -r -- "       -c, --continue             resume the last session in this directory"
   print -r -- "       -r, --resume               pick a session from the list"
   print -r -- "       claw \"fix the flaky test\"  start on a prompt"
-  print -r -- "       --chrome / --no-chrome     Claude in Chrome connection on / off; may"
-  print -r -- "                                  come before the account: claw --chrome builder"
+  print -r -- "       --chrome / --no-chrome     Claude in Chrome connection on (the default)"
+  print -r -- "                                  / off; may come before the account:"
+  print -r -- "                                  claw --no-chrome builder"
   print -r -- "Full set: \`claude --help\`."
 }
 
@@ -434,6 +435,8 @@ claw() {
   while [[ "$1" == (--chrome|--no-chrome) ]]; do
     chromeopt+=("$1"); shift
   done
+  # Claude in Chrome is on by default; --no-chrome turns it off.
+  (( ${#chromeopt} )) || chromeopt=(--chrome)
 
   # Only the first word can name the account. It used to be picked out anywhere
   # in the line, which cut a word like "sales" out of the middle of a prompt.
