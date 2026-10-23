@@ -9,10 +9,13 @@ Listen is on, a hand while Gestures are on.
 The panel: what the cam app's panel (https://cam.p14s.grining.eu) and `cam` (rofi)
 can do that is worth a click in a meeting: Turn on / Turn off, which real camera
 (Source), the scene, the camera settings (mirror, framing, close, blur), Listen and
-Gestures, the looks, the backdrop (one at a time; "room" = none), the bursts, and the
-face and text effects (a text effect fires with its own line: "hi!", a random headline,
-a 1-minute timer — typing a line is for `cam`'s board and the web panel). The effect
-grids are emoji only; the one under the pointer is named next to its heading.
+Gestures, the looks, the backdrop (one at a time; "room" = none), and two grids of
+effects to fire: "legartis", every effect fx.json marks "legartis": true (the dev pack,
+commit, ticket, objection — a new one shows up here by itself), and "fun", the bar's pick
+of the rest (FUN). Everything else is one click away on cam's board ("effects"). A text
+effect fires with its own line (a commit message, a ticket, a random headline, a 1-minute
+timer — typing a line is for `cam`'s board and the web panel). The effect grids are
+emoji only; the one under the pointer is named next to its heading.
 
 How: fakecam's HTTP API on 127.0.0.1:7788 (the same calls `cam` makes), on a
 thread of its own, never on the main loop. GET /api/listen (the power state and
@@ -49,7 +52,13 @@ GLYPH_WEB = "\U000f059f"  # web
 GLYPH_WAND = "\U000f0068"  # auto-fix: cam's board
 LOOKS_PER_ROW = 4
 BACKDROPS_PER_ROW = 6  # "room" and the five backdrops: one row
-BURSTS_PER_ROW = 13  # bursts, and face + text: emoji-only grids, two and three rows
+BURSTS_PER_ROW = 13  # the emoji-only grids: legartis three rows, fun two
+FIRE_GROUPS = ("bursts", "face", "text", "dev")  # the catalogue groups that fire (looks toggle)
+# The bar's pick of the effects that are not Legartis's own, in this order: the ones worth a
+# click in a meeting. Two rows; the rest (thumbs and the other gesture ones, the stickers) stay on the board.
+FUN = ("confetti", "hearts", "applause", "laugh", "fireworks", "mindblown", "hundred", "rocket", "shipit",
+       "airhorn", "drumroll", "replay", "clones", "freeze", "shades", "halo", "laser", "enhance", "bonk", "nerd",
+       "micdrop", "bighead", "witness", "timer", "news", "achieve")
 
 # power state -> (glyph, tone, strip word, panel words)
 POWER = {
@@ -70,6 +79,14 @@ def split_looks(st: dict) -> tuple[list[dict], list[dict]]:
     """(looks, backdrops): the catalogue's looks, with the ones marked "backdrop" apart."""
     every = (st.get("fx") or {}).get("catalogue", {}).get("looks", [])
     return [e for e in every if not e.get("backdrop")], [e for e in every if e.get("backdrop")]
+
+
+def split_fire(st: dict) -> tuple[list[dict], list[dict]]:
+    """(legartis, fun): every effect marked "legartis" in catalogue order, then FUN's in FUN's order."""
+    catalogue = (st.get("fx") or {}).get("catalogue", {})
+    every = [e for g in FIRE_GROUPS for e in catalogue.get(g, [])]
+    by_name = {e["name"]: e for e in every if not e.get("legartis")}
+    return [e for e in every if e.get("legartis")], [by_name[n] for n in FUN if n in by_name]
 
 
 def cam_name(label: str) -> str:
@@ -265,15 +282,12 @@ class CamPanel(Panel):
         h += 20 + self.ROW * len(CAMERA_ROWS) + 10  # camera
         h += 56  # listen + gestures
         looks, backdrops = split_looks(st)
-        catalogue = (st.get("fx") or {}).get("catalogue", {})
-        bursts = catalogue.get("bursts", [])
-        faces = catalogue.get("face", []) + catalogue.get("text", [])
         h += 20 + 30 * -(-len(looks) // LOOKS_PER_ROW) + 6
         if backdrops:
             h += 20 + 30 * -(-(len(backdrops) + 1) // BACKDROPS_PER_ROW) + 6
-        h += 20 + 32 * -(-len(bursts) // BURSTS_PER_ROW) + 6
-        if faces:
-            h += 20 + 32 * -(-len(faces) // BURSTS_PER_ROW) + 6
+        for effects in split_fire(st):
+            if effects:
+                h += 20 + 32 * -(-len(effects) // BURSTS_PER_ROW) + 6
         return self.W, h + 6
 
     def scene_rows(self, st: dict) -> int:
@@ -423,11 +437,11 @@ class CamPanel(Panel):
                        on=on, tone="purple", w=bw, size=11)
             y += 30 * -(-len(choices) // BACKDROPS_PER_ROW) + 6
 
-        # bursts: a few seconds, then gone; face and text effects: the same, on your face or with a line
-        catalogue = fx.get("catalogue", {})
+        # effects that fire: a few seconds, then gone (on your face, or with a line for the text ones)
+        legartis, fun = split_fire(st)
         self.cells = []
-        y = self.grid(cr, hits, y, "bursts", catalogue.get("bursts", []))
-        self.grid(cr, hits, y, "face · text", catalogue.get("face", []) + catalogue.get("text", []))
+        y = self.grid(cr, hits, y, "legartis", legartis)
+        self.grid(cr, hits, y, "fun", fun)
 
     def grid(self, cr, hits: Hits, y: float, title: str, effects: list[dict]) -> float:
         """Emoji buttons, BURSTS_PER_ROW a row, under `title`; the hovered one is named beside it. Returns y below."""
