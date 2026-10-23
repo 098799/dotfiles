@@ -30,6 +30,7 @@ opens this file. The bar shows one of these lines a day as a tip (see the end).
 - **Charge limit: power pill** — 60 / 80 / 100%, kept after a reboot; "full once" charges to 100% until the next boot (for a day away from the charger).
 - **Keyboard light: power pill** — off / low / high.
 - **Keep awake: power pill** — "keep awake" on / 1 h / until 20% battery: no lock, no screen off. A cup shows on the pill.
+- **Lid close: power pill** — suspend / do nothing. With "do nothing" a laptop shows on the pill, and a closed lid (no external screen) holds the CPU at minimum: low power, no boost, ≤1.4 GHz.
 - **Recording indicator: power pill** — while niri-record runs, a red dot and the time; the panel has a stop button.
 - **Notifications: the bell** — the badge counts new ones. Click a card to show it again, hover × to remove, "do not disturb" to hold popups. Middle-click the bell: do not disturb.
 - **Weather and today's meetings: the clock** — the next 12 h of weather from MeteoSwiss (Zürich). For meetings, put your Google "Secret address in iCal format" into `~/.config/bardeck/calendar`; a meeting link gets a "join" chip.

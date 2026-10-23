@@ -1,7 +1,8 @@
 """Power: battery and power profile on the strip; in the panel the battery's last 24 h
 (upower's own history), its draw and health, and the profile and boost switches.
 The battery's charge limit and the keyboard light (charge.py). Also what keeps the
-machine awake or busy: caffeine (caffeine.py: a cup on the strip)
+machine awake or busy: caffeine (caffeine.py: a cup on the strip), what closing the
+lid does (lid.py: a laptop on the strip while it does nothing; the CPU guard)
 and a screen recording that runs (recording.py: a red dot and its time on the strip,
 the file and a stop button in the panel).
 
@@ -13,10 +14,11 @@ import glob
 import os
 import time
 
-from . import charge, core, recording
+from . import charge, core, lid, recording
 from .caffeine import MODES as CAFFEINE_MODES
 from .caffeine import Caffeine
 from .charge import Charge
+from .lid import Lid
 from .core import Hits, button, heading, rgba, text
 from .deck import Panel
 from .sample import Sampler
@@ -46,6 +48,7 @@ def bat_tone(cap: int, status: str) -> str:
 
 GLYPH_CUP = "\U000f0176"
 GLYPH_STOP = "\uf04d"
+GLYPH_LAPTOP = "\U000f0322"
 
 
 def rec_dot(cr, x: float, mid: float, r: float, rec: recording.Recording) -> float:
@@ -86,9 +89,10 @@ class PowerStrip:
 
     name = "power"
 
-    def __init__(self, s: Sampler, caffeine: Caffeine):
+    def __init__(self, s: Sampler, caffeine: Caffeine, lid: Lid):
         self.s = s
         self.caffeine = caffeine
+        self.lid = lid
         self.rec: recording.Recording | None = None
         self.rec_at = 0.0
 
@@ -103,7 +107,7 @@ class PowerStrip:
         self.caffeine.check()
         rec = self.current()
         return (s.bat.get("capacity"), s.bat.get("status"), s.ac, s.profile, s.boost, self.caffeine.mode,
-                rec and (rec.kind, int(rec.elapsed())))
+                self.lid.mode(), rec and (rec.kind, int(rec.elapsed())))
 
     def draw(self, variant: str, scale: int):
         s = self.s
@@ -127,6 +131,9 @@ class PowerStrip:
         if self.caffeine.on:
             c.gap(7)
             c.icon(GLYPH_CUP, "warn", 14, after=0)
+        if self.lid.mode() == "ignore":
+            c.gap(7)
+            c.icon(GLYPH_LAPTOP, "warn", 14, after=0)  # closing the lid will not suspend
         rec = self.rec
         if rec is not None:
             c.gap(9)
@@ -141,9 +148,10 @@ class PowerPanel(Panel):
     live = 1.0  # a recording's clock
     W = 470
 
-    def __init__(self, s: Sampler, caffeine: Caffeine):
+    def __init__(self, s: Sampler, caffeine: Caffeine, lid: Lid):
         self.s = s
         self.caffeine = caffeine
+        self.lid = lid
         self.hist: list[tuple[float, float]] = []
         self.hist_at = 0.0
         self.rec: recording.Recording | None = None
@@ -154,6 +162,7 @@ class PowerPanel(Panel):
         h = 356 + (56 if self.rec is not None else 0)
         h += 56 if self.charge.stop() is not None else 0
         h += 56 if charge.kbd() is not None else 0
+        h += 56 if lid.has_lid() else 0
         return self.W, h
 
     def opened(self) -> None:
@@ -243,6 +252,7 @@ class PowerPanel(Panel):
         y = self.draw_charge(cr, hits, P, y)
         y = self.draw_kbd(cr, hits, P, y)
         y = self.draw_caffeine(cr, hits, P, y)
+        y = self.draw_lid(cr, hits, P, y)
         if self.rec is not None:
             self.draw_recording(cr, hits, P, y, self.rec)
 
@@ -301,6 +311,35 @@ class PowerPanel(Panel):
             x += button(cr, hits, x, y, label, lambda m=mode: caf.set(m), on=caf.mode == mode, tone="warn",
                         glyph=GLYPH_CUP if mode == "on" else None) + 8
         text(cr, x + 4, y + 4, "no lock, no screen off", 11, "dim")
+        return y + 36
+
+    def draw_lid(self, cr, hits: Hits, P: float, y: float) -> float:
+        """Suspend or do nothing when the lid closes (on battery: logind's HandleLidSwitch).
+        With "do nothing", a closed lid holds the CPU at its minimum (lid.py)."""
+        if not lid.has_lid():
+            return y
+        W, ld = self.W, self.lid
+        mode = ld.mode()
+        st = ld.status
+        if st:
+            words, tone = st[1], st[0]
+        elif ld.error:
+            words, tone = f"cpu guard: {ld.error}", "hit"
+        elif ld.guarding:
+            words, tone = "closed: cpu held at minimum", "warn"
+        else:
+            words, tone = ld.ac_words(), "dim"
+        ww = text(cr, W - P, y - 2, words, 12 if st or ld.error or ld.guarding else 11, tone, align=1) + 12 \
+            if words else 0
+        heading(cr, P, y, "lid close", W - 2 * P - ww)
+        y += 20
+        x = P
+        for value, label in lid.MODES:
+            x += button(cr, hits, x, y, label, lambda v=value: ld.set_mode(v) or self.s.poke(), on=mode == value,
+                        tone="warn" if value == "ignore" else "ok",
+                        glyph=GLYPH_LAPTOP if value == "ignore" else None) + 8
+        if mode == "ignore":
+            text(cr, x + 4, y + 4, f"closed: low power, no boost, ≤{lid.CAP_KHZ / 1e6:.1f} GHz", 11, "dim")
         return y + 36
 
     def draw_recording(self, cr, hits: Hits, P: float, y: float, rec: recording.Recording) -> None:

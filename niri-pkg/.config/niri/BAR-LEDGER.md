@@ -108,3 +108,15 @@ Asked by Tomek: "consider cam.p14s. Please port it's controls to niri bar" → "
 - Why the laptop camera: the external one (PC-LM1E) was not plugged in. The FC660C keyboard has used its USB port (3-2) since 09:23, and "auto" correctly fell back to the laptop's camera. The fix is a choice, not a change to "auto".
 - Verified: strip renders (full, compact) and the panel against a second fakecam (a git worktree, `--port 7799 --no-camera`, Chrome with two fake cameras via `FAKECAM_CHROME_ARGS`); every kind of click run from Python against that instance (source, two-click turn off, turn on, a look, a burst); the thread → GLib.idle_add callback in a main loop.
 - **Not verified on the live camera**: it was on air in a call the whole time, so nothing was clicked on 127.0.0.1:7788. Its server runs the old code until `systemctl --user restart fakecam`; until then the source row offers only "auto" (the old server refuses `source`).
+
+## 23 Oct 2026 — lid close and the CPU guard
+
+Asked by Tomek: "disable sleep on lid close" → "Please add functionality to niri bar to enable/disable this" → "make sure that when it's enabled, we can't be switching automatically to full cpu load, only work in minimal so that it doesn't overheat when closed lid and in the backpack". One Claude Code session (Opus 5.5), on master.
+
+| Commit | What |
+|---|---|
+| (this commit) | New `bardeck/lid.py` and a **lid close** row in the power panel: suspend / do nothing, which rewrites `HandleLidSwitch=` in `/etc/systemd/logind.conf.d/lid.conf` and sends systemd-logind SIGHUP. A laptop glyph on the power strip while it is "do nothing". **CPU guard** (`Lid.check()`, from `Daemon.tick`, every 5 s): mode "ignore" + lid closed + no external DRM connector connected ⇒ platform_profile low-power, boost 0, EPP `power` and scaling_max_freq 1400000 on every core; any drift (TLP on an AC plug) is written back; the values from before are saved in `$XDG_RUNTIME_DIR/bardeck/lid-guard.json` and written back when the condition ends. |
+
+- Verified: panel and strip rendered (`bardeck panel/render … power`); `set_mode` both ways from Python, with logind's `HandleLidSwitch` read back over D-Bus each time (suspend, then ignore; the AC line stayed `ignore`); the guard from Python with `lid_closed`/`external_screen` stubbed: closed → low-power / power / 1.4 GHz on cpu0 and cpu5, profile forced back to performance → re-held on the next check, opened → every knob back and the state file gone; the same with boost 1 (boost 0 while closed, 1 again after). The live daemon after `kill -USR2 waybar`.
+- **Not verified**: a real lid close in a bag (the guard reads `/proc/acpi/button/lid/LID/state`, so it should act the same), and the temperature it then holds.
+- Side effects on the real machine: lid.conf ended as it started (`HandleLidSwitch=ignore`); profile, boost, EPP and max freq ended as they started (performance, 0, balance_performance, 2 GHz).

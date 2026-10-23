@@ -73,6 +73,7 @@ def build(with_ws: bool = True):
     from .clock import ClockPanel, ClockStrip
     from .devices import DevPanel, DevStrip
     from .displays import DispPanel, DispStrip, Displays
+    from .lid import Lid
     from .net import NetPanel, NetStrip
     from .notif import Dunst, NotifPanel, NotifStrip
     from .palette import PalettePanel
@@ -84,6 +85,7 @@ def build(with_ws: bool = True):
 
     s = Sampler()
     caffeine = Caffeine(s)
+    lid = Lid()
     disp = Displays()
     audio = Audio()
     try:  # quota imports ~/bin/qtop: a host without it still gets the rest of the bar
@@ -99,7 +101,7 @@ def build(with_ws: bool = True):
         "sys": (SysStrip(s), 1),
         "net": (NetStrip(s), 2),
         "dev": (DevStrip(s), 2),
-        "power": (PowerStrip(s, caffeine), 1),  # key(): redrawn only on a change (a recording's clock)
+        "power": (PowerStrip(s, caffeine, lid), 1),  # key(): redrawn only on a change (a recording's clock)
         "audio": (AudioStrip(audio), 5),  # drawn on its own events too (watch)
         "disp": (DispStrip(disp), 2),
         "clock": (ClockStrip(), 1),
@@ -108,7 +110,7 @@ def build(with_ws: bool = True):
         "cam": (CamStrip(cam), 5),  # drawn on fakecam's answers (watch: its own thread)
         "wallpaper": (WallStrip(), 5),  # two small file reads; key() skips a redraw when unchanged
     }
-    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine),
+    panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine, lid),
                                   AudioPanel(audio), ClockPanel(), DispPanel(disp), WsPanel())}
     panels["notif"] = NotifPanel(dunst)
     panels["agents"] = AgentsPanel(agents)
@@ -209,6 +211,7 @@ class Daemon:
             self.quota.seen = None
         try:
             self.s.tick()
+            self.strips["power"][0].lid.check()  # the CPU guard while the lid is closed (lid.py)
             for name, (strip, every) in self.strips.items():
                 if n % every == 0 or fresh:
                     for variant, scale in variants:
