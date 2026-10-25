@@ -371,6 +371,9 @@ _claw_help() {
   print -r -- "usage: claw [--chrome|--no-chrome] [home|main] [claude args...]"
   print -r -- "       claw --help | -h"
   print -r -- ""
+  print -r -- "Effort is forced to medium (CLAUDE_CODE_EFFORT_LEVEL; /effort is locked)."
+  print -r -- "--effort <level> on the line forces that level instead. fable forces low."
+  print -r -- ""
   print -r -- "The session is named after the current directory plus the account tag the i3"
   print -r -- "bar uses, so \`tmux ls\` says which account every session is on:"
   print -r -- "       ~/legartis4 + builder  ->  legartis4-B"
@@ -487,8 +490,19 @@ claw() {
     name="${base}-$((n++))"
   done
 
+  # Effort is FORCED through CLAUDE_CODE_EFFORT_LEVEL, not --effort: the env var
+  # beats --effort, settings.json (effortLevel: high) and modelSettings, and it
+  # locks /effort for the session. Default medium; fable passes CLAW_EFFORT=low.
+  # An --effort on the line wins (last one counts, as in claude).
+  local effort="${CLAW_EFFORT:-medium}" a prev=""
+  for a in "$@"; do
+    [[ "$prev" == --effort ]] && effort="$a"
+    [[ "$a" == --effort=* ]] && effort="${a#--effort=}"
+    prev="$a"
+  done
+
   # --dangerously-skip-permissions does not skip the folder-trust dialog; this does.
-  local cmd="CLAUDE_CODE_SANDBOXED=1 claude --dangerously-skip-permissions"
+  local cmd="CLAUDE_CODE_SANDBOXED=1 CLAUDE_CODE_EFFORT_LEVEL=${(q)effort} claude --dangerously-skip-permissions"
   [[ -n "$chome" ]] && cmd="HOME=${(q)chome} $cmd"
   # Join first, then quote each word: inside "…" a bare ${(q)@} flattens all args
   # into ONE escaped word, so claude saw "-c --model x" as a single option.
@@ -524,21 +538,22 @@ _claw() {
 }
 (( $+functions[compdef] )) && compdef _claw claw
 
-# fable [home] [claude args...] — claw on Fable 5.1 at low effort. Same account
-# picking, same tmux naming. The defaults go BEFORE "$@" on purpose: claude takes
-# the LAST occurrence of --model/--effort, so this is what lets your own
-# --model/--effort on the fable line win. The account must stay the first word
-# claw sees, so peel it off here and hand it over in front of the defaults.
+# fable [home] [claude args...] — claw on Fable 5.1, effort FORCED to low (claw
+# turns CLAW_EFFORT into CLAUDE_CODE_EFFORT_LEVEL). Same account picking, same
+# tmux naming. The --model default goes BEFORE "$@" on purpose: claude takes the
+# LAST occurrence, so your own --model (or --effort) on the fable line wins. The
+# account must stay the first word claw sees, so peel it off here and hand it
+# over in front of the defaults.
 fable() {
   if [[ "$1" == (--help|-h) ]]; then
-    print -r -- "fable — claw with --model claude-fable-5-1 --effort low"
+    print -r -- "fable — claw with --model claude-fable-5-1, effort forced to low"
     print -r -- "usage: fable [home|main] [claude args...]   (see claw --help)"
     return 0
   fi
   local -a acct
   while [[ "$1" == (--chrome|--no-chrome) ]]; do acct+=("$1"); shift; done
   _claw_is_home "$1" && { acct+=("$1"); shift }
-  claw "${acct[@]}" --model claude-fable-5-1 --effort low "$@"
+  CLAW_EFFORT=low claw "${acct[@]}" --model claude-fable-5-1 "$@"
 }
 (( $+functions[compdef] )) && compdef _claw fable
 
