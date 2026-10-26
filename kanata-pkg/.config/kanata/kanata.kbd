@@ -1,8 +1,9 @@
-;; The TOTEM layout on the p14s BUILT-IN keyboard.
+;; The PLANCK thumbs on the p14s BUILT-IN keyboard.
 ;;
-;; A port of ~/zmk-config-totem/config/totem.keymap (itself a port of the
-;; Corne/Planck keymap tg in ~/qmk_firmware): home-row mods, the six thumb keys
-;; and the layers SYM / NUM / ADJ / MOV / MOUSE.
+;; Home-row mods and layers from ~/zmk-config-totem/config/totem.keymap (a port
+;; of the Corne/Planck keymap tg in ~/qmk_firmware); the thumb row follows the
+;; Planck (keyboards/planck/keymaps/tg): five thumb keys, one Space in the
+;; middle for both thumbs. Layers SYM / NUM / ADJ / MOV / MOUSE.
 ;;
 ;; Home-row mods  A=Super S=Alt D=Shift F=Ctrl | J=RCtrl K=Shift L=Alt ;=Super
 ;;   tap-hold-release        = QMK PERMISSIVE_HOLD = ZMK flavor "balanced"
@@ -11,35 +12,31 @@
 ;;   180 ms term, 160 ms on the Shift keys (QMK MIDDLE_TAPPING_TERM)
 ;;   J holds RIGHT Ctrl so the SYM thumb can tell it from F (Ctrl+Tab trick below).
 ;;
-;; Thumbs: the laptop's bottom row stands in for the TOTEM's six thumb keys.
+;; Thumbs: the laptop's bottom row stands in for the Planck's five thumb keys.
 ;;
-;;   laptop key       TOTEM thumb    tap                 hold
-;;   leftmost (Fn)*   left outer     Backspace           -
-;;   left Super       left middle    one-shot SYM        SYM   (J-Ctrl held: Ctrl+Tab)
-;;   left Alt         left inner     toggle MOUSE        MOV
-;;   Space            right inner    Space               Super
-;;   right Alt        right middle   Esc                 NUM
+;;   laptop key       Planck thumb   tap                 hold
+;;   left Super       left outer     Backspace           Backspace (repeats)
+;;   left Alt         left inner     one-shot SYM        SYM   (J-Ctrl held: Ctrl+Tab)
+;;   Space            both, middle   Space               MOV
+;;   right Alt        right inner    Esc                 NUM
 ;;   Copilot key**    right outer    Enter               -
+;;
+;;   leftmost (Fn)*   left pinky     toggle MOUSE        MOUSE while held
 ;;
 ;;   * The ThinkPad firmware owns Fn: it sends no key code. The BIOS setting
 ;;     FnCtrlKeySwap=Enable makes that key send Left Ctrl (and the Ctrl key
 ;;     becomes Fn), so `lctl` below IS the leftmost key. Before the swap is
 ;;     active, `lctl` is the physical Ctrl key, second from the left.
 ;;  ** The Copilot key (right of right Alt, P14s Gen 6) has no key code of its
-;;     own: firmware sends Left Super + Left Shift + F23. Its Super opens SYM
-;;     for a moment (harmless: the F23 press uses up the one-shot); F23 is the
-;;     key mapped here, as Enter with that Left Shift removed.
+;;     own: firmware sends Left Super + Left Shift + F23. Its Left Super is the
+;;     Backspace thumb, so the three are a chord (defchords cop): Enter, with no
+;;     Backspace and no Shift.
 ;;
-;; Caps Lock = the TOTEM left outer pinky: toggle MOV (tap again to leave).
+;; Caps Lock = Esc, the Esc key = Caps Lock.
 ;;
-;; Switch keys (Caps = MOV, left Alt tap = MOUSE). Only one switched layer is on
-;; at a time, never a stack. A tap on the key of the layer you are in = base; a
-;; tap on the other switch key = that layer. Two quick taps on any switch key =
-;; base, from any layer (the `guard` layer holds base for 400 ms after a switch
-;; key went back to base).
-;; Left Shift = MOUSE while held (laptop only; D and K are the Shift keys). No
-;; tap action, so no timeout: the cursor moves at once and MOUSE ends on release.
-;; Right Ctrl and right Shift stay plain.
+;; MOUSE: tap the leftmost key = on, tap it again = off. Hold it, or hold left
+;; Shift, = MOUSE while held (D and K are the Shift keys). Right Ctrl and right
+;; Shift stay plain.
 ;;
 ;; Only the laptop keyboard is grabbed. The TOTEM and the Corne do their own
 ;; layout in firmware and must never pass through here.
@@ -58,6 +55,7 @@
 )
 
 (defsrc
+  esc
   q    w    e    r    t    y    u    i    o    p
   caps a    s    d    f    g    h    j    k    l    ;    '
   lsft z    x    c    v    b    n    m    ,    .    /
@@ -74,14 +72,43 @@
 ;; Tab on the SYM thumb inside SYM goes through a virtual key. kanata does not let
 ;; a re-press of the key that started a one-shot use the one-shot up, so a plain
 ;; `tab` there left SYM on for one more key (double tap, d = "Tab -").
+;; The Copilot key sends Left Super + Left Shift + F23 at once, and Left Super
+;; is the Backspace thumb. As a chord the three give Enter and no Backspace.
+;; Each key alone waits up to 40 ms (less when it is released or another key is
+;; pressed), then does its own job. Not defchordsv2: that needs
+;; concurrent-tap-hold, which broke the home-row mods (F-Ctrl + right Alt = "f").
+(defchords cop 40
+  (bs         ) bspc
+  (   sh      ) @mouse
+  (      f23  ) @cop
+  (bs     f23 ) @cop
+  (bs  sh f23 ) @cop
+)
+;; the same in SYM, where the left outer thumb is Super (Copilot after a
+;; one-shot SYM tap must not give Super+Enter)
+(defchords copsym 40
+  (bs         ) lmet
+  (   sh      ) @mouse
+  (      f23  ) @cop
+  (bs     f23 ) @cop
+  (bs  sh f23 ) @cop
+)
+
 (defvirtualkeys
   symtab tab
-  ;; held for 400 ms after a switch key goes back to base: a fast 2nd tap of
-  ;; any switch key then stays in base (double tap = base, from any layer)
-  guard  (layer-while-held guard)
+  ;; does nothing; @tick holds it so kanata keeps ticking (see the alias)
+  tick   XX
 )
 
 (defalias
+  ;; kanata 1.12 stops ticking as soon as the last OUTPUT key is older than the
+  ;; longest timing check (src/kanata/mod.rs can_block_update_idle_waiting).
+  ;; After a press that outputs nothing (a layer key) the input history then
+  ;; freezes at ~0 ms, require-prior-idle sees no idle, and the next A/S/F/J/L/;
+  ;; hold types its letter however long you wait ("f" for Ctrl after a Copilot
+  ;; Enter). A virtual key held for 200 ms keeps kanata ticking past 120 ms.
+  tick (hold-for-duration 200 tick)
+
   ;; home-row mods
   a (tap-hold-release $tap-repress $term       a lmet (require-prior-idle $prior-idle))
   s (tap-hold-release $tap-repress $term       s lalt (require-prior-idle $prior-idle))
@@ -94,31 +121,33 @@
 
   ;; left Shift: MOUSE while held. The Copilot key's firmware Left Shift lands
   ;; here too: MOUSE is on while it is down, and F23 is @cop in MOUSE as well.
-  mouse (layer-while-held mouse)
-  ;; left middle thumb: one-shot SYM (= ZMK &sl SYM, 1 s), held = SYM while held.
+  mouse (multi (layer-while-held mouse) @tick)
+  ;; leftmost key (left pinky): tap = MOUSE on / off, hold = MOUSE while held
+  mouon  (tap-hold-release 0 200 (multi (layer-switch mouse) @tick) (layer-while-held mouse))
+  mouoff (tap-hold-release 0 200 (multi (layer-switch base) @tick)  (layer-while-held mouse))
+  ;; left inner thumb: one-shot SYM (= QMK OSL(1), 1 s), held = SYM while held.
   ;; With RIGHT Ctrl down (J held) it sends Tab instead, Ctrl kept: Ctrl+Tab, and
   ;; with K-Shift as well Ctrl+Shift+Tab. F-Ctrl is LEFT Ctrl, so F + this thumb
-  ;; still opens SYM for Ctrl+<symbol>. (= sym_tab in totem.keymap)
+  ;; still opens SYM for Ctrl+<symbol>.
   sym (fork (one-shot-release 1000 (layer-while-held sym)) tab (rctl))
-  ;; left middle thumb inside SYM: Tab (double tap = Tab, SYM ends)
+  ;; left inner thumb inside SYM: Tab (double tap = Tab, SYM ends)
   symtab (multi (on-press press-vkey symtab) (on-release release-vkey symtab))
-  ;; left inner thumb: hold = MOV while held, tap = MOUSE on (= mov_or_mouse)
-  movmou (tap-hold-release 0 200 (layer-switch mouse) (layer-while-held mov))
-  mouoff (tap-hold-release 0 200 (multi (layer-switch base) (hold-for-duration 400 guard)) (layer-while-held mov))
-  ;; right inner thumb: Space, held = Super (= &mt LGUI SPACE, tap-preferred 220)
-  spc (tap-hold 175 220 spc lmet)
-  ;; right middle thumb: Esc, held = NUM (= &lt NUM ESC, tap-preferred 200)
+  ;; middle thumb: Space, held = MOV (= QMK LT(4, KC_SPC), tap-preferred 220)
+  spc (tap-hold 175 220 spc (layer-while-held mov))
+  ;; right inner thumb: Esc, held = NUM (= QMK LT(2, KC_ESC), tap-preferred 200)
   num (tap-hold 0 200 esc (layer-while-held num))
   ;; right outer thumb = the Copilot key's F23: Enter without the Left Shift the
   ;; key adds. Only lsft goes, so F-Ctrl + Copilot = Ctrl+Enter and K-Shift
   ;; (right Shift) + Copilot = Shift+Enter.
-  cop (unmod (lsft) ret)
-  ;; Caps Lock: toggle MOV (= &tog MOV on the left outer pinky)
-  movon  (layer-switch mov)
-  base   (multi (layer-switch base) (hold-for-duration 400 guard))
-  ;; in the guard: left Alt tap = stay in base, hold = MOV as usual
-  grdalt (tap-hold-release 0 200 (layer-switch base) (layer-while-held mov))
-  adj    (layer-while-held adj)
+  cop (multi (unmod (lsft) ret) @tick)
+  adj (layer-while-held adj)
+  ;; the Copilot chord keys (see defchords cop)
+  cbs  (chord cop bs)
+  csh  (chord cop sh)
+  cf23 (chord cop f23)
+  sbs  (chord copsym bs)
+  ssh  (chord copsym sh)
+  sf23 (chord copsym f23)
 
   ;; mouse: ~250 px/s at the start, ~3000 px/s after 0.5 s (the Corne's ramp)
   ms← (movemouse-accel-left  16 500 4 48)
@@ -132,30 +161,34 @@
 )
 
 (deflayer base
+  caps
   q       w       e       r       t       y       u       i       o       p
-  @movon  @a      @s      @d      @f      g       h       @j      @k      @l      @;      '
-  @mouse  z       x       c       v       b       n       m       ,       .       /
-  bspc    @sym    @movmou @spc    @num    @cop
+  esc     @a      @s      @d      @f      g       h       @j      @k      @l      @;      '
+  @csh    z       x       c       v       b       n       m       ,       .       /
+  @mouon  @cbs   @sym    @spc    @num    @cf23
 )
 
 ;; ! @ # $ %    ^ & * ( )  /  ? : - _ 2   1 = + [ ]  /  ` ~ ' " <   > \ | { }
 (deflayer sym
+  _
   S-1     S-2     S-3     S-4     S-5     S-6     S-7     S-8     S-9     S-0
   _       S-/     S-;     -       S--     2       1       =       S-=     [       ]       _
-  @mouse  grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
-  lmet    @symtab _       _       @adj    @cop
+  @ssh    grv     S-grv   '       S-'     S-,     S-.     \       S-\     S-[     S-]
+  _       @sbs    @symtab _       @adj    @sf23
 )
 
 ;; 1-0 on the top row; mouse buttons on S D F; cursor on J K L ;; wheel on M , . /
 (deflayer num
+  _
   1       2       3       4       5       6       7       8       9       0
   _       @a      mmid    mrgt    mlft    _       _       @ms←    @ms↓    @ms↑    @ms→    _
   @mouse  _       _       _       _       _       _       @wh←    @wh↓    @wh↑    @wh→
-  del     @adj    _       _       _       @cop
+  _       del     @adj    _       _       @cop
 )
 
 ;; F1-F6 on the home row, F7-F12 below (the TOTEM's boot/BT top row has no use here)
 (deflayer adj
+  _
   _       _       _       _       _       _       _       _       _       _
   _       f1      f2      f3      f4      f5      f6      _       _       _       _       _
   @mouse  f7      f8      f9      f10     f11     f12     _       _       _       _
@@ -165,26 +198,20 @@
 ;; arrows on U I O P; Home / word-left / PgDn / PgUp / word-right on H J K L ;; End on '
 ;; workspaces (Super = niri Mod): G B | N M , . /
 (deflayer mov
+  _
   q       w       e       r       t       y       left    down    up      rght
-  @base   @a      @s      @d      @f      M-g     home    C-left  pgdn    pgup    C-rght  end
-  @mouse  z       x       c       v       M-b     M-n     M-m     M-,     M-.     M-/
-  bspc    @sym    @movmou @spc    esc     @cop
+  esc     @a      @s      @d      @f      M-g     home    C-left  pgdn    pgup    C-rght  end
+  @csh    z       x       c       v       M-b     M-n     M-m     M-,     M-.     M-/
+  @mouon  @cbs   @sym    _       esc     @cf23
 )
 
 ;; clicks on S D F; cursor on J K L ;; wheel on M , . /; Space = left click.
-;; Two ways in: hold left Shift (MOUSE ends on release), or tap left Alt
-;; (MOUSE stays on; leave with a tap on left Alt; Caps switches to MOV).
+;; Two ways in: hold left Shift or the leftmost key (MOUSE ends on release), or
+;; tap the leftmost key (MOUSE stays on; leave with another tap).
 (deflayer mouse
+  _
   q       w       e       r       t       y       u       i       o       p
-  @movon  @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
-  @mouse  z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
-  bspc    @sym    @mouoff mlft    @num    @cop
-)
-
-;; 400 ms after a switch key went back to base (see `guard` above)
-(deflayer guard
-  _       _       _       _       _       _       _       _       _       _
-  (layer-switch base) _       _       _       _       _       _       _       _       _       _       _
-  _       _       _       _       _       _       _       _       _       _       _
-  _       _       @grdalt _       _       _
+  esc     @a      mmid    mrgt    mlft    g       h       @ms←    @ms↓    @ms↑    @ms→    '
+  @csh    z       x       c       v       b       n       @wh←    @wh↓    @wh↑    @wh→
+  @mouoff @cbs   @sym    mlft    @num    @cf23
 )

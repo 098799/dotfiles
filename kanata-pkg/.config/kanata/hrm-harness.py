@@ -39,7 +39,7 @@ while out.read_one():  # drain
     pass
 
 SPECIAL = {";": "SEMICOLON", "lctl": "LEFTCTRL", "lmet": "LEFTMETA", "lalt": "LEFTALT",
-           "ralt": "RIGHTALT", "spc": "SPACE", "caps": "CAPSLOCK"}
+           "ralt": "RIGHTALT", "spc": "SPACE", "caps": "CAPSLOCK", "esc": "ESC"}
 
 
 class Keys(dict):
@@ -111,22 +111,6 @@ def tap(k, gap=60):
     return [(k, 1, 40), (k, 0, gap)]
 
 
-PROBE = tap("i", 30) + tap("f", 30)
-SEEN = {"base": "+i -i +f -f", "mov": "+down -down +f -f", "mouse": "+i -i +btn_left -btn_left"}
-ENTER = {"base": [], "mov": tap("caps"), "mouse": tap("lalt")}
-
-
-def switch_case(st, kn, k, n, want):
-    """Enter layer st, tap switch key k n times (quick), read the layer from PROBE."""
-    ok = case(f"from {st}: {kn} x{n} = {want}",
-              ENTER[st] + ([("f24", 0, 500)] if ENTER[st] else []) + tap(k) * n + PROBE, SEEN[want])
-    time.sleep(0.5)  # back to base: two quick Caps taps (the property under test)
-    for key, val, wait in tap("caps") * 2:
-        ev(key, val, wait)
-    collect()
-    return ok
-
-
 results = [
     case("tap a", [("a", 1, 50), ("a", 0, 0)], "+a -a"),
     case("hold f past term, tap x = Ctrl+x",
@@ -163,97 +147,112 @@ results = [
          [("f", 1, 25), ("s", 1, 40), ("s", 0, 20), ("f", 0, 0)],
          "+leftctrl +s -s -leftctrl"),
     case("unmapped key passes through", [("q", 1, 30), ("q", 0, 0)], "+q -q"),
+    # --- Caps / Esc ---
+    case("Caps = Esc", [("caps", 1, 40), ("caps", 0, 0)], "+esc -esc"),
+    case("Esc = Caps Lock", [("esc", 1, 40), ("esc", 0, 0)], "+capslock -capslock"),
     # --- thumbs ---
-    case("left outer thumb (lctl input) = Backspace", [("lctl", 1, 40), ("lctl", 0, 0)], "+backspace -backspace"),
-    case("leftmost held = Backspace held (no hold action)",
-         [("lctl", 1, 400), ("lctl", 0, 0)], "+backspace -backspace"),
+    case("left outer thumb (left Super) = Backspace", [("lmet", 1, 40), ("lmet", 0, 0)], "+backspace -backspace"),
+    case("left Super held = Backspace held (repeats)",
+         [("lmet", 1, 400), ("lmet", 0, 0)], "+backspace -backspace"),
+    case("roll Backspace -> x (x down before Backspace up) = Backspace, x",
+         [("lmet", 1, 40), ("x", 1, 40), ("lmet", 0, 40), ("x", 0, 0)], "+backspace +x -backspace -x"),
+    case("Backspace held, x tapped inside 200 ms = Backspace, x",
+         [("lmet", 1, 40), ("x", 1, 30), ("x", 0, 30), ("lmet", 0, 0)], "+backspace +x -x -backspace"),
     case("left Shift held = MOUSE at once: f = left click, Space = left click; released: f = f",
          [("leftshift", 1, 20), ("f", 1, 30), ("f", 0, 30), ("spc", 1, 30), ("spc", 0, 30), ("leftshift", 0, 60),
           ("f", 1, 30), ("f", 0, 0)],
          "+btn_left -btn_left +btn_left -btn_left +f -f"),
     case("left Shift tapped alone = nothing (no Shift sent)",
          [("leftshift", 1, 40), ("leftshift", 0, 60), ("x", 1, 30), ("x", 0, 0)], "+x -x"),
-    case("MOV on (Caps) + left Shift held: f = left click; Caps off",
-         [("caps", 1, 40), ("caps", 0, 40), ("leftshift", 1, 20), ("f", 1, 30), ("f", 0, 30), ("leftshift", 0, 40),
-          ("caps", 1, 40), ("caps", 0, 40), ("f", 1, 30), ("f", 0, 0)],
+    case("leftmost tap = MOUSE on: f = click, Space = click; tap again: f = f",
+         [("lctl", 1, 40), ("lctl", 0, 60), ("f", 1, 30), ("f", 0, 40), ("spc", 1, 30), ("spc", 0, 40),
+          ("lctl", 1, 40), ("lctl", 0, 60), ("f", 1, 30), ("f", 0, 0)],
+         "+btn_left -btn_left +btn_left -btn_left +f -f"),
+    case("leftmost tapped twice = base again",
+         tap("lctl") * 2 + [("f", 1, 30), ("f", 0, 0)], "+f -f"),
+    case("leftmost held = MOUSE while held: f = click; released: f = f",
+         [("lctl", 1, 250), ("f", 1, 30), ("f", 0, 30), ("lctl", 0, 60), ("f", 1, 30), ("f", 0, 0)],
          "+btn_left -btn_left +f -f"),
-    case_typed("Copilot key (Super+Shift+F23) = plain Enter", COPILOT, [("enter", [])]),
+    case_typed("Copilot key (Super+Shift+F23) = plain Enter, no Backspace", COPILOT, [("enter", [])]),
     case_typed("Copilot key, whole sequence at once = plain Enter", COPILOT_AT_ONCE, [("enter", [])]),
-    case_typed("Copilot then d = Enter, d (the SYM one-shot is used up)",
+    case_typed("Copilot then d = Enter, d",
                COPILOT + [("d", 1, 30), ("d", 0, 0)], [("enter", []), ("d", [])]),
+    case_typed("Copilot twice = Enter, Enter",
+               COPILOT + COPILOT, [("enter", []), ("enter", [])]),
     case_typed("F-Ctrl held + Copilot = Ctrl+Enter",
                [("f", 1, 250)] + COPILOT + [("f", 0, 0)], [("enter", ["leftctrl"])]),
     case_typed("K-Shift held + Copilot = Shift+Enter",
                [("k", 1, 250)] + COPILOT + [("k", 0, 0)], [("enter", ["rightshift"])]),
     case("right Alt tap = Esc", [("ralt", 1, 40), ("ralt", 0, 0)], "+esc -esc"),
     case("Space tap = space", [("spc", 1, 40), ("spc", 0, 0)], "+space -space"),
-    case("Space held past 220 + q = Super+q",
-         [("spc", 1, 260), ("q", 1, 30), ("q", 0, 30), ("spc", 0, 0)],
-         "+leftmeta +q -q -leftmeta"),
+    case("Space held past 220: u i o p = arrows",
+         [("spc", 1, 260), ("u", 1, 30), ("u", 0, 30), ("p", 1, 30), ("p", 0, 30), ("spc", 0, 0)],
+         "+left -left +right -right"),
+    case("Space held (MOV): left Super = Backspace, n = Super+n",
+         [("spc", 1, 260), ("lmet", 1, 30), ("lmet", 0, 30), ("n", 1, 30), ("n", 0, 30), ("spc", 0, 0)],
+         "+backspace -backspace +leftmeta +n -leftmeta -n"),
+    case("roll Space -> a = ' a' (no MOV)",
+         [("spc", 1, 40), ("a", 1, 40), ("spc", 0, 40), ("a", 0, 0)], "+space +a -space -a"),
     # --- SYM ---
-    case("left Super tap = one-shot SYM: d -> '-', then d is d again",
-         [("lmet", 1, 40), ("lmet", 0, 40), ("d", 1, 40), ("d", 0, 250), ("d", 1, 40), ("d", 0, 0)],
+    case("left Alt tap = one-shot SYM: d -> '-', then d is d again",
+         [("lalt", 1, 40), ("lalt", 0, 40), ("d", 1, 40), ("d", 0, 250), ("d", 1, 40), ("d", 0, 0)],
          "+minus -minus +d -d"),
     case("SYM held: q w = ! @ (shifted 1 2)",
-         [("lmet", 1, 40), ("q", 1, 30), ("q", 0, 30), ("w", 1, 30), ("w", 0, 30), ("lmet", 0, 0)],
+         [("lalt", 1, 40), ("q", 1, 30), ("q", 0, 30), ("w", 1, 30), ("w", 0, 30), ("lalt", 0, 0)],
          "+leftshift +1 -leftshift -1 +leftshift +2 -leftshift -2"),  # shift is down at each press = "!@"
     case_typed("SYM held: a k = ? + (Shift+/ and Shift+=)",
-               [("lmet", 1, 40)] + tap("a", 30) + tap("k", 30) + [("lmet", 0, 0)],
+               [("lalt", 1, 40)] + tap("a", 30) + tap("k", 30) + [("lalt", 0, 0)],
                [("slash", ["leftshift"]), ("equal", ["leftshift"])]),
     case_typed("one-shot SYM: a = ?, then a = a",
-               tap("lmet") + tap("a", 300) + tap("a", 0), [("slash", ["leftshift"]), ("a", [])]),
-    case("J-Ctrl held + left Super = Ctrl+Tab",
-         [("j", 1, 250), ("lmet", 1, 40), ("lmet", 0, 40), ("j", 0, 0)],
+               tap("lalt") + tap("a", 300) + tap("a", 0), [("slash", ["leftshift"]), ("a", [])]),
+    case("J-Ctrl held + left Alt = Ctrl+Tab",
+         [("j", 1, 250), ("lalt", 1, 40), ("lalt", 0, 40), ("j", 0, 0)],
          "+rightctrl +tab -tab -rightctrl"),
-    case_typed("J-Ctrl held + left Super tapped 3x = Ctrl+Tab 3x, Ctrl kept (cycles tabs)",
-               [("j", 1, 250)] + [("lmet", 1, 40), ("lmet", 0, 60)] * 3 + [("j", 0, 0)],
+    case_typed("J-Ctrl held + left Alt tapped 3x = Ctrl+Tab 3x, Ctrl kept (cycles tabs)",
+               [("j", 1, 250)] + [("lalt", 1, 40), ("lalt", 0, 60)] * 3 + [("j", 0, 0)],
                [("tab", ["rightctrl"])] * 3),
-    case_typed("J-Ctrl + K-Shift held + left Super = Ctrl+Shift+Tab",
-               [("j", 1, 250), ("k", 1, 250), ("lmet", 1, 40), ("lmet", 0, 40), ("k", 0, 30), ("j", 0, 0)],
+    case_typed("J-Ctrl + K-Shift held + left Alt = Ctrl+Shift+Tab",
+               [("j", 1, 250), ("k", 1, 250), ("lalt", 1, 40), ("lalt", 0, 40), ("k", 0, 30), ("j", 0, 0)],
                [("tab", ["rightctrl", "rightshift"])]),
-    case_typed("left Super tapped twice, then d = Tab, d (SYM ends with the Tab)",
-               [("lmet", 1, 40), ("lmet", 0, 60), ("lmet", 1, 40), ("lmet", 0, 100), ("d", 1, 30), ("d", 0, 0)],
+    case_typed("left Alt tapped twice, then d = Tab, d (SYM ends with the Tab)",
+               [("lalt", 1, 40), ("lalt", 0, 60), ("lalt", 1, 40), ("lalt", 0, 100), ("d", 1, 30), ("d", 0, 0)],
                [("tab", []), ("d", [])]),
-    case("left Super tapped, then pressed and held = Tab held down",
-         [("lmet", 1, 40), ("lmet", 0, 60), ("lmet", 1, 400), ("lmet", 0, 0)],
+    case("left Alt tapped, then pressed and held = Tab held down",
+         [("lalt", 1, 40), ("lalt", 0, 60), ("lalt", 1, 400), ("lalt", 0, 0)],
          "+tab -tab"),
     case("one-shot SYM, roll d->n (n down before d up) = '->' (SYM ends on the release)",
-         [("lmet", 1, 40), ("lmet", 0, 60), ("d", 1, 40), ("n", 1, 40), ("d", 0, 40), ("n", 0, 0)],
+         [("lalt", 1, 40), ("lalt", 0, 60), ("d", 1, 40), ("n", 1, 40), ("d", 0, 40), ("n", 0, 0)],
          "+minus +leftshift +dot -minus -leftshift -dot"),
-    case("F-Ctrl held + left Super opens SYM: j -> Ctrl+=",
-         [("f", 1, 250), ("lmet", 1, 40), ("lmet", 0, 40), ("j", 1, 30), ("j", 0, 30), ("f", 0, 0)],
+    case("F-Ctrl held + left Alt opens SYM: j -> Ctrl+=",
+         [("f", 1, 250), ("lalt", 1, 40), ("lalt", 0, 40), ("j", 1, 30), ("j", 0, 30), ("f", 0, 0)],
          "+leftctrl +equal -equal -leftctrl"),
+    case_typed("one-shot SYM, then Copilot = plain Enter (no Super)",
+               tap("lalt") + COPILOT, [("enter", [])]),
+    case("SYM held: left Super = Super (Planck: LGUI under SYM)",
+         [("lalt", 1, 40), ("lmet", 1, 30), ("q", 1, 30), ("q", 0, 30), ("lmet", 0, 30), ("lalt", 0, 0)],
+         "+leftmeta +leftshift +1 -leftshift -1 -leftmeta"),
     # --- NUM / ADJ ---
     case("right Alt held: q = 1, f = left click",
          [("ralt", 1, 230), ("q", 1, 30), ("q", 0, 30), ("f", 1, 30), ("f", 0, 30), ("ralt", 0, 0)],
          "+1 -1 +btn_left -btn_left"),
+    case("right Alt held: left Super = Delete",
+         [("ralt", 1, 230), ("lmet", 1, 30), ("lmet", 0, 30), ("ralt", 0, 0)],
+         "+delete -delete"),
     case("SYM held + right Alt held = ADJ: a = F1, z = F7",
-         [("lmet", 1, 40), ("ralt", 1, 40), ("a", 1, 30), ("a", 0, 30), ("z", 1, 30), ("z", 0, 30),
-          ("ralt", 0, 30), ("lmet", 0, 0)],
+         [("lalt", 1, 40), ("ralt", 1, 40), ("a", 1, 30), ("a", 0, 30), ("z", 1, 30), ("z", 0, 30),
+          ("ralt", 0, 30), ("lalt", 0, 0)],
          "+f1 -f1 +f7 -f7"),
-    # --- MOV / MOUSE ---
-    case("left Alt held: u i o p = arrows",
-         [("lalt", 1, 40), ("u", 1, 30), ("u", 0, 30), ("p", 1, 30), ("p", 0, 30), ("lalt", 0, 0)],
-         "+left -left +right -right"),
-] + [
-    # switch keys: one switched layer at a time; two quick taps = base from anywhere
-    switch_case(st, kn, k, n, want) for st, kn, k, n, want in [
-        ("base", "Caps", "caps", 1, "mov"), ("base", "Caps", "caps", 2, "base"),
-        ("base", "lAlt", "lalt", 1, "mouse"), ("base", "lAlt", "lalt", 2, "base"),
-        ("mov", "Caps", "caps", 1, "base"), ("mov", "Caps", "caps", 2, "base"),
-        ("mov", "lAlt", "lalt", 1, "mouse"), ("mov", "lAlt", "lalt", 2, "base"),
-        ("mouse", "Caps", "caps", 1, "mov"), ("mouse", "Caps", "caps", 2, "base"),
-        ("mouse", "lAlt", "lalt", 1, "base"), ("mouse", "lAlt", "lalt", 2, "base"),
-    ]
-] + [
-    case("Caps toggles MOV on: i = down; Caps again: i = i",
-         [("caps", 1, 40), ("caps", 0, 40), ("i", 1, 30), ("i", 0, 40),
-          ("caps", 1, 40), ("caps", 0, 40), ("i", 1, 30), ("i", 0, 0)],
-         "+down -down +i -i"),
-    case("left Alt tap = MOUSE: f = left click, Space = left click; tap left Alt again: f = f",
-         [("lalt", 1, 40), ("lalt", 0, 60), ("f", 1, 30), ("f", 0, 40), ("spc", 1, 30), ("spc", 0, 40),
-          ("lalt", 1, 40), ("lalt", 0, 60), ("f", 1, 30), ("f", 0, 0)],
-         "+btn_left -btn_left +btn_left -btn_left +f -f"),
+    case("NUM held + left Alt held = ADJ: a = F1",
+         [("ralt", 1, 230), ("lalt", 1, 40), ("a", 1, 30), ("a", 0, 30), ("lalt", 0, 30), ("ralt", 0, 0)],
+         "+f1 -f1"),
+    # --- a key that outputs nothing must not stall require-prior-idle (F would type "f") ---
+    # (the 400 ms pause is past the 120 ms prior-idle, so F must be a hold)
+    case_typed("left Shift tapped, 400 ms, then F held + x = Ctrl+x",
+               tap("leftshift", 400) + [("f", 1, 250)] + tap("x", 30) + [("f", 0, 0)], [("x", ["leftctrl"])]),
+    case_typed("leftmost tapped twice, 400 ms, then F held + x = Ctrl+x",
+               tap("lctl") + tap("lctl", 400) + [("f", 1, 250)] + tap("x", 30) + [("f", 0, 0)], [("x", ["leftctrl"])]),
+    case_typed("Copilot, 400 ms, then A held + x = Super+x",
+               COPILOT + [("f24", 0, 400), ("a", 1, 250)] + tap("x", 30) + [("a", 0, 0)], [("enter", []), ("x", ["leftmeta"])]),
 ]
 
 out.ungrab()

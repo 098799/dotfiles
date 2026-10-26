@@ -1,37 +1,38 @@
-# kanata — the TOTEM layout on the p14s built-in keyboard
+# kanata — the Planck thumbs on the p14s built-in keyboard
 
-The laptop keyboard runs the same layout as the TOTEM (`~/zmk-config-totem/config/totem.keymap`):
-home-row mods, the six thumb keys, and the layers SYM / NUM / ADJ / MOV / MOUSE.
+The laptop keyboard runs the home-row mods and layers SYM / NUM / ADJ / MOV / MOUSE of the
+TOTEM (`~/zmk-config-totem/config/totem.keymap`). The thumb row follows the **Planck**
+(`~/qmk_firmware/keyboards/planck/keymaps/tg`), not the TOTEM: five thumb keys, one Space
+in the middle for both thumbs. Six thumb keys (Corne/TOTEM) put too much on the left thumb.
 `kanata.kbd` has the full map and the timing in its header.
 
 Only `/dev/input/by-path/platform-i8042-serio-0-event-kbd` (the built-in keyboard) is
 grabbed. External keyboards do their layout in firmware and never pass through kanata.
 
-## The bottom row = the TOTEM thumbs
+## The bottom row = the Planck thumbs
 
-| Laptop key | TOTEM thumb | Tap | Hold |
+| Laptop key | Planck thumb | Tap | Hold |
 |---|---|---|---|
-| leftmost (Fn)* | left outer | Backspace | — |
-| left Super | left middle | one-shot SYM | SYM (J-Ctrl held: Ctrl+Tab) |
-| left Alt | left inner | toggle MOUSE | MOV |
-| Space | right inner | Space | Super |
-| right Alt | right middle | Esc | NUM |
+| left Super | left outer | Backspace | Backspace (repeats) |
+| left Alt | left inner | one-shot SYM | SYM (J-Ctrl held: Ctrl+Tab) |
+| Space | middle, both thumbs | Space | MOV |
+| right Alt | right inner | Esc | NUM |
 | Copilot key** | right outer | Enter | — |
+| leftmost (Fn)* | left pinky, bottom corner | MOUSE on / off | MOUSE while held |
 
-Caps Lock = the TOTEM left outer pinky: toggles MOV. Right Ctrl stays Ctrl.
+**Caps Lock = Esc, and the Esc key = Caps Lock.** Right Ctrl stays Ctrl.
 
-Mouse without a toggle: hold **left Shift**, move with J K L ;, click with Space (or S D F),
-let go — you are back in base. It has no tap action, so the cursor moves at once. The Shift keys
-are D and K (home-row mods); right Shift stays a plain Shift. A tap on left Alt still turns MOUSE
-on until the next tap.
+Super alone is on the home row (A, ;). Inside SYM the left Super key is Super, as on the Planck.
 
-Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Super.
+MOUSE: tap the leftmost key = on, tap it again = off (two quick taps = back where you were).
+Hold it, or hold **left Shift**, = MOUSE only while held: move with J K L ;, click with Space
+(or S D F). Left Shift has no tap action, so the cursor moves at once. The Shift keys are D and
+K (home-row mods); right Shift stays a plain Shift.
 
-**Switch keys** — Caps = MOV, left Alt tap = MOUSE. Only one switched layer is on at a time,
-never a stack. Tap the key of the layer you are in: back to base. Tap the other switch key:
-that layer. **Two quick taps on any switch key = base, from any layer** (a `guard` layer keeps
-base for 400 ms after a switch key went back to base, so the 2nd tap cannot turn a layer on).
-Held layers (SYM, NUM, MOV on left Alt, MOUSE on left Shift) end when you let go.
+MOV (arrows on U I O P, Home/End/PgUp/PgDn, niri workspaces) is only while Space is held. There is
+no MOV toggle any more: Caps Lock, which toggled it, is Esc now.
+
+Reach ADJ (F1–F12) with SYM + right Alt, or NUM + left Alt.
 
 \* The ThinkPad firmware owns Fn; it sends no key code. BIOS setting **FnCtrlKeySwap = Enable**
 (set 8 Oct 2026 through think-lmi, no BIOS password) makes it send Left Ctrl, and the Ctrl key
@@ -43,9 +44,12 @@ echo Disable | sudo tee /sys/class/firmware-attributes/thinklmi/attributes/FnCtr
 ```
 
 \*\* The Copilot key (P14s Gen 6, right of right Alt) has no key code of its own: firmware sends
-Left Super + Left Shift + F23. kanata maps F23 to `(unmod (lsft) ret)`: Enter without that Shift.
-Its Super opens SYM for a moment, and the F23 press uses up the one-shot. Held mods still apply:
-F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot = Shift+Enter. The BIOS has no Copilot option.
+Left Super + Left Shift + F23. Left Super is the Backspace thumb, so the three keys are a v1 chord
+(`defchords cop`, 40 ms) = Enter, with no Backspace and no Shift. A second group (`copsym`) does
+the same inside SYM. Held mods still apply: F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot =
+Shift+Enter. The cost: left Super and left Shift wait up to 40 ms (less when you let go or press
+another key) before they act. The BIOS has no Copilot option. Not `defchordsv2`: it needs
+`concurrent-tap-hold yes`, and that broke the home-row mods (F-Ctrl + right Alt gave "f" + Esc).
 
 ## Files
 
@@ -60,14 +64,15 @@ F-Ctrl + Copilot = Ctrl+Enter, K-Shift + Copilot = Shift+Enter. The BIOS has no 
 ```bash
 sudo systemctl restart kanata-laptop        # after an edit of kanata.kbd
 kanata --check -c ~/.config/kanata/kanata.kbd
-sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 54 cases
+sudo python3 ~/.config/kanata/hrm-harness.py ~/.config/kanata/kanata.kbd   # 55 cases
 sudo systemctl disable --now kanata-laptop  # turn it off
 journalctl -u kanata-laptop
 ```
 
 **Emergency exit:** hold Left Ctrl + Space + Esc, as kanata sees them: after the Fn/Ctrl swap
 that is the leftmost key + Space + the Esc key in the top-left corner. kanata exits 0 and
-stays off until `sudo systemctl restart kanata-laptop`.
+stays off until `sudo systemctl restart kanata-laptop`. The leftmost key is MOUSE, so Space
+clicks the left button on the way.
 
 The unit in `/etc/systemd/system/` is a **copy**; `install.sh` warns when it differs. After you edit it:
 `sudo install -m644 ~/dotfiles/kanata-pkg/systemd/kanata-laptop.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart kanata-laptop`.
@@ -87,3 +92,8 @@ the one root command for the unit. Then set FnCtrlKeySwap as above.
 - **No bilateral filter**, like the TOTEM and like the QMK boards in practice (their Achordion
   `achordion_chord` falls through to `return true` for every home-row key). If same-hand misfires
   start, kanata 1.12 has `defhands` + `tap-hold-opposite-hand-release` — the Achordion equivalent.
+- **kanata idle bug (worked around):** kanata 1.12 stops ticking when the last *output* key is old,
+  so after a key that outputs nothing (left Shift, a MOUSE toggle, the Copilot chord) the
+  `require-prior-idle` history froze and the next A/S/F/J/L/; hold typed its letter, however long
+  you waited. `@tick` holds an empty virtual key for 200 ms on those keys to keep kanata ticking.
+  Any new key that outputs nothing needs `@tick` too. The harness has a case for each.
