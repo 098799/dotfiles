@@ -731,6 +731,8 @@ gclaw() {
   if [[ -n "$afile" ]]; then
     _gclaw_prep_home "$afile" || return
     cmd="HOME=${(q)afile} GCLAW_DBUS=${(q)DBUS_SESSION_BUS_ADDRESS} BASH_ENV=${(q)afile}/.gclaw-dbus.sh DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/gclaw-no-bus $cmd"
+    # glab reads its login from $HOME: point it at the real one, or MRs cannot be opened.
+    [[ "$afile" != "$root" && -d $root/.config/glab-cli ]] && cmd="GLAB_CONFIG_DIR=${(q)root}/.config/glab-cli $cmd"
   fi
   (( $# )) && cmd+=" ${(j: :)${(q)@}}"
 
@@ -752,6 +754,7 @@ gclaw() {
 if [[ -n "$AGY_HOME" ]]; then
   agy() {
     HOME="$AGY_HOME" GCLAW_DBUS="$DBUS_SESSION_BUS_ADDRESS" BASH_ENV="$AGY_HOME/.gclaw-dbus.sh" \
+      GLAB_CONFIG_DIR="${GLAB_CONFIG_DIR:-/home/tgrining/.config/glab-cli}" \
       DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/gclaw-no-bus command agy "$@"
   }
 fi
