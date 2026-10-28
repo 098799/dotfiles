@@ -632,7 +632,10 @@ if [ -n "${GCLAW_DBUS+x}" ]; then
   if [ -n "$GCLAW_DBUS" ]; then export DBUS_SESSION_BUS_ADDRESS="$GCLAW_DBUS"; else unset DBUS_SESSION_BUS_ADDRESS; fi
   unset GCLAW_DBUS BASH_ENV
 fi' > "$h/.gclaw-dbus.sh"
-  print -r -- '. "$HOME/.gclaw-dbus.sh"' > "$h/.zshenv"
+  # Never in the real HOME (main on a token file): that .zshenv is the user's own.
+  # There a zsh child keeps the dead bus; bash children still get it back.
+  [[ "$h" != "$root" ]] && print -r -- '. "$HOME/.gclaw-dbus.sh"' > "$h/.zshenv"
+  return 0
 }
 
 _gclaw_help() {
@@ -680,6 +683,11 @@ gclaw() {
     [[ "$aname" != main ]] && ahome="$root/agy-$aname"
     shift
   fi
+  # main keeps its login in the keyring, except where a token file holds it (p340:
+  # its keyring is locked, nobody types the password). On the file, main runs like a
+  # fake home: dead bus, restore script — same rule as cmon/agy_accounts.py.
+  local afile=""
+  [[ -n "$ahome" || -f "$root/.gemini/antigravity-cli/antigravity-oauth-token" ]] && afile="${ahome:-$root}"
 
   local base="${PWD:t}"
   base="${base//[.:[:space:]]/-}"   # tmux gives "." and ":" a special meaning
@@ -694,9 +702,9 @@ gclaw() {
   # Absolute path: the binary lives under the real HOME, and a nested gclaw may
   # run with HOME pointed elsewhere.
   local cmd="${(q)root}/.local/bin/agy --dangerously-skip-permissions"
-  if [[ -n "$ahome" ]]; then
-    _gclaw_prep_home "$ahome" || return
-    cmd="HOME=${(q)ahome} GCLAW_DBUS=${(q)DBUS_SESSION_BUS_ADDRESS} BASH_ENV=${(q)ahome}/.gclaw-dbus.sh DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/gclaw-no-bus $cmd"
+  if [[ -n "$afile" ]]; then
+    _gclaw_prep_home "$afile" || return
+    cmd="HOME=${(q)afile} GCLAW_DBUS=${(q)DBUS_SESSION_BUS_ADDRESS} BASH_ENV=${(q)afile}/.gclaw-dbus.sh DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/gclaw-no-bus $cmd"
   fi
   (( $# )) && cmd+=" ${(j: :)${(q)@}}"
 
