@@ -763,6 +763,27 @@ _gclaw() {
 }
 (( $+functions[compdef] )) && compdef _gclaw gclaw
 
+# flash [home|main] [agy args...] — gclaw on Gemini 3.8 Flash, effort high unless an
+# --effort on the line or GCLAW_EFFORT says else. agy has no env var that locks the
+# model the way CLAUDE_CODE_EFFORT_LEVEL locks claw's effort: these are start flags,
+# and /model or /effort inside the session can still change them. Always pass the
+# model: a home's saved default may be another one (main's was Claude Sonnet).
+flash() {
+  if [[ "$1" == (--help|-h) ]]; then
+    print -r -- "flash — gclaw with --model gemini-3.8-flash --effort high"
+    print -r -- "usage: flash [home|main] [agy args...]   (see gclaw --help)"
+    print -r -- "       --effort low|medium|high|xhigh|max on the line, or GCLAW_EFFORT, sets the effort"
+    return 0
+  fi
+  local -a acct eff
+  _gclaw_is_home "$1" && { acct+=("$1"); shift }
+  local a seen=""
+  for a in "$@"; do [[ "$a" == (--effort|--effort=*) ]] && seen=1; done
+  [[ -n "$seen" ]] || eff=(--effort "${GCLAW_EFFORT:-high}")
+  gclaw "${acct[@]}" --model gemini-3.8-flash "${eff[@]}" "$@"
+}
+(( $+functions[compdef] )) && compdef _gclaw flash
+
 #---------------------------------------------------------------------------
 # External tools
 #---------------------------------------------------------------------------
