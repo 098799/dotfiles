@@ -557,6 +557,22 @@ fable() {
 }
 (( $+functions[compdef] )) && compdef _claw fable
 
+# haiku [home] [claude args...] — claw on Haiku 5.5. Same account picking, tmux
+# naming and effort as claw (medium unless --effort or CLAW_EFFORT says else).
+# Same --model ordering as fable: your own --model on the haiku line wins.
+haiku() {
+  if [[ "$1" == (--help|-h) ]]; then
+    print -r -- "haiku — claw with --model claude-haiku-5-5"
+    print -r -- "usage: haiku [home|main] [claude args...]   (see claw --help)"
+    return 0
+  fi
+  local -a acct
+  while [[ "$1" == (--chrome|--no-chrome) ]]; do acct+=("$1"); shift; done
+  _claw_is_home "$1" && { acct+=("$1"); shift }
+  claw "${acct[@]}" --model claude-haiku-5-5 "$@"
+}
+(( $+functions[compdef] )) && compdef _claw haiku
+
 # foreman [home] [text...] — claw started on "/foreman <text>". The first word is
 # the account if it names one; all the other words are joined into ONE prompt, so
 # `foreman main please make queue work` opens main on "/foreman please make queue
