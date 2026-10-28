@@ -127,6 +127,32 @@ alias kgpl="k get pods -n legartis-prod"
 alias kgna="k get namespaces"
 alias kgno="k get nodes"
 
+# kgpw <pod-name regex> [kubectl args...]  — watch pods, filtered by name, coloured
+kgpw() {
+  local pat=$1; shift
+  local prog='
+    BEGIN { R = "\033[0m"; B = "\033[1m"; D = "\033[2m" }
+    NR == 1 { printf "%s%s%s\n", "\033[1;36m", $0, R; next }
+    $1 !~ pat { next }
+    {
+      split($2, rd, "/")
+      rc = (rd[1] == rd[2]) ? "32" : "33"
+      s = $3
+      if (s == "Completed" || s == "Succeeded") sc = "34"
+      else if (s == "Running") sc = "32"
+      else if (s ~ /Pending|Creating|Init|Terminating/) sc = "33"
+      else sc = "31"
+      rs = ($4 + 0 > 0) ? "33" : "2"
+      tail = ""
+      for (i = 5; i <= NF; i++) tail = tail " " $i
+      printf "%s%-55s%s %s%-7s%s %s%-24s%s %s%-10s%s%s%s\n", B, $1, R, "\033[" rc "m", $2, R, "\033[" sc "m", s, R, "\033[" rs "m", $4, R, D, substr(tail, 2), R
+    }'
+  KGPW_PAT=$pat KGPW_PROG=$prog KGPW_ARGS="$*" watch -c -n "${KGPW_INTERVAL:-2}" '
+    out=$(kubectl get pods $KGPW_ARGS) || exit 1
+    printf "%s\n" "$out" | awk -v pat="$KGPW_PAT" "$KGPW_PROG"
+  '
+}
+
 alias knsl="kubie ns legartis-prod"
 alias knsi="kubie ns inference-models"
 alias kns="kubie ns"
