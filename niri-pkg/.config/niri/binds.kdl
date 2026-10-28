@@ -133,8 +133,9 @@ binds {
     // emacs on PATH (/usr/local/bin). Neomacs again: { spawn "neomacs-try"; }
     Mod+X hotkey-overlay-title="emacs"     { spawn-sh "emacsclient -c || { $HOME/Programs/emacs-pgtk/src/emacs --daemon && emacsclient -c; }"; }
     Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
-    Mod+S hotkey-overlay-title="System Monitor" { spawn "w95-sysmon"; }
-    Mod+Shift+S hotkey-overlay-title="cmon" { spawn "alacritty" "-e" "/home/tgrining/bin/cmon"; }
+    // haiku/claw name their tmux session after the cwd, so start them in ~/legartis.
+    Mod+S hotkey-overlay-title="haiku" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "zsh" "-ic" "haiku"; }
+    Mod+Shift+S hotkey-overlay-title="claw" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "zsh" "-ic" "claw"; }
 
     // ---- workspaces (i3 keys, i3 names) ------------------------------------
     Mod+R     { focus-workspace "cmon"; }
