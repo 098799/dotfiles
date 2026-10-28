@@ -412,6 +412,9 @@ _claw_help() {
   print -r -- "Full set: \`claude --help\`."
 }
 
+# opus — claw on Opus, no account picked (the usage selector still chooses one).
+alias opus='claw --model opus'
+
 # Repo-relative account selector. Overridable for a
 # checkout somewhere else; silently unused if the repo isn't there.
 : ${LEGARTIS_REPO:=$HOME/legartis}
