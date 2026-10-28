@@ -595,6 +595,140 @@ foreman() {
 }
 (( $+functions[compdef] )) && compdef _claw foreman
 
+# gclaw [home|main] [agy args...] — claw for Antigravity's `agy`: a fresh tmux
+# session named after the current directory, running
+# `agy --dangerously-skip-permissions`. `main` (or no home) is the real HOME. A
+# home is ~/agy-<name>/: agy runs with HOME=~/agy-<name>, so its data
+# ($HOME/.gemini) and plugin secrets ($HOME/.config/antigravity) live there.
+#
+# The login is the catch: agy keeps it in the desktop keyring (secret service,
+# "antigravity" on "gemini"), one entry per USER, not per HOME, so a fake HOME
+# alone would sign in as main. agy skips the keyring and keeps the token in a
+# file under $HOME when it finds no D-Bus session bus (unset is not enough: it
+# falls back to the default socket), so a fake-home agy gets a dead bus address.
+# Its child shells get the real address back through BASH_ENV and the home's
+# .zshenv, or glab, dunstify, secret-tool… would break inside the session.
+_gclaw_homes() {
+  local -a h; h=($(_claw_root)/agy-*(/N:t))
+  print -l -- "${h[@]#agy-}"
+}
+
+_gclaw_is_home() {
+  [[ -n "$1" && ( "$1" == main || -d "$(_claw_root)/agy-$1" ) ]]
+}
+
+# Write the pieces a fake home needs. Rewritten on every start, so a home made
+# by hand (mkdir ~/agy-x) works too.
+_gclaw_prep_home() {
+  local h="$1" root="$(_claw_root)"
+  mkdir -p "$h/.gemini/antigravity-cli" || return
+  # Trust the real home tree, as main's settings do, so the first start in a
+  # repo does not stop on agy's workspace-trust question. agy rewrites this
+  # file itself later, so only seed it.
+  [[ -e "$h/.gemini/antigravity-cli/settings.json" ]] ||
+    printf '{\n  "trustedWorkspaces": [\n    "%s"\n  ]\n}\n' "$root" > "$h/.gemini/antigravity-cli/settings.json"
+  print -r -- '# gclaw: give child shells of agy the real D-Bus address back (see .zshrc).
+if [ -n "${GCLAW_DBUS+x}" ]; then
+  if [ -n "$GCLAW_DBUS" ]; then export DBUS_SESSION_BUS_ADDRESS="$GCLAW_DBUS"; else unset DBUS_SESSION_BUS_ADDRESS; fi
+  unset GCLAW_DBUS BASH_ENV
+fi' > "$h/.gclaw-dbus.sh"
+  print -r -- '. "$HOME/.gclaw-dbus.sh"' > "$h/.zshenv"
+}
+
+_gclaw_help() {
+  local root="$(_claw_root)" h
+  print -r -- "gclaw — agy --dangerously-skip-permissions in a fresh tmux session"
+  print -r -- ""
+  print -r -- "usage: gclaw [home|main] [agy args...]"
+  print -r -- "       gclaw --new <name>     make the home $root/agy-<name>"
+  print -r -- "       gclaw --help | -h"
+  print -r -- ""
+  print -r -- "Only the FIRST word can name the home, as in claw. Session name:"
+  print -r -- "       ~/legartis4 + home work  ->  legartis4-agy-work"
+  print -r -- ""
+  print -r -- "homes (tab-completes):"
+  printf '       %-10s %s\n' "main" "\$HOME as it is ($root), login in the desktop keyring"
+  for h in $(_gclaw_homes); do
+    printf '       %-10s %s\n' "$h" "HOME=$root/agy-$h, login in a file there"
+  done
+  print -r -- "No home named = main. A new home asks for a Google login at its first start."
+  print -r -- ""
+  print -r -- "agy's own flags still work: -c, --model, --effort, -i \"prompt\", …  (agy --help)"
+}
+
+gclaw() {
+  local root="$(_claw_root)"
+
+  if [[ "$1" == (--help|-h) ]]; then
+    _gclaw_help
+    return 0
+  fi
+
+  if [[ "$1" == --new ]]; then
+    [[ -n "$2" && "$2" != main && "$2" != *[^[:alnum:]_-]* ]] ||
+      { print -u2 -r -- "gclaw: --new needs a name ([a-z0-9_-], not main)"; return 1 }
+    local nh="$root/agy-$2"
+    [[ -e "$nh" ]] && { print -u2 -r -- "gclaw: $nh exists already"; return 1 }
+    _gclaw_prep_home "$nh" || return
+    print -r -- "gclaw: made $nh — \`gclaw $2\` starts on it; log in at the first start"
+    return 0
+  fi
+
+  local ahome="" aname="main"
+  if _gclaw_is_home "$1"; then
+    aname="$1"
+    [[ "$aname" != main ]] && ahome="$root/agy-$aname"
+    shift
+  fi
+
+  local base="${PWD:t}"
+  base="${base//[.:[:space:]]/-}"   # tmux gives "." and ":" a special meaning
+  [[ -n "$base" ]] || base="agy"
+  base="${base}-agy-${aname}"
+
+  local name="$base" n=2
+  while tmux has-session -t "=$name" 2>/dev/null; do
+    name="${base}-$((n++))"
+  done
+
+  # Absolute path: the binary lives under the real HOME, and a nested gclaw may
+  # run with HOME pointed elsewhere.
+  local cmd="${(q)root}/.local/bin/agy --dangerously-skip-permissions"
+  if [[ -n "$ahome" ]]; then
+    _gclaw_prep_home "$ahome" || return
+    cmd="HOME=${(q)ahome} GCLAW_DBUS=${(q)DBUS_SESSION_BUS_ADDRESS} BASH_ENV=${(q)ahome}/.gclaw-dbus.sh DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/gclaw-no-bus $cmd"
+  fi
+  (( $# )) && cmd+=" ${(j: :)${(q)@}}"
+
+  # HOME on the agy command only, never on the session (same reason as claw: a
+  # pane in a HOME with no .zshrc runs zsh-newuser-install). AGY_HOME puts `agy`
+  # typed in a new pane back on the session's home.
+  local -a envopt
+  [[ -n "$ahome" ]] && envopt=(-e "AGY_HOME=$ahome")
+
+  tmux new-session -d -s "$name" -c "$PWD" "${envopt[@]}" "$cmd" || return
+  if [[ -n "$TMUX" ]]; then
+    tmux switch-client -t "=$name"
+  else
+    tmux attach-session -t "=$name"
+  fi
+}
+
+# In a pane of a gclaw session, `agy` runs on that session's home, keyring off.
+if [[ -n "$AGY_HOME" ]]; then
+  agy() {
+    HOME="$AGY_HOME" GCLAW_DBUS="$DBUS_SESSION_BUS_ADDRESS" BASH_ENV="$AGY_HOME/.gclaw-dbus.sh" \
+      DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/gclaw-no-bus command agy "$@"
+  }
+fi
+
+_gclaw() {
+  local -a homes
+  homes=(main $(_claw_root)/agy-*(/N:t))
+  _describe 'agy home' "${homes[@]#agy-}"
+}
+(( $+functions[compdef] )) && compdef _gclaw gclaw
+
 #---------------------------------------------------------------------------
 # External tools
 #---------------------------------------------------------------------------
