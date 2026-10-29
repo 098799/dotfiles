@@ -734,6 +734,9 @@ gclaw() {
     # glab reads its login from $HOME: point it at the real one, or MRs cannot be opened.
     [[ "$afile" != "$root" && -d $root/.config/glab-cli ]] && cmd="GLAB_CONFIG_DIR=${(q)root}/.config/glab-cli $cmd"
   fi
+  # Claude Code's context for agy (rules, memories, skills): cmon/agy_context.py.
+  [[ -f $root/legartis/cmon/agy_context.py ]] &&
+    python3 "$root/legartis/cmon/agy_context.py" sync "${ahome:-$root}" >/dev/null 2>&1
   (( $# )) && cmd+=" ${(j: :)${(q)@}}"
 
   # HOME on the agy command only, never on the session (same reason as claw: a
