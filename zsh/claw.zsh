@@ -1,4 +1,5 @@
-# claw.zsh — claw, fable, haiku, foreman, gclaw, flash: Claude Code (or agy) in a
+# claw.zsh — the shortcuts opus, sonnet, haiku, fable, foreman (Claude Code) and flash,
+# gopus, gsonnet (agy), on top of the engines claw and gclaw: Claude Code (or agy) in a
 # fresh tmux session. Sourced by ~/.zshrc, and on its own by the niri launchers
 # (Mod+S etc.) as `zsh -fc 'source …/claw.zsh; haiku'`: a full interactive zsh
 # costs ~1.7 s before claude even starts. So this file must stand alone — no
@@ -86,9 +87,6 @@ _claw_help() {
   print -r -- "                                  claw --no-chrome builder"
   print -r -- "Full set: \`claude --help\`."
 }
-
-# opus — claw on Opus, no account picked (the usage selector still chooses one).
-alias opus='claw --model opus'
 
 # Repo-relative account selector. Overridable for a
 # checkout somewhere else; silently unused if the repo isn't there.
@@ -242,18 +240,32 @@ fable() {
 # haiku [home] [claude args...] — claw on Haiku 5.5. Same account picking, tmux
 # naming and effort as claw (medium unless --effort or CLAW_EFFORT says else).
 # Same --model ordering as fable: your own --model on the haiku line wins.
-haiku() {
+haiku() { _claw_shortcut haiku claude-haiku-5-5 "$@" }
+(( $+functions[compdef] )) && compdef _claw haiku
+
+# The shortcuts that differ only by model (Claude Code: opus, sonnet, haiku). Same account
+# picking as claw, and your own --model on the line wins: claude takes the LAST --model.
+# _claw_shortcut <name> <model> [claw args...]
+_claw_shortcut() {
+  local name="$1" model="$2"; shift 2
   if [[ "$1" == (--help|-h) ]]; then
-    print -r -- "haiku — claw with --model claude-haiku-5-5"
-    print -r -- "usage: haiku [home|main] [claude args...]   (see claw --help)"
+    print -r -- "$name — claw with --model $model"
+    print -r -- "usage: $name [home|main] [claude args...]   (see claw --help)"
     return 0
   fi
   local -a acct
   while [[ "$1" == (--chrome|--no-chrome) ]]; do acct+=("$1"); shift; done
   _claw_is_home "$1" && { acct+=("$1"); shift }
-  claw "${acct[@]}" --model claude-haiku-5-5 "$@"
+  claw "${acct[@]}" --model "$model" "$@"
 }
-(( $+functions[compdef] )) && compdef _claw haiku
+
+# opus — claw on Opus, no account picked (the usage selector still chooses one).
+opus() { _claw_shortcut opus opus "$@" }
+(( $+functions[compdef] )) && compdef _claw opus
+
+# sonnet [home] [claude args...] — claw on Sonnet 5.5.
+sonnet() { _claw_shortcut sonnet claude-sonnet-5-5 "$@" }
+(( $+functions[compdef] )) && compdef _claw sonnet
 
 # foreman [home] [text...] — claw started on "/foreman <text>". The first word is
 # the account if it names one; all the other words are joined into ONE prompt, so
@@ -422,15 +434,17 @@ _gclaw() {
 }
 (( $+functions[compdef] )) && compdef _gclaw gclaw
 
-# flash [home|main] [agy args...] — gclaw on Gemini 3.8 Flash, effort high unless an
-# --effort on the line or GCLAW_EFFORT says else. agy has no env var that locks the
-# model the way CLAUDE_CODE_EFFORT_LEVEL locks claw's effort: these are start flags,
-# and /model or /effort inside the session can still change them. Always pass the
-# model: a home's saved default may be another one (main's was Claude Sonnet).
-flash() {
+# _agy_shortcut <name> <model> <default effort> [gclaw args...] — the agy shortcuts
+# (flash, gopus, gsonnet). The effort goes on the line unless an --effort is already
+# there, or GCLAW_EFFORT says else. agy has no env var that locks the model the way
+# CLAUDE_CODE_EFFORT_LEVEL locks claw's effort: these are start flags, and /model or
+# /effort inside the session can still change them. Always pass the model: a home's
+# saved default may be another one (main's was Claude Sonnet).
+_agy_shortcut() {
+  local name="$1" model="$2" effort="$3"; shift 3
   if [[ "$1" == (--help|-h) ]]; then
-    print -r -- "flash — gclaw with --model gemini-3.8-flash --effort high"
-    print -r -- "usage: flash [home|main] [agy args...]   (see gclaw --help)"
+    print -r -- "$name — gclaw with --model $model --effort $effort"
+    print -r -- "usage: $name [home|main] [agy args...]   (see gclaw --help)"
     print -r -- "       --effort low|medium|high|xhigh|max on the line, or GCLAW_EFFORT, sets the effort"
     return 0
   fi
@@ -438,7 +452,18 @@ flash() {
   _gclaw_is_home "$1" && { acct+=("$1"); shift }
   local a seen=""
   for a in "$@"; do [[ "$a" == (--effort|--effort=*) ]] && seen=1; done
-  [[ -n "$seen" ]] || eff=(--effort "${GCLAW_EFFORT:-high}")
-  gclaw "${acct[@]}" --model gemini-3.8-flash "${eff[@]}" "$@"
+  [[ -n "$seen" ]] || eff=(--effort "${GCLAW_EFFORT:-$effort}")
+  gclaw "${acct[@]}" --model "$model" "${eff[@]}" "$@"
 }
+
+# flash — agy on Gemini 3.8 Flash.
+flash() { _agy_shortcut flash gemini-3.8-flash high "$@" }
 (( $+functions[compdef] )) && compdef _gclaw flash
+
+# gopus — agy on Claude Opus 5.5 (served through agy's own quota, not Claude Code's).
+gopus() { _agy_shortcut gopus claude-opus-5-5 high "$@" }
+(( $+functions[compdef] )) && compdef _gclaw gopus
+
+# gsonnet — agy on Claude Sonnet 5.5 (agy's quota, see gopus).
+gsonnet() { _agy_shortcut gsonnet claude-sonnet-5-5 high "$@" }
+(( $+functions[compdef] )) && compdef _gclaw gsonnet
