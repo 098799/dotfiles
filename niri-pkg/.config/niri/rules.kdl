@@ -42,3 +42,25 @@ window-rule {
     match app-id=r#"^(google-chrome|chromium)"# title="^(Open|Save) File$"
     open-floating true
 }
+// Chrome picture-in-picture: float it in the bottom-right corner, over the
+// tiled windows, instead of a new column that scrolls the workspace sideways.
+// There are two kinds, and neither has a fixed marker. Measured 30 Oct 2026
+// with `niri msg -j event-stream`, Chrome on Wayland:
+//   video PiP (<video>.requestPictureInPicture):
+//     app-id "" (empty), title "Picture in picture"
+//   Document PiP (Google Meet, Spotify; automatic on tab switch):
+//     app-id "google-chrome", title = the page's title with NO
+//     " - Google Chrome" suffix. Every normal browser window has that suffix,
+//     so the missing suffix is the marker. DevTools also has none: excluded.
+// open-focused false: the automatic PiP opens when you switch tabs, and must
+// not take the keyboard from the tab you just switched to.
+window-rule {
+    match app-id=r#"^$"# title=r#"^Picture in picture$"#
+    match app-id=r#"^(google-chrome|chromium)$"#
+    exclude title=r#" - (Google Chrome|Chromium)$"#
+    exclude title=r#"^DevTools"#
+    exclude title=r#"^(Open|Save) File$"#
+    open-floating true
+    open-focused false
+    default-floating-position x=24 y=24 relative-to="bottom-right"
+}
