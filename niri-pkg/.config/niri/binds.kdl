@@ -134,8 +134,9 @@ binds {
     Mod+X hotkey-overlay-title="emacs"     { spawn-sh "emacsclient -c || { $HOME/Programs/emacs-pgtk/src/emacs --daemon && emacsclient -c; }"; }
     Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
     // haiku/claw name their tmux session after the cwd, so start them in ~/legartis.
-    Mod+S hotkey-overlay-title="haiku" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "zsh" "-ic" "haiku"; }
-    Mod+Shift+S hotkey-overlay-title="claw" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "zsh" "-ic" "claw"; }
+    // claw-fast, not `zsh -ic`: a type-ahead box at once, no full .zshrc (~1.7 s).
+    Mod+S hotkey-overlay-title="haiku" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "haiku"; }
+    Mod+Shift+S hotkey-overlay-title="claw" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "claw"; }
 
     // ---- workspaces (i3 keys, i3 names) ------------------------------------
     Mod+R     { focus-workspace "cmon"; }

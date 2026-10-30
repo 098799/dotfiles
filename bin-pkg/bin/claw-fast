@@ -1,0 +1,155 @@
+#!/bin/zsh -f
+# claw-fast <claw|haiku|fable|foreman|opus…> [args...] — the niri launcher for a
+# claw session, with type-ahead.
+#
+# Like powerlevel10k's instant prompt: a box that looks like Claude Code's input
+# is on screen within milliseconds, and you type into it at once. Behind it, claw
+# picks the account and starts tmux + claude, detached. As soon as claude draws
+# its real input box, your text is pasted into it (bracketed paste, so newlines
+# from a paste stay newlines), Enter follows if you pressed it, and the terminal
+# attaches to the session. Keys typed after that go to claude itself.
+#
+# zsh -f on purpose: the full ~/.zshrc is not needed here and used to cost ~1.7 s.
+# claw.zsh (the claw functions) and node-path.zsh (node on PATH for claude's npx
+# MCP servers, in case this starts the tmux server) are all it reads.
+#
+# Keys in the box: Enter queues the message (Backspace un-queues it), Backspace,
+# Ctrl-U, Ctrl-W edit, Ctrl-C cancels and kills the session.
+# If claude does not show its input box within $CLAW_FAST_TIMEOUT s (60; a login
+# or a dialog, say), it attaches anyway and leaves your text in the tmux buffer
+# "clawfast" (prefix ] pastes the last buffer) instead of typing into the dialog.
+
+zmodload zsh/datetime
+setopt extended_glob
+
+ZSHDIR=/home/tgrining/dotfiles/zsh
+(( $# )) || set -- claw
+launcher="$1"
+timeout="${CLAW_FAST_TIMEOUT:-60}"
+
+tmpd="${XDG_RUNTIME_DIR:-/tmp}/claw-fast.$$"
+mkdir -p "$tmpd"
+saved_tty="$(stty -g)"
+cleanup() { stty "$saved_tty" 2>/dev/null; print -n '\e[?2004l'; rm -rf "$tmpd" }
+trap cleanup EXIT
+stty -echo -icanon -isig min 1
+
+# --- start the session in the background --------------------------------------
+{
+  source "$ZSHDIR/node-path.zsh"
+  source "$ZSHDIR/claw.zsh"
+  # opus is an alias in claw.zsh; aliases do not expand in a script.
+  [[ "$1" == opus ]] && set -- claw --model opus "${@:2}"
+  CLAW_DETACH=1 "$@" >"$tmpd/name" 2>"$tmpd/err" </dev/null
+  print $? >"$tmpd/rc"
+} &!
+
+# --- the box -------------------------------------------------------------------
+buf="" queued="" name="" spin=0
+frames=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
+cols=${$(stty size)[2]:-80}
+rule="${(l:$cols::─:)}"
+
+draw() {
+  local shown="${buf//$'\n'/↵ }" max=$(( cols - 4 ))
+  (( ${#shown} > max )) && shown="…${shown[-$((max-1)),-1]}"
+  local line
+  if [[ -n "$queued" ]]; then
+    line="$frames[spin % $#frames + 1] starting $launcher… message queued, sends when claude is ready"
+  else
+    line="$frames[spin % $#frames + 1] starting $launcher… type now, it goes in when claude is ready"
+  fi
+  print -n "\e[H\e[2J\n\e[90m$rule\e[0m\n\e[1m❯\e[0m $shown${queued:+ \e[90m↵\e[0m}\n\e[90m$rule\e[0m\n  \e[90m$line\e[0m"
+  print -n "\e[3;$(( ${#shown} + 3 ))H"
+}
+
+fail() {
+  stty "$saved_tty"
+  print -n "\e[H\e[2J"
+  print -u2 -r -- "$launcher failed:"
+  [[ -s "$tmpd/err" ]] && cat "$tmpd/err" >&2
+  print -u2 -r -- "${1:-}"
+  print -r -- "(press a key to close)"
+  read -k -s 1
+  exit 1
+}
+
+# Esc sequence after the ESC byte: CSI/SS3 up to the final byte.
+read_esc() {
+  local seq="" c
+  while read -s -k 1 -t 0.01 c; do
+    seq+="$c"
+    [[ "$c" == [@-~] && ${#seq} -gt 1 ]] && break
+  done
+  REPLY="$seq"
+}
+
+print -n '\e[?2004h'   # bracketed paste: a pasted newline is text, not Enter
+draw
+start=$EPOCHREALTIME next_check=0 next_spin=0 pasting="" ready=""
+while true; do
+  now=$EPOCHREALTIME
+
+  if [[ -z "$name" && -s "$tmpd/rc" ]]; then
+    [[ "$(<"$tmpd/rc")" == 0 ]] || fail
+    name="$(<"$tmpd/name")"
+    [[ -n "$name" ]] || fail "claw printed no session name"
+  fi
+  if [[ -n "$name" ]] && (( now >= next_check )); then
+    next_check=$(( now + 0.1 ))
+    tmux capture-pane -p -t "=$name:" 2>/dev/null | grep -q 'bypass permissions on' && { ready=1; break }
+    tmux has-session -t "=$name" 2>/dev/null || fail "the tmux session ended before claude was ready"
+  fi
+  (( now - start > timeout )) && break
+  if (( now >= next_spin )); then
+    next_spin=$(( now + 0.1 )); (( spin++ )); draw
+  fi
+
+  read -s -k 1 -t 0.03 c || continue
+  case "$c" in
+    $'\e')
+      read_esc
+      case "$REPLY" in
+        '[200~') pasting=1 ;;
+        '[201~') pasting="" ;;
+      esac ;;
+    $'\r'|$'\n')
+      if [[ -n "$pasting" ]]; then buf+=$'\n'; else queued=1; fi ;;
+    $'\x7f'|$'\b')
+      if [[ -n "$queued" ]]; then queued=""; else buf="${buf%?}"; fi ;;
+    $'\x15') buf="" queued="" ;;
+    $'\x17') buf="${buf%%[^[:space:]]#[[:space:]]#}" ;;
+    $'\x03')
+      print -n "\e[H\e[2J"
+      for i in {1..100}; do [[ -s "$tmpd/rc" ]] && break; sleep 0.05; done
+      name="$(<"$tmpd/name")" 2>/dev/null
+      [[ -n "$name" ]] && tmux kill-session -t "=$name" 2>/dev/null
+      exit 130 ;;
+    [[:cntrl:]]) ;;
+    *) [[ -z "$queued" ]] && buf+="$c" ;;
+  esac
+  draw
+done
+
+# --- hand over -------------------------------------------------------------------
+# A timeout before claw even returned: wait for the name, nothing to attach to yet.
+while [[ -z "$name" ]]; do
+  [[ -s "$tmpd/rc" ]] && { [[ "$(<"$tmpd/rc")" == 0 ]] || fail; name="$(<"$tmpd/name")"; break }
+  sleep 0.1
+done
+
+if [[ -n "$buf" ]]; then
+  tmux set-buffer -b clawfast -- "$buf"
+  if [[ -n "$ready" ]]; then
+    tmux paste-buffer -p -b clawfast -t "=$name:"
+    # Let claude take the paste in before Enter, or the Enter can land first.
+    [[ -n "$queued" ]] && { sleep 0.15; tmux send-keys -t "=$name:" Enter }
+  else
+    (sleep 1; tmux display-message -t "=$name:" -d 8000 \
+      'claw-fast: claude was not ready; your text is in tmux buffer "clawfast" (prefix ] pastes it)') &!
+  fi
+fi
+
+cleanup
+trap - EXIT
+exec tmux attach-session -t "=$name"
