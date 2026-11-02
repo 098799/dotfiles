@@ -333,16 +333,18 @@ CARD_H = 112
 FOOT_H = 26
 INFO_W = 230
 PAD = 14
+SCROLL_STEP = 48  # px per wheel notch (PgUp/PgDn move a whole band)
 
 
 def deck_size(n: int) -> tuple[int, int]:
     return DECK_W, HEAD_H + n * CARD_H + FOOT_H
 
 
-def draw_deck(cr, m, now: float, back: int, sel: int) -> list[tuple[str, float, float]]:
-    """Draw the deck at (0, 0). Returns (account, y0, y1) per card, for clicks."""
+def draw_deck(cr, m, now: float, back: int, sel: int, top: float, h: float) -> list[tuple[str, float, float]]:
+    """Draw the deck at (0, 0), h tall. The header and footer stay; the cards scroll
+    `top` px under the header. Returns (account, y0, y1) per visible card, for clicks."""
     rs = rows(m, now, back)
-    w, h = deck_size(len(rs))
+    w = DECK_W
     core.panel_frame(cr, w, h)
 
     # Header: title, freshness, federation, clock; the pools under it.
@@ -369,10 +371,17 @@ def draw_deck(cr, m, now: float, back: int, sel: int) -> list[tuple[str, float, 
     pools = "".join(t for t, _ in Q.pool_summary(m, now)).strip()
     text(cr, PAD, 27, pools or " ", 12, "fg")
 
+    # The cards scroll between the header and the footer: clip them to that band.
+    bottom = h - FOOT_H
     hits = []
+    cr.save()
+    cr.rectangle(0, HEAD_H, w, bottom - HEAD_H)
+    cr.clip()
     for i, r in enumerate(rs):
-        y0 = HEAD_H + i * CARD_H
-        hits.append((r.account, y0, y0 + CARD_H))
+        y0 = HEAD_H + i * CARD_H - top
+        if y0 + CARD_H <= HEAD_H or y0 >= bottom:
+            continue  # off the band: drawn nowhere, clickable nowhere
+        hits.append((r.account, max(y0, HEAD_H), min(y0 + CARD_H, bottom)))
         cr.move_to(PAD, y0 + 0.5)
         cr.line_to(w - PAD, y0 + 0.5)
         cr.set_source_rgba(*rgba("sep", 0.7))
@@ -387,8 +396,19 @@ def draw_deck(cr, m, now: float, back: int, sel: int) -> list[tuple[str, float, 
             cr.set_source_rgba(*rgba("accent"))
             cr.fill()
         draw_card(cr, r, now, PAD, y0 + 8, w - 2 * PAD, CARD_H - 16)
+    cr.restore()
 
-    hint = "click a card or Enter: qtop on it · i/o select · u/p earlier/later week · esc closes"
+    # A thin thumb at the right edge while the cards overflow the band.
+    span, content = bottom - HEAD_H, len(rs) * CARD_H
+    if content > span:
+        track = span - 8
+        thumb = max(24.0, track * span / content)
+        ty = HEAD_H + 4 + (track - thumb) * top / (content - span)
+        rrect(cr, w - 6, ty, 3, thumb, 1.5)
+        cr.set_source_rgba(*rgba("accent", 0.6))
+        cr.fill()
+
+    hint = "click a card or Enter: qtop on it · i/o select · u/p earlier/later week · wheel or PgUp/PgDn scroll · esc closes"
     text(cr, w / 2, h - FOOT_H + 5, hint, 12, "dim", align=0.5)
     return hits
 
@@ -535,29 +555,74 @@ class Quota:
 
 
 class QuotaPanel(Panel):
+    """Taller than the output (one card per account, agy ones included), it is clamped
+    to the room the output leaves and its cards scroll under the header."""
+
     name = "quota"
-    drawn_ahead = True
+    # Not drawn ahead: its height and scroll change with the output and the wheel, so a
+    # picture kept per (scroll, height) would only pile up. Five cards draw in a blink.
+    drawn_ahead = False
 
     def __init__(self, quota: Quota):
         self.q = quota
         self.back, self.sel = 0, -1
+        self.top = 0.0  # the cards' scroll, px, under the header
+
+    def content_h(self) -> int:
+        return deck_size(len(self.q.m.accounts()))[1]
+
+    def room(self) -> float:
+        """The panel's height the output leaves it, in panel px (before the zoom).
+        Before the overlay has an allocation (its first draw), the whole deck."""
+        win = getattr(self.deck, "win", None)
+        full = win.get_allocated_height() if win is not None else 0
+        if full <= 0:
+            return self.content_h()
+        margin = max(6, round(full * self.deck.FREE_TOP)) if self.deck.free else 6
+        return (full - margin - 12) / self.deck.zoom
 
     def size(self):
-        return deck_size(len(self.q.m.accounts()))
+        h = min(self.content_h(), max(self.room(), HEAD_H + CARD_H + FOOT_H))
+        return DECK_W, int(h)
+
+    def card_span(self) -> float:
+        """The height the cards show at once."""
+        return self.size()[1] - HEAD_H - FOOT_H
+
+    def max_top(self) -> float:
+        return max(0.0, len(self.q.m.accounts()) * CARD_H - self.card_span())
+
+    def follow(self) -> None:
+        """Scroll so the selected card is in the band."""
+        if not 0 <= self.sel < len(self.q.m.accounts()):
+            return
+        y = self.sel * CARD_H
+        if y < self.top:
+            self.top = y
+        elif y + CARD_H > self.top + self.card_span():
+            self.top = y + CARD_H - self.card_span()
+        self.top = min(max(self.top, 0.0), self.max_top())
 
     def opened(self) -> None:
         accts = self.q.m.accounts()
         active = read_active()
         self.back, self.sel = 0, (accts.index(active) if active in accts else -1)
+        self.top = 0.0
+        self.follow()
+
+    def scroll(self, down: bool) -> bool:
+        before = self.top
+        self.top = min(max(self.top + (SCROLL_STEP if down else -SCROLL_STEP), 0.0), self.max_top())
+        return self.top != before
 
     def state(self) -> tuple:
-        return (self.back, self.sel)
+        return (self.back, self.sel, round(self.top), self.size()[1])
 
     def draw(self, cr, hits: core.Hits) -> None:
-        cards = draw_deck(cr, self.q.m, time.time(), self.back, self.sel)
-        w, _ = self.size()
+        self.top = min(max(self.top, 0.0), self.max_top())
+        cards = draw_deck(cr, self.q.m, time.time(), self.back, self.sel, self.top, self.size()[1])
         for account, y0, y1 in cards:
-            hits.add(0, y0, w, y1 - y0, lambda a=account: open_qtop(a))
+            hits.add(0, y0, DECK_W, y1 - y0, lambda a=account: open_qtop(a))
 
     def key(self, key: str, ctrl: bool) -> bool:
         n = len(self.q.m.accounts())
@@ -571,12 +636,17 @@ class QuotaPanel(Panel):
             self.back += 1
         elif key in ("p", "Right") or (ctrl and key == "f"):
             self.back = max(0, self.back - 1)
+        elif key in ("Page_Down", "Next", "Page_Up", "Prior"):  # a band; the selection stays
+            step = self.card_span() if key in ("Page_Down", "Next") else -self.card_span()
+            self.top = min(max(self.top + step, 0.0), self.max_top())
+            return True
         elif key in ("Return", "KP_Enter") and 0 <= self.sel < n:
             # "close": the panel lets go of the keyboard. With True it kept it, and a
             # repeating Enter opened a qtop per repeat (13 Oct 2026: 120 terminals in 3 s).
             return "close" if open_qtop(self.q.m.accounts()[self.sel]) else True
         else:
             return False
+        self.follow()
         return True
 
 
