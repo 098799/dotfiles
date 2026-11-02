@@ -82,6 +82,9 @@ class Row:
             self.verdict, self.tone = (f"{why} · {age}" if why else f"no reading for {age}"), "dim"
         # "over" = the week in the log has reset and no reading of the new one came yet.
         self.over = self.week is None or (back == 0 and self.week.over(now))
+        self.name = account + (f" · {Q.ALIAS[account]}" if account in Q.ALIAS else "")
+        self.ceiling = Q.CEILING[self.pool]
+        self.extra: list[tuple[str, object]] = []  # agy: the other weekly buckets (label, Week)
 
     @property
     def colour(self) -> str:
@@ -90,12 +93,175 @@ class Row:
     def five_colour(self) -> str:
         if self.u5 >= 100:
             return "hit"
-        return "warn" if self.u5 >= Q.CEILING[self.pool] else "fg"
+        return "warn" if self.u5 >= self.ceiling else "fg"
+
+
+# ── agy (Antigravity CLI) accounts ───────────────────────────────────────────
+#
+# qtop lists them (Model.accounts() adds "agy:<home>"), but its Store reads only
+# claude-usage.csv, so their cards had no week. rcmon's agy_federation.py writes a
+# history beside it, one row per bucket per reading; AgyHistory reads that.
+
+AGY_HISTORY = os.environ.get("AGY_USAGE_HISTORY") or f"{core.REAL_HOME}/.local/state/w95/agy-usage.csv"
+AGY_FIVE = {"gemini-weekly": "gemini-5h", "3p-weekly": "3p-5h"}  # a weekly bucket's 5h sibling
+FLOAT_S = 1800  # an unused bucket's reset floats at now + its window; this close = not started
+
+
+def _floating(t: float, used: float, reset: float, window: float) -> bool:
+    return used <= 0 and abs(reset - (t + window)) < FLOAT_S
+
+
+class AgyHistory:
+    """agy-usage.csv, read incrementally: {(home, bucket): [(t, used, reset)]}."""
+
+    def __init__(self, path: str = AGY_HISTORY):
+        self.path = path
+        self.offset, self.inode, self.tail = 0, None, ""
+        self.rows: dict[tuple[str, str], list[tuple[float, float, float]]] = {}
+        self._weeks: dict[tuple[str, str], list] = {}
+
+    def load(self) -> bool:
+        try:
+            st = os.stat(self.path)
+        except OSError:
+            return False
+        if st.st_ino != self.inode or st.st_size < self.offset:
+            self.offset, self.tail, self.rows, self.inode = 0, "", {}, st.st_ino
+        if st.st_size == self.offset:
+            return False
+        with open(self.path, encoding="utf-8", errors="replace") as fh:
+            fh.seek(self.offset)
+            chunk = fh.read()
+            self.offset = fh.tell()
+        lines = (self.tail + chunk).split("\n")
+        self.tail = lines.pop()
+        for line in lines:
+            # timestamp,account,group,bucket,window,used,resets_at — the group may hold a comma.
+            p = line.split(",")
+            if len(p) < 7 or p[0] == "timestamp":
+                continue
+            t, reset = Q.iso_ts(p[0]), Q.iso_ts(p[-1])
+            try:
+                used = float(p[-2])
+            except ValueError:
+                continue
+            if t is None or reset is None:
+                continue
+            self.rows.setdefault((p[1], p[-4]), []).append((t, used, reset))
+        self._weeks.clear()
+        return True
+
+    def trim(self, cutoff: float) -> None:
+        for rs in self.rows.values():
+            if rs and rs[0][0] < cutoff:
+                rs[:] = [r for r in rs if r[0] >= cutoff]
+        self._weeks.clear()
+
+    def buckets(self, home: str) -> list[str]:
+        """The weekly buckets of one home, in the snapshot's order where it has one."""
+        acc = Q.agy_account(home) or {}
+        order = [str(b.get("id")) for b in acc.get("buckets") or [] if isinstance(b, dict)]
+        have = [b for (h, b) in self.rows if h == home and b.endswith("-weekly")]
+        return [b for b in order if b in have] + sorted(b for b in have if b not in order)
+
+    def last(self, home: str, bucket: str) -> tuple[float, float, float] | None:
+        rs = self.rows.get((home, bucket))
+        return rs[-1] if rs else None
+
+    def weeks(self, home: str, bucket: str) -> list:
+        """Every quota week of one weekly bucket, oldest first, as qtop Weeks.
+
+        A bucket nobody used has a reset that floats at now + 7 d; those readings join
+        the week that follows them (its reset is fixed by the first use)."""
+        key = (home, bucket)
+        if key in self._weeks:
+            return self._weeks[key]
+        groups: list[list] = []  # [reset, floating, points]
+        for t, used, reset in self.rows.get(key, []):
+            fl = _floating(t, used, reset, Q.WEEK)
+            g = groups[-1] if groups else None
+            if g and (abs(reset - g[0]) <= 7200 or (g[1] and t < g[0])):
+                g[0] = reset if g[1] or not fl else g[0]
+                g[1] = g[1] and fl
+                g[2].append((t, used))
+            else:
+                groups.append([reset, fl, [(t, used)]])
+        peaks: dict[float, float] = {}
+        for t, used, reset in self.rows.get((home, AGY_FIVE.get(bucket, "")), []):
+            if not _floating(t, used, reset, 5 * 3600):
+                r = Q._round(reset, 600)
+                peaks[r] = max(peaks.get(r, 0.0), used)
+        out = []
+        for reset, _, pts in groups:
+            wins = {r: p for r, p in peaks.items() if reset - Q.WEEK < r <= reset + 5 * 3600}
+            out.append(Q.Week(f"agy:{home}", reset, pts, wins))
+        self._weeks[key] = out
+        return out
+
+
+def agy_label(bucket: str) -> str:
+    return Q.AGY_LABEL.get(bucket, bucket.split("-")[0][:6])
+
+
+class AgyRow(Row):
+    """An agy account's card. Its week is the weekly bucket with the most used (the
+    one that stops agy first: no Gemini left means no Opus either); the other weekly
+    buckets ride along in `extra`, drawn as thin lines on the same chart."""
+
+    def __init__(self, m, account: str, now: float, back: int = 0):
+        home = account[len(Q.AGY_KEY):]
+        hist: AgyHistory = m.agy
+        who = Q.AGY_NAME.get(home, home)
+        self.account = account
+        self.label = "g" + Q.LETTER.get(who, who[:2].upper())
+        self.name = f"agy · {who}" + (f" · {home}" if home != who else "")
+        self.active = False
+        self.pool = "agy"
+        self.ceiling = 100.0  # burn sets no 5h ceiling for agy
+        acc = Q.agy_account(home) or {}
+        observed = Q.iso_ts(acc.get("observed_at"))
+        self.stale = observed is None or now - observed > Q.STALE_S
+
+        live = []
+        for b in hist.buckets(home):
+            ws = hist.weeks(home, b)
+            if ws:
+                live.append((b, ws))
+        # The binding bucket: the most used now (the first on a tie: Gemini).
+        live.sort(key=lambda bw: -bw[1][-1].used if not bw[1][-1].over(now) else 1.0)
+        self.bucket = live[0][0] if live else None
+        self.week, self.back, self.weeks = None, 0, 0
+        self.extra = []
+        if live:
+            ws = live[0][1]
+            self.back = max(0, min(back, len(ws) - 1))
+            self.week, self.weeks = ws[-1 - self.back], len(ws)
+            for b, other in live[1:]:
+                near = min(other, key=lambda w: abs(w.reset - self.week.reset))
+                self.extra.append((agy_label(b), near))
+
+        five = hist.last(home, AGY_FIVE.get(self.bucket or "", ""))
+        self.five_live = bool(five and five[2] > now and not self.stale
+                              and not _floating(five[0], five[1], five[2], 5 * 3600))
+        self.u5 = five[1] if self.five_live else 0.0
+        self.r5 = (five[2] - now) if self.five_live else None
+
+        if self.week is None:
+            self.verdict, self.tone = "no readings", "dim"
+        else:
+            v, self.tone = Q.week_verdict(self.week, now)
+            self.verdict = f"{agy_label(self.bucket)} {v}"
+        if self.stale and back == 0:
+            err = str(acc.get("error") or "")[:24]
+            age = Q.ago(now - observed) if observed else "ever"
+            self.verdict, self.tone = (f"{err} · {age}" if err else f"no reading for {age}"), "dim"
+        self.over = self.week is None or (back == 0 and self.week.over(now))
 
 
 def rows(m, now: float, back: int = 0) -> list[Row]:
     active = read_active()
-    return [Row(m, a, active, now, back) for a in m.accounts()]
+    return [AgyRow(m, a, now, back) if a.startswith(Q.AGY_KEY) else Row(m, a, active, now, back)
+            for a in m.accounts()]
 
 
 def read_active() -> str:
@@ -201,6 +367,19 @@ def week_chart(cr, x: float, y: float, w: float, h: float, row: Row, now: float,
                 cr.set_source_rgba(*rgba("hit"))
                 cr.fill()
 
+    # agy: the other weekly buckets, thin lines on this week's clock.
+    if detail:
+        for _, other in row.extra:
+            opts = [(X(t), Y(v)) for t, v in other.points if wk.start <= t <= wk.reset]
+            if len(opts) < 2:
+                continue
+            cr.move_to(*opts[0])
+            for p in opts[1:]:
+                cr.line_to(*p)
+            cr.set_source_rgba(*rgba("accent", 0.8))
+            cr.set_line_width(1.0)
+            cr.stroke()
+
     # Now.
     if row.back == 0 and wk.start < now < wk.reset:
         cr.move_to(round(X(now)) + 0.5, y)
@@ -216,7 +395,7 @@ def peaks_chart(cr, x: float, y: float, w: float, h: float, row: Row) -> None:
     wk = row.week
     if wk is None:
         return
-    ceiling = Q.CEILING[row.pool]
+    ceiling = row.ceiling
 
     def X(t: float) -> float:
         return x + (t - wk.start) / Q.WEEK * w
@@ -416,8 +595,7 @@ def draw_deck(cr, m, now: float, back: int, sel: int, top: float, h: float) -> l
 def draw_card(cr, r: Row, now: float, x: float, y: float, w: float, h: float) -> None:
     # Info column.
     lw = text(cr, x + 4, y - 2, r.label, 22, "title" if r.active else "fg", bold=True)
-    name = r.account + (f" · {Q.ALIAS[r.account]}" if r.account in Q.ALIAS else "")
-    text(cr, x + 12 + lw, y + 1, name, 14, "title")
+    text(cr, x + 12 + lw, y + 1, r.name, 14, "title")
     pool_x = x + 12 + lw
     text(cr, pool_x, y + 17, r.pool + (" · active" if r.active else ""), 12, "max" if r.pool == "max" else "team")
 
@@ -446,7 +624,7 @@ def draw_card(cr, r: Row, now: float, x: float, y: float, w: float, h: float) ->
         cr.rectangle(x + 4, my, mw * min(100.0, r.u5) / 100, 5)
         cr.set_source_rgba(*rgba(r.five_colour() if r.five_colour() != "fg" else "pace"))
         cr.fill()
-    ceiling = Q.CEILING[r.pool]
+    ceiling = r.ceiling
     cr.rectangle(x + 4 + mw * ceiling / 100, my - 2, 1, 9)
     cr.set_source_rgba(*rgba("warn", 0.7))
     cr.fill()
@@ -489,6 +667,9 @@ def draw_card(cr, r: Row, now: float, x: float, y: float, w: float, h: float) ->
         proj = wk.projected(now) if r.back == 0 else None
         if proj is not None:
             label(proj, f"~{proj:.0f}%", r.colour)
+    for name, other in r.extra:
+        if other.points and wk.start <= other.points[-1][0] <= wk.reset:
+            label(other.used, f"{name} {other.used:.0f}%", "accent")
     label(Q.TARGET, f"{Q.TARGET:.0f}%", "pace")
 
 
@@ -509,6 +690,8 @@ def model():
         return cache[key]
 
     store.weeks = weeks
+    m.agy = AgyHistory()
+    m.agy.load()
     return m
 
 
@@ -531,12 +714,15 @@ class Quota:
                 return os.stat(p).st_mtime
             except OSError:
                 return 0.0
-        key = (mt(Q.CSV), mt(Q.SNAPSHOT), mt(ACCOUNT_FILE), int(time.time() // 60))
+        key = (mt(Q.CSV), mt(Q.SNAPSHOT), mt(AGY_HISTORY), mt(Q.AGY_SNAPSHOT), mt(ACCOUNT_FILE),
+               int(time.time() // 60))
         if key == self.seen:
             return False
         self.seen = key
         if self.m.store.load():
             self.trim(time.time())
+        if self.m.agy.load():
+            self.m.agy.trim(time.time() - self.KEEP_S)
         return True
 
     KEEP_S = 36 * 86400  # five quota weeks: the panel's u/p history, and no more
