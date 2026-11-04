@@ -53,7 +53,7 @@ done
 # main2 is the second Max account (~/claude-main2, 1 Oct 2026): P2 pairs it with
 # private's P. The same pins live in claw's CLAW_TAGS (.zshrc), cmon's SESSION_TAGS
 # and qtop's LETTER — keep all four in step.
-declare -A LABELS=([work]=W [private]=P [main2]=P2 [builder]=B [sales]=S [success]=CS)
+declare -A LABELS=([work]=W [private]=P [main2]=P2 [builder]=B [sales]=S [success]=CS [marketing]=M)
 
 # Auto-label the remaining discovered accounts by initial, lengthening the prefix
 # until no two of them collide: `sales` and `success` both wanted "S", and the bar

@@ -14,7 +14,7 @@
 # these in step with it. There, "work" is ~/claude-prim under its legacy name
 # and "private" is the real HOME, so claw translates prim → work.
 # main2 is the second Max account (~/claude-main2, 1 Oct 2026): P2, next to private's P.
-typeset -gA CLAW_TAGS=([work]=W [private]=P [main2]=P2 [builder]=B [sales]=S [success]=CS)
+typeset -gA CLAW_TAGS=([work]=W [private]=P [main2]=P2 [builder]=B [sales]=S [success]=CS [marketing]=M)
 
 # From the passwd entry, not $HOME: a nested claw (inside a session that already
 # overrode HOME) must still find the homes next to the real one.
