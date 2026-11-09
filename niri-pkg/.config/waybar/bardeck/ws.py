@@ -226,11 +226,15 @@ def claude_grid(cr, x: float, scale: float) -> tuple[float, float, float]:
     return cell, sx, sy
 
 
-def draw_claude(cr, x: float, scale: float, state: str | None) -> float:
+def draw_claude(cr, x: float, scale: float, state: str | None, on_accent: bool = False) -> float:
     cell, x, y = claude_grid(cr, x, scale)
     alpha, dot = CLAUDE_LOOK.get(state or "", (1.0, None))
-    for cells, colour in ((CLAUDE_BODY, CLAUDE_COLOR), (CLAUDE_EYES, (0.08, 0.08, 0.08))):
-        cr.set_source_rgba(*colour, alpha)
+    body, eyes = (CLAUDE_COLOR, alpha), ((0.08, 0.08, 0.08), alpha)
+    if alpha < 1 and on_accent:
+        # Faded pink on the accent is mud: a dark shape with pink eyes reads as "resting".
+        body, eyes = (rgba("bg")[:3], 0.55), (CLAUDE_COLOR, 1.0)
+    for cells, (colour, a) in ((CLAUDE_BODY, body), (CLAUDE_EYES, eyes)):
+        cr.set_source_rgba(*colour, a)
         for cx, cy, cw, ch in cells:
             cr.rectangle(x + cx * cell, y + cy * cell, cw * cell, ch * cell)
         cr.fill()
@@ -431,7 +435,7 @@ class WsStrip:
     def _mark(self, cr, x: float, w: dict, fg: str, scale: float, on_accent: bool) -> None:
         d = self.describe(w)
         if d[0] == "claude":
-            draw_claude(cr, x, scale, d[1])
+            draw_claude(cr, x, scale, d[1], on_accent)
             return
         if d[0] in ("letters", "glyph"):
             # A chip of the strip's own dark, so every tone reads on the accent too.

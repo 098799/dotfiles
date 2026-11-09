@@ -101,11 +101,12 @@ class AudioStrip:
             c.icon(GLYPH_MUTED, "dim", 15, after=3)
             c.text("no sound", "dim")
         else:
-            c.icon(vol_glyph(sink.vol, sink.mute), "hit" if sink.mute else "title", 15, after=3)
+            c.icon(vol_glyph(sink.vol, sink.mute), "dim" if sink.mute else "title", 15, after=3)
             c.text(f"{sink.vol}%", "dim" if sink.mute else ("warn" if sink.vol > 100 else "title"))
         if src is not None:
             c.gap(8)
-            c.icon(GLYPH_MIC_OFF if src.mute else GLYPH_MIC, "hit" if src.mute else "ok", 15, after=0)
+            # Muted is the quiet, safe state: dim. Red stays for trouble.
+            c.icon(GLYPH_MIC_OFF if src.mute else GLYPH_MIC, "dim" if src.mute else "ok", 15, after=0)
         p = a.mpris.playing()
         if p is not None:
             c.gap(10)

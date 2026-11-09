@@ -23,11 +23,14 @@ from .core import Hits, button, heading, rgba, text
 from .deck import Panel
 from .sample import Sampler
 
+# A speedometer per profile, slow to full (the strip shows only the glyph; the panel
+# the word too). Red stays for trouble: performance is orange, not red.
 PROFILE = {
-    "low-power": ("󰌪", "lo", "aqua"),
-    "balanced": ("󰛲", "bal", "warn"),
-    "performance": ("󱐋", "hi", "hit"),
+    "low-power": ("\U000f0f86", "lo", "aqua"),
+    "balanced": ("\U000f0f85", "bal", "fg"),
+    "performance": ("\U000f04c5", "hi", "orange"),
 }
+GLYPH_BOOST = "\U000f14de"  # a rocket: CPU boost on
 
 
 def bat_glyph(cap: int, status: str) -> str:
@@ -122,12 +125,10 @@ class PowerStrip:
                 c.icon("", "dim", 12, after=0)  # plugged in, held at the charge limit
             c.gap(10)
         glyph, label, tone = PROFILE.get(s.profile, ("?", s.profile or "?", "fg"))
-        c.icon(glyph, tone, 15, after=2 if variant == "full" else 0)
-        if variant == "full":
-            c.text(label, tone)
+        c.icon(glyph, tone, 15, after=0)
         if s.boost == "1":
             c.gap(6)
-            c.icon("󰓅", "hit", 14, after=0)
+            c.icon(GLYPH_BOOST, "orange", 14, after=0)
         if self.caffeine.on:
             c.gap(7)
             c.icon(GLYPH_CUP, "warn", 14, after=0)

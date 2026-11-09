@@ -117,14 +117,22 @@
         "on-click-middle": "dunstctl set-paused toggle",
         "on-click-right": "dunstctl history-pop"
     },
-    // Panel: the Claude agent sessions (waiting ones first; click: a terminal attached
-    // to its tmux session), slotq's queue, Tomek's open MRs (click: the browser).
-    // bardeck/agents.py; it reads rcmon (GitLab only while rcmon is down). Right: cmon.
-    "cffi/agents": {
+    // The meeting on now, or the next one within 12 h, as a countdown (bardeck/next.py,
+    // the clock panel's calendar feeds). No pill when nothing is coming. Click: join it.
+    // No panel, so no hover.
+    "cffi/next": {
         "module_path": "/home/tgrining/.config/waybar/bar-strip.so",
-        "strip": "agents", "variant": "full", "scale": 1,
-        "on-click-right": "alacritty -e ~/bin/cmon"
+        "strip": "next", "variant": "full", "scale": 1, "hover-ms": 0
     },
 
-    "tray": { "spacing": 8, "icon-size": 16 }
+    // Tray icons in the bar's own colour: bardeck draws them (main.write_tray_icons,
+    // with theme.css, so they follow the theme). Slack keeps its own: its unread mark.
+    "tray": {
+        "spacing": 8, "icon-size": 16,
+        "icons": {
+            "blueman": "/home/tgrining/.config/waybar/tray/blueman.png",
+            "nm-applet": "/home/tgrining/.config/waybar/tray/nm-applet.png",
+            "CopyQ_copyq": "/home/tgrining/.config/waybar/tray/copyq.png"
+        }
+    }
 }

@@ -23,3 +23,4 @@ webkit/snippets/mr-reviewer-keys/
 niri-pkg/.config/waybar/bar-strip.so
 # written by bardeck for the current theme
 niri-pkg/.config/waybar/theme.css
+niri-pkg/.config/waybar/tray/

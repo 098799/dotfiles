@@ -189,8 +189,35 @@ class Thumbs:
             GLib.idle_add(lambda: self.ready() or False)
 
 
+THUMB_H = 16
+_THUMBS: dict[tuple, cairo.ImageSurface | None] = {}
+
+
+def thumb(path: str, scale: float) -> cairo.ImageSurface | None:
+    """The wallpaper, cut to 16:9 and THUMB_H high, at the strip's device scale."""
+    key = (path, scale)
+    if key not in _THUMBS:
+        _THUMBS.clear()  # one wallpaper at a time: keep only the current one
+        try:
+            import gi
+
+            gi.require_version("Gdk", "3.0")
+            from gi.repository import Gdk, GdkPixbuf
+
+            h = round(THUMB_H * scale)
+            pix = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, -1, h, True)
+            w = round(h * 16 / 9)
+            if pix.get_width() > w:  # a wide wallpaper: its middle
+                pix = pix.new_subpixbuf((pix.get_width() - w) // 2, 0, w, pix.get_height())
+            _THUMBS[key] = Gdk.cairo_surface_create_from_pixbuf(pix, scale, None)
+        except Exception as err:  # noqa: BLE001 — a missing or odd file: the plain icon
+            core.log(f"wallpaper thumb: {err!r}")
+            _THUMBS[key] = None
+    return _THUMBS[key]
+
+
 class WallStrip:
-    """The pill: a picture icon, the design on screen, and a pin when it is pinned.
+    """The pill: a thumbnail of the wallpaper on screen, and a pin when it is pinned.
     Hover: the panel; click: pinned open."""
 
     name = "wallpaper"
@@ -202,14 +229,30 @@ class WallStrip:
         return palette, m.group(1) if m else "", pin_of(palette, mode)
 
     def key(self, variant: str):
-        return self.state()
+        return self.state(), current_file()
 
     def draw(self, variant: str, scale: int):
         palette, design, pin = self.state()
         cv = core.StripCanvas(scale)
-        cv.icon(GLYPH_WALL, "fg", 15, after=4 if design else 0)
-        if design:
-            cv.text(design, "fg2", 12)
+        surf = thumb(current_file(), scale)
+        if surf is not None:
+            w = surf.get_width() / scale
+            cr, y = cv.cr, core.MID - THUMB_H / 2
+            cr.save()
+            core.rrect(cr, cv.x, y, w, THUMB_H, 3)
+            cr.clip()
+            cr.set_source_surface(surf, cv.x, y)
+            cr.paint()
+            cr.restore()
+            core.rrect(cr, cv.x + 0.5, y + 0.5, w - 1, THUMB_H - 1, 3)
+            cr.set_source_rgba(*rgba("rim"))
+            cr.set_line_width(1)
+            cr.stroke()
+            cv.x += w
+        else:
+            cv.icon(GLYPH_WALL, "fg", 15, after=4 if design else 0)
+            if design:
+                cv.text(design, "fg2", 12)
         if pin:
             cv.gap(4)
             cv.icon(GLYPH_PIN, "accent", 12, after=0)

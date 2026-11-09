@@ -348,6 +348,22 @@ def short_error(err: Exception) -> str:
 # ── the strip ────────────────────────────────────────────────────────────────
 
 
+def screen_shape(cr, x: float, w: float, h: float, tone: str, on: bool) -> float:
+    """A small monitor: a rounded screen on a stand, centred on the bar's middle."""
+    top = core.MID - (h + 3) / 2
+    core.rrect(cr, x + 0.5, top + 0.5, w - 1, h - 1, 1.5)
+    cr.set_line_width(1.2)
+    if on:
+        cr.set_source_rgba(*rgba(tone, 0.9))
+        cr.fill_preserve()
+    cr.set_source_rgba(*rgba(tone))
+    cr.stroke()
+    cr.rectangle(x + w / 2 - 0.6, top + h, 1.2, 2)
+    cr.rectangle(x + w / 2 - 2.5, top + h + 2, 5, 1)
+    cr.fill()
+    return w
+
+
 class DispStrip:
     name = "disp"
 
@@ -358,17 +374,24 @@ class DispStrip:
         d = self.d
         d.read(max_age=1.5)
         d.expire()
-        return (len(d.live_names()), len(d.outputs), d.pending is not None, bool(d.running))
+        return (tuple(sorted(d.live_names())), tuple(sorted(d.outputs)), d.pending is not None, bool(d.running))
 
     def draw(self, variant: str, scale: int):
         d = self.d
         c = core.StripCanvas(scale)
-        n, total = len(d.live_names()), len(d.outputs)
-        tone = "warn" if (d.pending or d.running) else ("title" if n else "hit")
-        c.icon(GLYPH_MULTI if n > 1 else GLYPH_MONITOR, tone, 15, after=3)
-        c.text(str(n), "title" if n else "hit")
-        if variant == "full" and total > n:  # connected but off
-            c.text(f"/{total}", "dim", size=11)
+        live = set(d.live_names())
+        tone = "warn" if (d.pending or d.running) else ("title" if live else "hit")
+        # One little screen per connected output, sized by its panel (the 27" big,
+        # the laptop small): filled when on, an outline when off.
+        outs = sorted(d.outputs.values(), key=lambda o: -((o.get("physical_size") or [0, 0])[0]))
+        for i, o in enumerate(outs):
+            pw, ph = o.get("physical_size") or [300, 190]
+            h = 9.0 if pw >= 450 else 7.0
+            w = h * (pw / ph if pw and ph else 1.6)
+            c.x += screen_shape(c.cr, c.x, w, h, tone if o.get("name") in live else "dim",
+                                o.get("name") in live) + (5 if i < len(outs) - 1 else 0)
+        if not outs:
+            c.icon(GLYPH_MONITOR, "hit", 15, after=0)
         return c.finish()
 
 

@@ -8,9 +8,10 @@
                                        (palette: the launcher, clip: the clipboard history)
     BARDECK_TRACE=1 bardeck daemon     print how long each panel takes to open
 
-STRIP / PANEL: quota sys net dev cam audio power disp notif agents clock ws (ws: a strip per output; its panel,
-the overview, opens on a right click).
-Panels with no strip, opened by key only: palette clip.
+STRIP / PANEL: quota sys net dev cam audio power disp notif clock ws (ws: a strip per output; its panel,
+the overview, opens on a right click). Strip with no panel: next (the meeting on now or next; a click
+joins it). Panels with no strip, opened by key only: palette clip agents (its model still feeds ws's
+Claude marks; the agents pill left the bar on 9 Nov 2026).
 
 Waybar shows each strip with bar-strip.so (bar-strip.c), which loads the pictures (raw ARGB) from
 $XDG_RUNTIME_DIR/bardeck (raw ARGB, core.write_strip) and sends hover / click / scroll to this daemon's socket
@@ -52,11 +53,33 @@ def write_css() -> bool:
     """theme.css for the current theme; True when it changed."""
     css = core.theme_css()
     if core.read(THEME_CSS) == css.strip():
+        write_tray_icons()  # only the missing ones
         return False
+    write_tray_icons(force=True)
     with open(f"{THEME_CSS}.tmp", "w") as fh:
         fh.write(css)
     os.replace(f"{THEME_CSS}.tmp", THEME_CSS)
     return True
+
+
+TRAY_DIR = f"{core.REAL_HOME}/.config/waybar/tray"
+# Tray item id (modules.jsonc "tray.icons") -> the Nerd Font glyph drawn for it.
+TRAY_ICONS = {"blueman": "\U000f00af", "nm-applet": "\U000f05a9", "copyq": "\U000f0147"}
+
+
+def write_tray_icons(force: bool = False) -> None:
+    """The tray's icons in the bar's own colour (the theme's fg), so they read as one set."""
+    import cairo
+
+    os.makedirs(TRAY_DIR, exist_ok=True)
+    for name, glyph in TRAY_ICONS.items():
+        path = f"{TRAY_DIR}/{name}.png"
+        if os.path.exists(path) and not force:
+            continue
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, 64, 64)
+        core.icon(cairo.Context(surf), 32, 32, glyph, 44, "fg", align=0.5)
+        surf.write_to_png(f"{path}.tmp")
+        os.replace(f"{path}.tmp", path)
 
 
 def reload_waybar() -> None:
@@ -75,6 +98,7 @@ def build(with_ws: bool = True):
     from .displays import DispPanel, DispStrip, Displays
     from .lid import Lid
     from .net import NetPanel, NetStrip
+    from .next import NextStrip
     from .notif import Dunst, NotifPanel, NotifStrip
     from .palette import PalettePanel
     from .power import PowerPanel, PowerStrip
@@ -96,6 +120,7 @@ def build(with_ws: bool = True):
         quota = None
     dunst = Dunst()
     agents = Agents()
+    clock_panel = ClockPanel()  # its agenda feeds the next-meeting strip too
     cam = Cam()
     strips = {
         "sys": (SysStrip(s), 1),
@@ -105,13 +130,14 @@ def build(with_ws: bool = True):
         "audio": (AudioStrip(audio), 5),  # drawn on its own events too (watch)
         "disp": (DispStrip(disp), 2),
         "clock": (ClockStrip(), 1),
+        "next": (NextStrip(clock_panel.agenda), 1),  # key(): redrawn once a minute or on a new feed
         "notif": (NotifStrip(dunst), 1),
         "agents": (AgentsStrip(agents), 5),  # drawn on rcmon's answers too (watch)
         "cam": (CamStrip(cam), 5),  # drawn on fakecam's answers (watch: its own thread)
         "wallpaper": (WallStrip(), 5),  # two small file reads; key() skips a redraw when unchanged
     }
     panels = {p.name: p for p in (SystemPanel(s), NetPanel(s), DevPanel(s), PowerPanel(s, caffeine, lid),
-                                  AudioPanel(audio), ClockPanel(), DispPanel(disp), WsPanel())}
+                                  AudioPanel(audio), clock_panel, DispPanel(disp), WsPanel())}
     panels["notif"] = NotifPanel(dunst)
     panels["agents"] = AgentsPanel(agents)
     panels["cam"] = CamPanel(cam)
@@ -301,6 +327,10 @@ class Daemon:
                 self.ws.click(key, local)
             elif verb in ("scroll-up", "scroll-down"):
                 self.ws.scroll(verb == "scroll-up")
+            return
+        if strip == "next":  # no panel: a click joins the meeting
+            if verb == "click":
+                self.strips["next"][0].click()
             return
         if verb in ("scroll-up", "scroll-down") and hasattr(self.strips.get(strip, (None,))[0], "scroll"):
             self.strips[strip][0].scroll(verb == "scroll-up")  # audio: the volume
