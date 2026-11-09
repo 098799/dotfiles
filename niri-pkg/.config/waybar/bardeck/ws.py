@@ -2,7 +2,8 @@
 
 Each workspace with windows (and the visible one) is a chip: its name, then one mark
 per column in column order: the app's icon, or for a terminal the first letters of
-its title (seven Alacritty icons say nothing; "cm cl nv" does). The focused column is
+its title (seven Alacritty icons say nothing; "cm cl nv" does), or Claude's mascot
+when the terminal runs Claude Code (directly, or in the pane its tmux client shows). The focused column is
 underlined. Click a chip: that workspace. Click a mark: that window. Scroll: the
 next / previous workspace. Right click: the overview (WsPanel), every workspace of
 every output with its windows.
@@ -18,7 +19,9 @@ import json
 import math
 import os
 import socket
+import subprocess
 import threading
+import time
 
 import cairo
 import gi
@@ -98,6 +101,79 @@ def app_icon(app_id: str, scale: float):
             surf = None
     _ICONS[key] = surf
     return surf
+
+
+# Claude Code's mascot, 12 x 8 cells: body, arms, eyes, four legs.
+CLAUDE_BODY = [(1, 0, 10, 6), (0, 2, 1, 2), (11, 2, 1, 2), (2, 6, 1, 2), (4, 6, 1, 2), (7, 6, 1, 2), (9, 6, 1, 2)]
+CLAUDE_EYES = [(3, 1, 1, 2), (8, 1, 1, 2)]
+CLAUDE_COLOR = (0xDE / 255, 0x85 / 255, 0x80 / 255)  # as Claude Code draws it in this terminal theme
+_TMUX: tuple[float, dict[int, str]] = (0.0, {})
+
+
+def tmux_clients() -> dict[int, str]:
+    """tmux client pid -> the command of the pane it shows. Cached for two seconds."""
+    global _TMUX
+    if time.monotonic() - _TMUX[0] < 2:
+        return _TMUX[1]
+    out: dict[int, str] = {}
+    try:
+        res = subprocess.run(["tmux", "list-clients", "-F", "#{client_pid} #{pane_current_command}"],
+                             capture_output=True, text=True, timeout=0.3)
+        for line in res.stdout.splitlines():
+            pid, _, cmd = line.partition(" ")
+            if pid.isdigit():
+                out[int(pid)] = cmd
+    except (OSError, subprocess.SubprocessError):
+        pass
+    _TMUX = (time.monotonic(), out)
+    return out
+
+
+def _children(pid: int) -> list[int]:
+    try:
+        with open(f"/proc/{pid}/task/{pid}/children") as f:
+            return [int(c) for c in f.read().split()]
+    except OSError:
+        return []
+
+
+def _comm(pid: int) -> str:
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def runs_claude(pid: int | None) -> bool:
+    """Does this terminal show Claude Code: directly, or through a tmux client?"""
+    if not pid:
+        return False
+    clients = None
+    todo, seen = [pid], 0
+    while todo and seen < 64:
+        p = todo.pop()
+        seen += 1
+        comm = _comm(p)
+        if comm == "claude":
+            return True
+        if comm.startswith("tmux"):
+            if clients is None:
+                clients = tmux_clients()
+            if clients.get(p) == "claude":
+                return True
+        todo.extend(_children(p))
+    return False
+
+
+def draw_claude(cr, x: float, y: float, size: float) -> None:
+    cell = size / 12
+    y += (size - 8 * cell) / 2
+    for cells, colour in ((CLAUDE_BODY, CLAUDE_COLOR), (CLAUDE_EYES, (0.08, 0.08, 0.08))):
+        cr.set_source_rgb(*colour)
+        for cx, cy, cw, ch in cells:
+            cr.rectangle(x + cx * cell, y + cy * cell, cw * cell, ch * cell)
+        cr.fill()
 
 
 def term_letters(title: str) -> str:
@@ -238,11 +314,16 @@ class WsStrip:
 
     def _mark_w(self, cr, w: dict) -> float:
         if (w.get("app_id") or "").lower() in TERMINALS:
+            if runs_claude(w.get("pid")):
+                return ICON
             return max(14, core.text_w(cr, term_letters(w.get("title", "")), 11) + 6)
         return ICON
 
     def _mark(self, cr, x: float, w: dict, fg: str, scale: int, on_accent: bool) -> None:
         app = w.get("app_id") or ""
+        if app.lower() in TERMINALS and runs_claude(w.get("pid")):
+            draw_claude(cr, x, MID - ICON / 2, ICON)
+            return
         if app.lower() in TERMINALS:
             letters = term_letters(w.get("title", ""))
             mw = self._mark_w(cr, w)
