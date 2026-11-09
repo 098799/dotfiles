@@ -21,8 +21,10 @@ stub when it has no fresh reading). Six full cells took 636 px and pushed the cl
 off the screen; the panel (hover) still shows every account at full size.
 
 The panel: every account's week full size, its 5h peaks against burn's ceiling, the
-pool totals. Pinned: u/p earlier/later week, i/o select, Enter or a click on a card
-opens `qtop <account>`.
+pool totals. Two columns: cc (Claude Code) and agy (Antigravity). Each has two
+sections: "main (private)" (the personal Max accounts: private, main2, agy's main)
+and "work (others)" (everything else). Pinned: u/p earlier/later week, i/o select
+(down each column, then the next), Enter or a click on a card opens `qtop <account>`.
 """
 
 from __future__ import annotations
@@ -506,23 +508,73 @@ def draw_strip(rs: list[Row], now: float, variant: str, scale: int):
 
 # ── the deck (the drop-down) ─────────────────────────────────────────────────
 
-DECK_W = 860
-HEAD_H = 46
-CARD_H = 112
-FOOT_H = 26
-INFO_W = 230
 PAD = 14
+INFO_W = 230
+COL_GAP = 56  # between the two columns; the divider runs down its middle
+DECK_W = 1320
+COL_W = (DECK_W - 2 * PAD - COL_GAP) // 2
+HEAD_H = 46
+COLHEAD_H = 26  # the column titles, under the header and not scrolled
+TOP_H = HEAD_H + COLHEAD_H  # where the cards' band starts
+CARD_H = 112
+SEC_H = 28  # a section's header: "main (private)"
+EMPTY_H = 24  # an empty section's one dim line
+FOOT_H = 26
 SCROLL_STEP = 48  # px per wheel notch (PgUp/PgDn move a whole band)
 
+# The columns: qtop's Claude accounts, then agy's (the AGY_KEY ones).
+COLUMNS = (("cc", "cc · Claude Code", False), ("agy", "agy · Antigravity", True))
+# The personal Max accounts: the "main (private)" section. agy's home main is one too.
+PRIVATE = ("private", "main2")
+SECTIONS = ("main (private)", "work (others)")
 
-def deck_size(n: int) -> tuple[int, int]:
-    return DECK_W, HEAD_H + n * CARD_H + FOOT_H
+
+def is_private(account: str) -> bool:
+    if account.startswith(Q.AGY_KEY):
+        home = account[len(Q.AGY_KEY):]
+        return Q.AGY_NAME.get(home, home) == "private"
+    return account in PRIVATE
 
 
-def draw_deck(cr, m, now: float, back: int, sel: int, top: float, h: float) -> list[tuple[str, float, float]]:
-    """Draw the deck at (0, 0), h tall. The header and footer stay; the cards scroll
-    `top` px under the header. Returns (account, y0, y1) per visible card, for clicks."""
-    rs = rows(m, now, back)
+def sections(accounts: list[str]) -> list[tuple[str, list[tuple[str, list[str]]]]]:
+    """Each column as (title, [(section title, its accounts)]), in the order drawn."""
+    out = []
+    for _, title, is_agy in COLUMNS:
+        mine = [a for a in accounts if a.startswith(Q.AGY_KEY) == is_agy]
+        out.append((title, [(SECTIONS[0], [a for a in mine if is_private(a)]),
+                            (SECTIONS[1], [a for a in mine if not is_private(a)])]))
+    return out
+
+
+def order(accounts: list[str]) -> list[str]:
+    """The accounts in the order i/o step through them: column by column, section by section."""
+    return [a for _, secs in sections(accounts) for _, accts in secs for a in accts]
+
+
+def layout(accounts: list[str]) -> tuple[dict[str, tuple[float, float]], list[tuple[float, float, str, bool]], float]:
+    """(each card's (x, y) in the band, each section's (x, y, title, empty), the band's height)."""
+    pos: dict[str, tuple[float, float]] = {}
+    heads: list[tuple[float, float, str, bool]] = []
+    tallest = 0.0
+    for ci, (_, secs) in enumerate(sections(accounts)):
+        x = PAD + ci * (COL_W + COL_GAP)
+        y = 0.0
+        for title, accts in secs:
+            heads.append((x, y, title, not accts))
+            y += SEC_H + (0.0 if accts else EMPTY_H)
+            for a in accts:
+                pos[a] = (x, y)
+                y += CARD_H
+        tallest = max(tallest, y)
+    return pos, heads, tallest
+
+
+def draw_deck(cr, m, now: float, back: int, sel: str | None, top: float, h: float) -> list[tuple[str, float, float, float]]:
+    """Draw the deck at (0, 0), h tall. The header, the column titles and the footer stay;
+    the cards scroll `top` px under the column titles. Returns (account, x, y0, y1) per
+    visible card, for clicks."""
+    rs = {r.account: r for r in rows(m, now, back)}
+    accts = list(rs)
     w = DECK_W
     core.panel_frame(cr, w, h)
 
@@ -550,39 +602,64 @@ def draw_deck(cr, m, now: float, back: int, sel: int, top: float, h: float) -> l
     pools = "".join(t for t, _ in Q.pool_summary(m, now)).strip()
     text(cr, PAD, 27, pools or " ", 12, "fg")
 
-    # The cards scroll between the header and the footer: clip them to that band.
+    # The two columns: a title each (fixed), a divider between them.
     bottom = h - FOOT_H
+    for ci, (title, _) in enumerate(sections(accts)):
+        text(cr, PAD + ci * (COL_W + COL_GAP) + 4, HEAD_H + 6, title, 14, "title", bold=True)
+    cr.move_to(w / 2 + 0.5, HEAD_H)
+    cr.line_to(w / 2 + 0.5, bottom)
+    cr.set_source_rgba(*rgba("sep", 0.7))
+    cr.set_line_width(1)
+    cr.stroke()
+
+    # The cards and section headers scroll between the column titles and the footer:
+    # clip them to that band.
+    pos, heads, tallest = layout(accts)
     hits = []
     cr.save()
-    cr.rectangle(0, HEAD_H, w, bottom - HEAD_H)
+    cr.rectangle(0, TOP_H, w, bottom - TOP_H)
     cr.clip()
-    for i, r in enumerate(rs):
-        y0 = HEAD_H + i * CARD_H - top
-        if y0 + CARD_H <= HEAD_H or y0 >= bottom:
+    for x, y, title, empty in heads:
+        y0 = TOP_H + y - top
+        if y0 + SEC_H <= TOP_H or y0 >= bottom:
+            continue
+        text(cr, x + 4, y0 + 7, title, 13, "fg", bold=True)
+        cr.move_to(x, y0 + SEC_H - 0.5)
+        cr.line_to(x + COL_W, y0 + SEC_H - 0.5)
+        cr.set_source_rgba(*rgba("sep"))
+        cr.set_line_width(1)
+        cr.stroke()
+        if empty:
+            text(cr, x + 4, y0 + SEC_H + 4, "none", 12, "dim")
+    for account in accts:
+        x, y = pos[account]
+        r = rs[account]
+        y0 = TOP_H + y - top
+        if y0 + CARD_H <= TOP_H or y0 >= bottom:
             continue  # off the band: drawn nowhere, clickable nowhere
-        hits.append((r.account, max(y0, HEAD_H), min(y0 + CARD_H, bottom)))
-        cr.move_to(PAD, y0 + 0.5)
-        cr.line_to(w - PAD, y0 + 0.5)
+        hits.append((account, x, max(y0, TOP_H), min(y0 + CARD_H, bottom)))
+        cr.move_to(x, y0 + 0.5)
+        cr.line_to(x + COL_W, y0 + 0.5)
         cr.set_source_rgba(*rgba("sep", 0.7))
         cr.set_line_width(1)
         cr.stroke()
-        if i == sel:
-            cr.rectangle(1, y0 + 1, w - 2, CARD_H - 1)
+        if account == sel:
+            cr.rectangle(x + 1, y0 + 1, COL_W - 2, CARD_H - 1)
             cr.set_source_rgba(*rgba("alt", 0.45))
             cr.fill()
         if r.active:
-            cr.rectangle(1, y0 + 8, 3, CARD_H - 16)
+            cr.rectangle(x + 1, y0 + 8, 3, CARD_H - 16)
             cr.set_source_rgba(*rgba("accent"))
             cr.fill()
-        draw_card(cr, r, now, PAD, y0 + 8, w - 2 * PAD, CARD_H - 16)
+        draw_card(cr, r, now, x + PAD, y0 + 8, COL_W - 2 * PAD, CARD_H - 16)
     cr.restore()
 
     # A thin thumb at the right edge while the cards overflow the band.
-    span, content = bottom - HEAD_H, len(rs) * CARD_H
+    span, content = bottom - TOP_H, tallest
     if content > span:
         track = span - 8
         thumb = max(24.0, track * span / content)
-        ty = HEAD_H + 4 + (track - thumb) * top / (content - span)
+        ty = TOP_H + 4 + (track - thumb) * top / (content - span)
         rrect(cr, w - 6, ty, 3, thumb, 1.5)
         cr.set_source_rgba(*rgba("accent", 0.6))
         cr.fill()
@@ -751,11 +828,11 @@ class QuotaPanel(Panel):
 
     def __init__(self, quota: Quota):
         self.q = quota
-        self.back, self.sel = 0, -1
-        self.top = 0.0  # the cards' scroll, px, under the header
+        self.back, self.sel = 0, None  # sel: the selected account's name
+        self.top = 0.0  # the cards' scroll, px, under the column titles
 
     def content_h(self) -> int:
-        return deck_size(len(self.q.m.accounts()))[1]
+        return int(TOP_H + layout(self.q.m.accounts())[2] + FOOT_H)
 
     def room(self) -> float:
         """The panel's height the output leaves it, in panel px (before the zoom).
@@ -768,21 +845,22 @@ class QuotaPanel(Panel):
         return (full - margin - 12) / self.deck.zoom
 
     def size(self):
-        h = min(self.content_h(), max(self.room(), HEAD_H + CARD_H + FOOT_H))
+        h = min(self.content_h(), max(self.room(), TOP_H + CARD_H + FOOT_H))
         return DECK_W, int(h)
 
     def card_span(self) -> float:
         """The height the cards show at once."""
-        return self.size()[1] - HEAD_H - FOOT_H
+        return self.size()[1] - TOP_H - FOOT_H
 
     def max_top(self) -> float:
-        return max(0.0, len(self.q.m.accounts()) * CARD_H - self.card_span())
+        return max(0.0, layout(self.q.m.accounts())[2] - self.card_span())
 
     def follow(self) -> None:
         """Scroll so the selected card is in the band."""
-        if not 0 <= self.sel < len(self.q.m.accounts()):
+        pos = layout(self.q.m.accounts())[0]
+        if self.sel not in pos:
             return
-        y = self.sel * CARD_H
+        y = pos[self.sel][1]
         if y < self.top:
             self.top = y
         elif y + CARD_H > self.top + self.card_span():
@@ -792,7 +870,7 @@ class QuotaPanel(Panel):
     def opened(self) -> None:
         accts = self.q.m.accounts()
         active = read_active()
-        self.back, self.sel = 0, (accts.index(active) if active in accts else -1)
+        self.back, self.sel = 0, (active if active in accts else None)
         self.top = 0.0
         self.follow()
 
@@ -807,17 +885,19 @@ class QuotaPanel(Panel):
     def draw(self, cr, hits: core.Hits) -> None:
         self.top = min(max(self.top, 0.0), self.max_top())
         cards = draw_deck(cr, self.q.m, time.time(), self.back, self.sel, self.top, self.size()[1])
-        for account, y0, y1 in cards:
-            hits.add(0, y0, DECK_W, y1 - y0, lambda a=account: open_qtop(a))
+        for account, x, y0, y1 in cards:
+            hits.add(x, y0, COL_W, y1 - y0, lambda a=account: open_qtop(a))
 
     def key(self, key: str, ctrl: bool) -> bool:
-        n = len(self.q.m.accounts())
+        steps = order(self.q.m.accounts())
+        n = len(steps)
         if n == 0:
             return False
+        cur = steps.index(self.sel) if self.sel in steps else -1
         if key in ("i", "Down") or (ctrl and key == "n"):
-            self.sel = (self.sel + 1) % n
+            self.sel = steps[(cur + 1) % n]
         elif key in ("o", "Up") or (ctrl and key == "p"):
-            self.sel = (self.sel - 1) % n
+            self.sel = steps[cur - 1 if cur > 0 else n - 1]
         elif key in ("u", "Left") or (ctrl and key == "b"):
             self.back += 1
         elif key in ("p", "Right") or (ctrl and key == "f"):
@@ -826,10 +906,10 @@ class QuotaPanel(Panel):
             step = self.card_span() if key in ("Page_Down", "Next") else -self.card_span()
             self.top = min(max(self.top + step, 0.0), self.max_top())
             return True
-        elif key in ("Return", "KP_Enter") and 0 <= self.sel < n:
+        elif key in ("Return", "KP_Enter") and self.sel in steps:
             # "close": the panel lets go of the keyboard. With True it kept it, and a
             # repeating Enter opened a qtop per repeat (13 Oct 2026: 120 terminals in 3 s).
-            return "close" if open_qtop(self.q.m.accounts()[self.sel]) else True
+            return "close" if open_qtop(self.sel) else True
         else:
             return False
         self.follow()
