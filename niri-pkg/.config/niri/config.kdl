@@ -51,19 +51,19 @@ input {
 // walks this list). 9 and 10 are outside the cycle, so they go last. Named
 // workspaces are pinned to the top of every output; the `open-on-output` lines
 // are commented until the Wayland connector names are known (`niri msg outputs`).
-workspace "cmon"
+workspace "c"
 workspace "0"
 workspace "1"
 workspace "2"
 workspace "3"
 workspace "4"
 workspace "5"
-workspace "work"  // { open-on-output "DP-1"; }
-workspace "slack" // { open-on-output "DP-1"; }
+workspace "w"  // { open-on-output "DP-1"; }
+workspace "s" // { open-on-output "DP-1"; }
 workspace "6"
 workspace "7"
 workspace "8"
-workspace "priv"  // { open-on-output "DP-1"; }
+workspace "p"  // { open-on-output "DP-1"; }
 workspace "9"
 workspace "10"
 
