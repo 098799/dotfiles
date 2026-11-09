@@ -2,8 +2,12 @@
 
 Each workspace with windows (and the visible one) is a chip: its name, then one mark
 per column in column order: the app's icon, or for a terminal the first letters of
-its title (seven Alacritty icons say nothing; "cm cl nv" does), or Claude's mascot
-when the terminal runs Claude Code (directly, or in the pane its tmux client shows). The focused column is
+its title (seven Alacritty icons say nothing; "cm cl nv" does). The terminal's
+foreground command decides first (directly, or the pane its tmux client shows):
+Claude Code is its mascot, faded when it stopped, with an amber dot when it waits
+for you and a red one when it failed (the agents' model: rcmon plus a busy sample
+every 4 s); a common tool is a glyph (CMD_ICONS); the rest keep their letters, in
+a colour fixed per word. A browser window titled "rcmon ..." is rcmon's icon. The focused column is
 underlined. Click a chip: that workspace. Click a mark: that window. Scroll: the
 next / previous workspace. Right click: the overview (WsPanel), every workspace of
 every output with its windows.
@@ -22,6 +26,7 @@ import socket
 import subprocess
 import threading
 import time
+import zlib
 
 import cairo
 import gi
@@ -107,22 +112,54 @@ def app_icon(app_id: str, scale: float):
 CLAUDE_BODY = [(1, 0, 10, 6), (0, 2, 1, 2), (11, 2, 1, 2), (2, 6, 1, 2), (4, 6, 1, 2), (7, 6, 1, 2), (9, 6, 1, 2)]
 CLAUDE_EYES = [(3, 1, 1, 2), (8, 1, 1, 2)]
 CLAUDE_COLOR = (0xDE / 255, 0x85 / 255, 0x80 / 255)  # as Claude Code draws it in this terminal theme
-_TMUX: tuple[float, dict[int, str]] = (0.0, {})
+# What a Claude shows: (body alpha, dot tone). Working: full colour; it stopped:
+# faded; it waits for you: an amber dot; it failed (rate limit, error): a red dot.
+CLAUDE_LOOK = {"working": (1.0, None), "idle": (0.45, None), "done": (0.45, None),
+               "waiting": (1.0, "warn"), "error": (1.0, "hit")}
+
+# A terminal's foreground command -> (Nerd Font glyph, tone).
+_K8S, _SERVER, _ROBOT = "\U000f10fe", "\U000f048b", "\U000f06a9"
+CMD_ICONS = {
+    **dict.fromkeys(("kubectl", "k9s", "kubie", "stern", "helm"), (_K8S, "blue")),
+    "osh": (_K8S, "orange"),
+    **dict.fromkeys(("ssh", "mosh", "mosh-client", "et"), (_SERVER, "aqua")),
+    "prod": (_SERVER, "hit"),
+    **dict.fromkeys(("cmon", "cherd"), (_ROBOT, "ok")),
+    **dict.fromkeys(("htop", "btop", "top"), ("\U000f0a07", "ok")),
+    "qtop": ("\U000f029a", "warn"),
+    **dict.fromkeys(("nvim", "vim", "vi"), ("\ue62b", "ok")),
+    **dict.fromkeys(("emacs", "emacsclient"), ("\ue632", "purple")),
+    **dict.fromkeys(("python", "python3", "ipython"), ("\ue73c", "warn")),
+    **dict.fromkeys(("git", "lazygit", "tig"), ("\U000f02a2", "orange")),
+    **dict.fromkeys(("nmtui", "nmtui-connect"), ("\U000f05a9", "blue")),
+    **dict.fromkeys(("psql", "pgcli"), ("\ue76e", "blue")),
+    "docker": ("\U000f0868", "blue"),
+    **dict.fromkeys(("node", "npm", "npx"), ("\U000f0399", "ok")),
+    "aws": ("\U000f0e0f", "orange"),
+    **dict.fromkeys(("man", "less"), ("\U000f14f7", "fg")),
+}
+SHELLS = {"zsh", "bash", "sh", "fish", "dash"}
+# A browser window whose title starts with a key shows that app's icon (its .desktop).
+BROWSERS = {"google-chrome", "chromium", "firefox"}
+WEB_APPS = {"rcmon": "rcmon"}
+# The letters that remain: one fixed colour per word, so a tool keeps its colour.
+LETTER_TONES = ("blue", "aqua", "purple", "orange", "ok", "warn")
+_TMUX: tuple[float, dict[int, tuple[str, str]]] = (0.0, {})
 
 
-def tmux_clients() -> dict[int, str]:
-    """tmux client pid -> the command of the pane it shows. Cached for two seconds."""
+def tmux_clients() -> dict[int, tuple[str, str]]:
+    """tmux client pid -> (its session, the command of the pane it shows). Cached 2 s."""
     global _TMUX
     if time.monotonic() - _TMUX[0] < 2:
         return _TMUX[1]
-    out: dict[int, str] = {}
+    out: dict[int, tuple[str, str]] = {}
     try:
-        res = subprocess.run(["tmux", "list-clients", "-F", "#{client_pid} #{pane_current_command}"],
+        res = subprocess.run(["tmux", "list-clients", "-F", "#{client_pid}\t#{session_name}\t#{pane_current_command}"],
                              capture_output=True, text=True, timeout=0.3)
         for line in res.stdout.splitlines():
-            pid, _, cmd = line.partition(" ")
-            if pid.isdigit():
-                out[int(pid)] = cmd
+            parts = line.split("\t")
+            if len(parts) == 3 and parts[0].isdigit():
+                out[int(parts[0])] = (parts[1], parts[2])
     except (OSError, subprocess.SubprocessError):
         pass
     _TMUX = (time.monotonic(), out)
@@ -145,40 +182,66 @@ def _comm(pid: int) -> str:
         return ""
 
 
-def runs_claude(pid: int | None) -> bool:
-    """Does this terminal show Claude Code: directly, or through a tmux client?"""
-    if not pid:
-        return False
-    clients = None
-    todo, seen = [pid], 0
-    while todo and seen < 64:
-        p = todo.pop()
-        seen += 1
-        comm = _comm(p)
-        if comm == "claude":
-            return True
+def _tpgid(pid: int) -> int:
+    """The foreground process group of pid's terminal (its shell's job in front)."""
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return int(f.read().rsplit(")", 1)[1].split()[5])
+    except (OSError, IndexError, ValueError):
+        return 0
+
+
+def foreground(pid: int | None) -> tuple[str, str, int]:
+    """What a terminal window shows: (command, tmux session or "", that command's pid or 0).
+
+    The terminal's shell, then the job in front of it; a tmux client stands for the
+    pane its session shows (tmux list-clients)."""
+    for shell in _children(pid) if pid else []:
+        front = _tpgid(shell)
+        if front <= 0:
+            continue
+        comm = _comm(front)
         if comm.startswith("tmux"):
-            if clients is None:
-                clients = tmux_clients()
-            if clients.get(p) == "claude":
-                return True
-        todo.extend(_children(p))
-    return False
-
-
-def draw_claude(cr, x: float, y: float, size: float) -> None:
-    cell = size / 12
-    y += (size - 8 * cell) / 2
-    for cells, colour in ((CLAUDE_BODY, CLAUDE_COLOR), (CLAUDE_EYES, (0.08, 0.08, 0.08))):
-        cr.set_source_rgb(*colour)
-        for cx, cy, cw, ch in cells:
-            cr.rectangle(x + cx * cell, y + cy * cell, cw * cell, ch * cell)
-        cr.fill()
+            session, cmd = tmux_clients().get(front, ("", ""))
+            return cmd, session, 0
+        return comm, "", front
+    return "", "", 0
 
 
 def term_letters(title: str) -> str:
     word = (title or "").strip().split(" ")[0].split("/")[-1].lstrip("~:@") or "?"
     return word[:2].lower()
+
+
+def letter_tone(letters: str) -> str:
+    return LETTER_TONES[zlib.crc32(letters.encode()) % len(LETTER_TONES)]
+
+
+def claude_grid(cr, x: float, scale: float) -> tuple[float, float, float]:
+    """The mascot's cell and origin, on whole device pixels (sharp at 1.29 and 2)."""
+    scale = scale or 1
+    cell = max(1, round(ICON * scale / 12)) / scale
+    ox, oy = cr.user_to_device(x, MID - 4 * cell)
+    sx, sy = cr.device_to_user(round(ox * scale) / scale, round(oy * scale) / scale)
+    return cell, sx, sy
+
+
+def draw_claude(cr, x: float, scale: float, state: str | None) -> float:
+    cell, x, y = claude_grid(cr, x, scale)
+    alpha, dot = CLAUDE_LOOK.get(state or "", (1.0, None))
+    for cells, colour in ((CLAUDE_BODY, CLAUDE_COLOR), (CLAUDE_EYES, (0.08, 0.08, 0.08))):
+        cr.set_source_rgba(*colour, alpha)
+        for cx, cy, cw, ch in cells:
+            cr.rectangle(x + cx * cell, y + cy * cell, cw * cell, ch * cell)
+        cr.fill()
+    if dot:
+        cr.arc(x + 12 * cell - 1.5, y - 0.5, 3.2, 0, 2 * math.pi)
+        cr.set_source_rgba(*rgba("bg"))
+        cr.fill()
+        cr.arc(x + 12 * cell - 1.5, y - 0.5, 2.3, 0, 2 * math.pi)
+        cr.set_source_rgba(*rgba(dot))
+        cr.fill()
+    return 12 * cell
 
 
 class WsStrip:
@@ -194,6 +257,8 @@ class WsStrip:
         self.hits: dict[tuple, list[tuple[float, float, object]]] = {}  # (mx, my, variant) -> map
         self.widths: dict[tuple, float] = {}
         self._pending = False
+        self.agents = None  # the Agents model (agents.py), set by the daemon: Claude's state
+        self._desc: dict[tuple, tuple] = {}
         if os.environ.get("NIRI_SOCKET"):
             threading.Thread(target=self._events, daemon=True).start()
 
@@ -250,6 +315,7 @@ class WsStrip:
     def _draw(self, output: str, variant: str, scale: float, hidden: int):
         c = core.StripCanvas(scale)
         cr = c.cr
+        self._desc = {}
         wins_by_ws: dict[int, list[dict]] = {}
         for w in self.windows:
             wins_by_ws.setdefault(w.get("workspace_id"), []).append(w)
@@ -277,7 +343,7 @@ class WsStrip:
             # Compact (the laptop), or past BUDGET: fewer marks where you are not.
             n_marks = MAX_MARKS[variant] if (active or focused) else hidden
             marks = columns[:n_marks]
-            mw = sum(self._mark_w(cr, col[0]) + 3 for col in marks)
+            mw = sum(self._mark_w(cr, col[0], scale) + 3 for col in marks)
             more = len(columns) - len(marks) if marks else 0
             more_w = core.text_w(cr, f"+{more}", 11) + 3 if more > 0 else 0
             cw = 8 + lw + (6 + mw + more_w if marks else 0) + 6
@@ -293,7 +359,7 @@ class WsStrip:
             active_win = ws.get("active_window_id")
             for col in marks:
                 w0 = col[0]
-                mw1 = self._mark_w(cr, w0)
+                mw1 = self._mark_w(cr, w0, scale)
                 self._mark(cr, x, w0, fg, scale, on_accent=bool(focused))
                 if any(w["id"] == active_win for w in col) and len(columns) > 1:
                     core.rrect(cr, x, PILL_Y + PILL_H - 5, mw1, 2, 1)
@@ -312,26 +378,73 @@ class WsStrip:
         surf = c.finish()
         return surf, hits
 
-    def _mark_w(self, cr, w: dict) -> float:
-        if (w.get("app_id") or "").lower() in TERMINALS:
-            if runs_claude(w.get("pid")):
-                return ICON
-            return max(14, core.text_w(cr, term_letters(w.get("title", "")), 11) + 6)
+    def claude_state(self, session: str, pid: int) -> str | None:
+        """rcmon's word for this Claude, made quicker by the agents' own busy sample."""
+        m = self.agents
+        if m is None:
+            return None
+        a = next((a for a in m.agents if not a.remote
+                  and ((session and a.session == session) or (pid and a.pid == pid))), None)
+        if a is None:
+            return None
+        if a.group in ("waiting", "error"):
+            return a.group
+        busy = m.steady.get(a.pid)
+        if busy is None:
+            return a.group
+        if busy or (a.group == "working" and "subagent" in (a.words or "")):
+            return "working"
+        return "done" if a.group == "done" else "idle"
+
+    def describe(self, w: dict) -> tuple:
+        """("claude", state) | ("glyph", glyph, tone) | ("letters", s, tone) | ("app", app_id)."""
+        key = (w.get("id"), w.get("title"))
+        if key in self._desc:
+            return self._desc[key]
+        app = w.get("app_id") or ""
+        low, title = app.lower(), w.get("title") or ""
+        d: tuple = ("app", app)
+        if low in TERMINALS:
+            cmd, session, pid = foreground(w.get("pid"))
+            if cmd == "claude":
+                d = ("claude", self.claude_state(session, pid))
+            elif cmd in CMD_ICONS:
+                d = ("glyph", *CMD_ICONS[cmd])
+            else:
+                letters = term_letters(title)
+                d = ("letters", letters, letter_tone(letters))
+        elif low in BROWSERS:
+            for prefix, desktop in WEB_APPS.items():
+                if title.lower().startswith(prefix):
+                    d = ("app", desktop)
+        self._desc[key] = d
+        return d
+
+    def _mark_w(self, cr, w: dict, scale: float) -> float:
+        d = self.describe(w)
+        if d[0] == "claude":
+            return claude_grid(cr, 0, scale)[0] * 12
+        if d[0] == "letters":
+            return max(14, core.text_w(cr, d[1], 11) + 6)
         return ICON
 
-    def _mark(self, cr, x: float, w: dict, fg: str, scale: int, on_accent: bool) -> None:
-        app = w.get("app_id") or ""
-        if app.lower() in TERMINALS and runs_claude(w.get("pid")):
-            draw_claude(cr, x, MID - ICON / 2, ICON)
+    def _mark(self, cr, x: float, w: dict, fg: str, scale: float, on_accent: bool) -> None:
+        d = self.describe(w)
+        if d[0] == "claude":
+            draw_claude(cr, x, scale, d[1])
             return
-        if app.lower() in TERMINALS:
-            letters = term_letters(w.get("title", ""))
-            mw = self._mark_w(cr, w)
+        if d[0] in ("letters", "glyph"):
+            # A chip of the strip's own dark, so every tone reads on the accent too.
+            mw = self._mark_w(cr, w, scale)
             core.rrect(cr, x, MID - 8, mw, 16, 4)
-            cr.set_source_rgba(*rgba("bg" if on_accent else "bg1", 0.35 if on_accent else 1))
+            cr.set_source_rgba(*rgba("bg" if on_accent else "bg1", 0.85 if on_accent else 1))
             cr.fill()
-            text(cr, x + mw / 2, MID, letters, 11, fg, align=0.5, valign=0.5)
+            if d[0] == "glyph":
+                core.icon(cr, x + mw / 2, MID, d[1], 12, d[2], align=0.5)
+            else:
+                text(cr, x + mw / 2, MID, d[1], 11, d[2], align=0.5, valign=0.5)
             return
+        app = d[1]
         surf = app_icon(app, scale)
         if surf is None:
             text(cr, x + ICON / 2, MID, (app[:1] or "?").upper(), 12, fg, align=0.5, valign=0.5)

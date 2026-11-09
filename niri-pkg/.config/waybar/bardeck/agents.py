@@ -194,6 +194,7 @@ class Agents:
         self._pending = False       # an edge came inside EDGE_GAP_S: ask when it is over
         self._cpu: dict[int, tuple[float, int]] = {}     # pid -> (monotonic, ticks)
         self._busy: dict[int, bool] = {}                 # pid -> busy at the last sample
+        self.steady: dict[int, bool] = {}                # pid -> busy, two samples alike (ws.py's mascot)
         self._busy_asked: dict[int, bool] = {}           # pid -> busy when rcmon was last asked
         self._locks_mtime = 0.0
         self._queue_mtime = 0.0
@@ -258,7 +259,10 @@ class Agents:
 
     def _tick(self) -> bool:
         now = time.monotonic()
+        steady = dict(self.steady)
         edge = self._edges(now)
+        if self.steady != steady:
+            self.changed()  # a Claude in the bar fades or lights up now, not at rcmon's answer
         since = now - self._asked
         if self.open:
             due = since >= TICK_S - 0.5
@@ -289,6 +293,7 @@ class Agents:
             except (OSError, IndexError, ValueError):
                 if pid in self._cpu:  # it ended
                     del self._cpu[pid]
+                    self.steady.pop(pid, None)
                     edge = True
                 continue
             last = self._cpu.get(pid)
@@ -297,8 +302,10 @@ class Agents:
                 continue
             busy = (ticks - last[1]) / (now - last[0]) >= BUSY_TICKS_PER_S
             # Two samples alike before it counts: one busy second is not a turn.
-            if busy == self._busy.get(pid) and busy != self._busy_asked.get(pid, busy):
-                edge = True
+            if busy == self._busy.get(pid):
+                self.steady[pid] = busy
+                if busy != self._busy_asked.get(pid, busy):
+                    edge = True
             self._busy[pid] = busy
         return edge
 

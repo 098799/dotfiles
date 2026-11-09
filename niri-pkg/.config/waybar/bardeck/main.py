@@ -135,6 +135,8 @@ class Daemon:
         self.deck = Deck(self.panels)
         self.ws = WsStrip(self.draw_ws)
         self.panels["ws"].src = self.ws  # the overview reads the strip's niri state: no reads of its own
+        self.ws.agents = self.strips["agents"][0].m  # Claude's state on its mascot
+        self.ws.agents.watch(self.draw_ws)
         self.s.watch_bluez()
         self.panels["clip"].clip.watch()  # the one `wl-paste --watch` (clip.py)
         # A strip with its own event feed (audio: pactl subscribe, MPRIS) is drawn when
