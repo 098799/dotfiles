@@ -4,7 +4,8 @@ The strip: a webcam, red with "live" while a call has the camera, amber with
 "preview" while the control panel previews it, plain in standby (no browser; it
 wakes when a call opens the camera), crossed out when turned off (it stays off,
 even for a call), dim and crossed out when fakecam does not answer. An ear while
-Listen is on, a hand while Gestures are on.
+Listen is on, a hand while Gestures are on. A "CC" (red) while scribe writes a
+meeting transcript.
 
 The panel: what the cam app's panel (https://cam.p14s.grining.eu) and `cam` (rofi)
 can do that is worth a click in a meeting: Turn on / Turn off, which real camera
@@ -16,6 +17,13 @@ of the rest (FUN). Everything else is one click away on cam's board ("effects").
 effect fires with its own line (a commit message, a ticket, a random headline, a 1-minute
 timer — typing a line is for `cam`'s board and the web panel). The effect grids are
 emoji only; the one under the pointer is named next to its heading.
+
+Transcript: the panel's first row starts and stops scribe (~/scribe), the light
+meeting transcriber that runs without the camera: your microphone and the call's
+audio, Whisper on the CPU, a Markdown file agents read with `scribe show`. "on"
+names the transcript after the calendar event you are in (the clock panel's
+agenda). Its state is scribe's state file, read with fakecam's, so it shows even
+while fakecam is down.
 
 How: fakecam's HTTP API on 127.0.0.1:7788 (the same calls `cam` makes), on a
 thread of its own, never on the main loop. GET /api/listen (the power state and
@@ -31,6 +39,7 @@ import os
 import threading
 import time
 import urllib.error
+from datetime import datetime
 import urllib.request
 
 from . import core
@@ -40,6 +49,8 @@ from .deck import Panel
 BASE = os.environ.get("FAKECAM_URL", "http://127.0.0.1:7788")
 WEB = "https://cam.p14s.grining.eu"
 INSTALLED = os.path.exists(f"{REAL_HOME}/fakecam/fakecam")
+SCRIBE = f"{REAL_HOME}/scribe/scribe"
+SCRIBE_STATE = f"{REAL_HOME}/.local/share/scribe/state.json"
 STRIP_EVERY = 3.0
 PANEL_EVERY = 1.5
 
@@ -50,6 +61,8 @@ GLYPH_HAND = "\U000f0e47"  # hand-back-right
 GLYPH_POWER = "\U000f0425"
 GLYPH_WEB = "\U000f059f"  # web
 GLYPH_WAND = "\U000f0068"  # auto-fix: cam's board
+GLYPH_CC = "\U000f015e"  # closed-caption: scribe's transcript
+GLYPH_FILE = "\U000f0219"  # file-document
 LOOKS_PER_ROW = 4
 BACKDROPS_PER_ROW = 6  # "room" and the five backdrops: one row
 BURSTS_PER_ROW = 13  # the emoji-only grids: legartis three rows, fun two
@@ -89,6 +102,25 @@ def split_fire(st: dict) -> tuple[list[dict], list[dict]]:
     return [e for e in every if e.get("legartis")], [by_name[n] for n in FUN if n in by_name]
 
 
+def scribe_state() -> dict:
+    """scribe's state file; "on" only while its worker process lives."""
+    try:
+        with open(SCRIBE_STATE) as fh:
+            st = json.load(fh)
+        pid = int(st.get("pid") or 0)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {"on": False}
+    if pid <= 0:
+        return {**st, "on": False}
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        pass
+    except OSError:
+        return {**st, "on": False}
+    return st
+
+
 def cam_name(label: str) -> str:
     """"Integrated Camera (30c9:00f4)" -> "Integrated Camera"."""
     name, _, tail = label.rpartition(" (")
@@ -107,6 +139,8 @@ class Cam:
         self.error = ""  # the last click that failed
         self.armed = ""  # "off": Turn off was clicked once while on air
         self.panel_open = False
+        self.scribe: dict = {"on": False}
+        self.scribe_wait = ""  # "on" / "off": clicked, scribe has not said so yet
         self.notify = None
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
@@ -146,17 +180,20 @@ class Cam:
             if st is not None:
                 self.power, self.listen = st.get("power", ""), st.get("mode", "off")
         self.up = st is not None
+        self.scribe = scribe_state() if os.path.exists(SCRIBE) else {"on": False}
+        if self.scribe_wait == ("on" if self.scribe.get("on") else "off"):
+            self.scribe_wait = ""
         if self.power != "on air":
             self.armed = ""
 
     def _loop(self) -> None:
         n = 0
         while True:
-            before = (self.up, self.power, self.listen, self.full_at)
+            before = (self.up, self.power, self.listen, self.full_at, self.scribe.get("on"), self.scribe.get("lines"))
             # the whole state while the panel is open, and every 10th read for the strip's hand
             self.read_now(full=self.panel_open or n % 10 == 0)
             n += 1
-            if (self.up, self.power, self.listen, self.full_at) != before:
+            if (self.up, self.power, self.listen, self.full_at, self.scribe.get("on"), self.scribe.get("lines")) != before:
                 self._changed()
             self._wake.wait(PANEL_EVERY if self.panel_open else STRIP_EVERY)
             self._wake.clear()
@@ -199,6 +236,14 @@ class Cam:
         core.spawn(["systemctl", "--user", "start", "fakecam"])
         self.poke()
 
+    def transcribe(self, on: bool, title: str = "") -> None:
+        """Start or stop scribe; the button shows the click until scribe's state agrees."""
+        if on == bool(self.scribe.get("on")):
+            return
+        self.scribe_wait = "on" if on else "off"
+        core.spawn([SCRIBE, "on", "--title", title] if on else [SCRIBE, "off"])
+        self.poke()
+
 
 class CamStrip:
     name = "cam"
@@ -211,7 +256,7 @@ class CamStrip:
 
     def key(self, variant: str):
         c = self.cam
-        return INSTALLED, c.up, c.power, c.listen, (c.full.get("gestures") or {}).get("mode")
+        return INSTALLED, c.up, c.power, c.listen, (c.full.get("gestures") or {}).get("mode"), c.scribe.get("on")
 
     def draw(self, variant: str, scale: int):
         if not INSTALLED:  # no fakecam on this host: nothing on the bar
@@ -221,6 +266,9 @@ class CamStrip:
         cv = core.StripCanvas(scale)
         if not c.up:
             cv.icon(GLYPH_CAM_OFF, "dim", 15, after=0)
+            if c.scribe.get("on"):
+                cv.gap(6)
+                cv.icon(GLYPH_CC, "hit", 14, after=0)
             return cv.finish()
         glyph, tone, word, _ = POWER.get(c.power, (GLYPH_CAM, "fg", c.power, ""))
         if c.power == "on air":
@@ -239,6 +287,9 @@ class CamStrip:
         if (c.full.get("gestures") or {}).get("mode") == "on":
             cv.gap(5)
             cv.icon(GLYPH_HAND, "aqua", 13, after=0)
+        if c.scribe.get("on"):
+            cv.gap(6)
+            cv.icon(GLYPH_CC, "hit", 14, after=0)
         return cv.finish()
 
 
@@ -247,8 +298,9 @@ class CamPanel(Panel):
     W = 470
     ROW = 30
 
-    def __init__(self, cam: Cam):
+    def __init__(self, cam: Cam, agenda=None):
         self.cam = cam
+        self.agenda = agenda  # the clock panel's: the meeting you are in names the transcript
         self.cells: list[tuple[float, float, float, float, dict]] = []  # the emoji grids, for the hover label
         self.hovered: dict | None = None
 
@@ -271,11 +323,44 @@ class CamPanel(Panel):
         self.cam.panel_open = False
         self.cam.armed = ""
 
+    def meeting(self) -> str:
+        """The calendar event on now (the shortest, when two overlap), or ""."""
+        if self.agenda is None:
+            return ""
+        now = datetime.now().astimezone()
+        on = [e for evs in self.agenda.days.values() for e in evs if not e.all_day and e.start <= now < e.end]
+        return min(on, key=lambda e: e.end - e.start).title if on else ""
+
+    def transcript_row(self, cr, hits: Hits, y: float) -> float:
+        """scribe: on / off / open, and what it writes. Returns y below."""
+        c, W, P = self.cam, self.W, 16
+        sc = c.scribe
+        on = bool(sc.get("on"))
+        if c.scribe_wait:
+            note = "starting…" if c.scribe_wait == "on" else "finishing the last sentences…"
+        elif on:
+            since = datetime.fromtimestamp(sc.get("started") or time.time()).strftime("%H:%M")
+            note = f"since {since} · {sc.get('lines', 0)} lines" + (f" · {sc['title']}" if sc.get("title") else "")
+        else:
+            note = "agents read it: scribe show"
+        heading(cr, P, y, "transcript", W - 2 * P - (text(cr, W - P, y - 2, note, 11, "hit" if on else "dim",
+                                                           align=1, width=300) + 10))
+        y += 20
+        x = P
+        x += button(cr, hits, x, y, "on", lambda: c.transcribe(True, self.meeting()), on=on or c.scribe_wait == "on",
+                    tone="hit", glyph=GLYPH_CC, w=64) + 6
+        x += button(cr, hits, x, y, "off", lambda: c.transcribe(False), on=not on and c.scribe_wait != "on",
+                    tone="bg3", w=64) + 6
+        if sc.get("path") and os.path.exists(sc["path"]):
+            button(cr, hits, x, y, "open", lambda p=sc["path"]: core.spawn(["xdg-open", p]) or True, glyph=GLYPH_FILE)
+        return y + 36
+
     def size(self):
         st = self.cam.full
         if not self.cam.up or not st:
-            return self.W, 100
+            return self.W, 100 + 56
         h = 12 + 50  # the header
+        h += 56  # transcript
         h += 56  # power
         h += 56  # source
         h += 56 + 30 * (self.scene_rows(st) - 1)  # scene
@@ -311,6 +396,7 @@ class CamPanel(Panel):
                  12, "dim")
             if not c.up:
                 button(cr, hits, P, y + 50, "start fakecam", c.start, tone="ok", glyph=GLYPH_POWER)
+            self.transcript_row(cr, hits, y + 88)
             return
 
         # header: the state, the scene
@@ -324,6 +410,9 @@ class CamPanel(Panel):
         button(cr, hits, x - 80, y + 4, "effects", lambda: core.spawn([f"{REAL_HOME}/bin/cam"]) or True,
                glyph=GLYPH_WAND, w=80)  # cam's board: every face and text effect too
         y += 50
+
+        # transcript: scribe, the meeting transcript that needs no camera
+        y = self.transcript_row(cr, hits, y)
 
         # power
         note = c.error or ("click again: the call sees a “Camera off” card" if c.armed == "off" else "")

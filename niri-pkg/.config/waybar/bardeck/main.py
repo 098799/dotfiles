@@ -140,7 +140,7 @@ def build(with_ws: bool = True):
                                   AudioPanel(audio), clock_panel, DispPanel(disp), WsPanel())}
     panels["notif"] = NotifPanel(dunst)
     panels["agents"] = AgentsPanel(agents)
-    panels["cam"] = CamPanel(cam)
+    panels["cam"] = CamPanel(cam, clock_panel.agenda)
     panels["clip"] = ClipPanel(Clip())
     panels["palette"] = PalettePanel()
     panels["wallpaper"] = WallPanel()
