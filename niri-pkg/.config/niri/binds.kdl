@@ -133,10 +133,13 @@ binds {
     // emacs on PATH (/usr/local/bin). Neomacs again: { spawn "neomacs-try"; }
     Mod+X hotkey-overlay-title="emacs"     { spawn-sh "emacsclient -c || { $HOME/Programs/emacs-pgtk/src/emacs --daemon && emacsclient -c; }"; }
     Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
-    // haiku/claw name their tmux session after the cwd, so start them in ~/legartis.
+    // sonnet/claw name their tmux session after the cwd, so start them in ~/legartis.
     // claw-fast, not `zsh -ic`: a type-ahead box at once, no full .zshrc (~1.7 s).
-    Mod+S hotkey-overlay-title="haiku" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "haiku"; }
+    Mod+S hotkey-overlay-title="sonnet" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "sonnet"; }
     Mod+Shift+S hotkey-overlay-title="claw" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "claw"; }
+    // opus main2: claw takes the account first, then --model (claw-fast's own `opus`
+    // mapping would put main2 after --model, where claw does not read it as an account).
+    Mod+Ctrl+S hotkey-overlay-title="opus main2" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "claw" "main2" "--model" "opus"; }
 
     // ---- workspaces (i3 keys, i3 names) ------------------------------------
     Mod+R     { focus-workspace "c"; }
