@@ -52,11 +52,23 @@ def has_lid() -> bool:
     return bool(glob.glob("/proc/acpi/button/lid/*/state"))
 
 
+def dummy_edid(path: str) -> bool:
+    """A USB-C hub's HDMI converter: "connected" with or without a monitor behind it.
+    Manufacturer AGT (bytes 8-9 = 04 f4), product name "1080p60" (see displays.dummy)."""
+    try:
+        with open(path, "rb") as f:
+            e = f.read()
+    except OSError:
+        return False
+    return e[8:10] == b"\x04\xf4" and b"1080p60" in e
+
+
 def external_screen() -> bool:
     """A connected screen that is not the laptop's own (DP, HDMI, …)."""
     for f in glob.glob("/sys/class/drm/card*-*/status"):
         name = f.split("/")[-2].split("-", 1)[1]
-        if not name.startswith(("eDP", "LVDS", "Writeback")) and core.read(f) == "connected":
+        if not name.startswith(("eDP", "LVDS", "Writeback")) and core.read(f) == "connected" \
+                and not dummy_edid(f.rsplit("/", 1)[0] + "/edid"):
             return True
     return False
 

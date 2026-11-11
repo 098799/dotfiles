@@ -15,8 +15,19 @@ LAPTOP=eDP-1
 HDMI=HDMI-A-1
 # The two USB-C ports are DP-1 and DP-2 (the charging one comes up as DP-2,
 # 15 Oct 2026). Take whichever is connected; DP-1 when neither is.
-EXTERNAL=$(niri msg -j outputs 2>/dev/null | jq -r '[keys[] | select(startswith("DP-"))] | sort | .[0] // empty')
-EXTERNAL=${EXTERNAL:-DP-1}
+# A hub's HDMI converter ("Agilent Technologies 1080p60", see niri-hotplug) is
+# no screen: never pick it.
+EXTERNAL=$(niri msg -j outputs 2>/dev/null | jq -r '[to_entries[] | select(.key | startswith("DP-"))
+    | select((.value.make == "Agilent Technologies" and (.value.model | startswith("1080p60"))) | not)
+    | .key] | sort | .[0] // empty')
+# Neither connected: DP-1, or DP-2 when the hub's converter sits on DP-1 (a
+# later "on" would wake the converter, not the monitor).
+DUMMIES=$(niri msg -j outputs 2>/dev/null | jq -r 'to_entries[]
+    | select(.value.make == "Agilent Technologies" and (.value.model | startswith("1080p60"))) | .key')
+if [[ -z $EXTERNAL ]]; then
+    EXTERNAL=DP-1
+    grep -qx DP-1 <<<"$DUMMIES" && EXTERNAL=DP-2
+fi
 PAD=AC:8E:BD:4C:5E:21   # Xbox Wireless Controller (BLE, bonded + trusted)
 
 # The wallpaper set is mixed 16:9 / 21:9 and the scaler ignores aspect, so a

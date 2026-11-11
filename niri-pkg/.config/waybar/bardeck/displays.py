@@ -112,6 +112,13 @@ def termfont_state(name: str, default: str) -> str:
 # ── an output (niri's dict) ──────────────────────────────────────────────────
 
 
+def dummy(o: dict) -> bool:
+    """No screen: a USB-C hub's HDMI converter that shows up as "Agilent Technologies
+    1080p60" on a DP-* port with or without a monitor behind it (11 Nov 2026).
+    niri-hotplug keeps it off; the panel does not list it, so no click turns it on."""
+    return o.get("make") == "Agilent Technologies" and str(o.get("model") or "").startswith("1080p60")
+
+
 def live(o: dict) -> bool:
     return o.get("logical") is not None
 
@@ -203,7 +210,7 @@ class Displays:
             return
         outs = niri("Outputs")
         if isinstance(outs, dict):
-            self.outputs = outs
+            self.outputs = {n: o for n, o in outs.items() if not dummy(o)}
             self.read_at = time.monotonic()
         if focus:
             f = niri("FocusedOutput")

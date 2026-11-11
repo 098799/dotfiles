@@ -13,6 +13,7 @@
 #   the last external one removed  -> niri-screen-switch "Screen: laptop only"
 #                                     (a laptop panel left off would mean no screen at all)
 #   HDMI (the TV) connected        -> nothing: game mode wakes it and sets it up
+#   a dummy output (IGNORED, below) -> turned off, and otherwise treated as absent
 # Then every executable in ~/.config/niri/hotplug.d/ runs once per change:
 #   <script> connect|disconnect <output> <description>
 #
@@ -26,10 +27,26 @@ HOOKS=/home/tgrining/.config/niri/hotplug.d
 
 log() { logger -t niri-hotplug -- "$*"; }
 
+# Outputs that are no screen. A USB-C hub's HDMI converter (Genesys hub, 11 Nov
+# 2026) shows up as "Agilent Technologies 1080p60" on a DP-* connector whether
+# or not anything is behind it. Left on, it is a blank screen windows vanish to.
+# jq filter on one `niri msg -j outputs` value.
+IGNORED='.make == "Agilent Technologies" and (.model | startswith("1080p60"))'
+
+# Turn every ignored output off (niri turns a new output on by itself).
+silence_ignored() {
+    local o
+    for o in $(niri msg -j outputs 2>/dev/null \
+            | jq -r "to_entries[] | select(.value | $IGNORED) | select(.value.logical != null) | .key"); do
+        log "ignored output $o turned off"
+        niri msg output "$o" off
+    done
+}
+
 # One line per connected output: "<name>\t<make model serial>".
 connected() {
     niri msg -j outputs 2>/dev/null \
-        | jq -r 'to_entries[] | "\(.key)\t\(.value.make) \(.value.model) \(.value.serial // "")"' | sort
+        | jq -r "to_entries[] | select(.value | ($IGNORED) | not)"' | "\(.key)\t\(.value.make) \(.value.model) \(.value.serial // "")"' | sort
 }
 
 run_hooks() {
@@ -70,6 +87,7 @@ react() {
 exec 9>"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/niri-hotplug.lock"
 flock -n 9 || { echo "niri-hotplug: already running" >&2; exit 0; }
 
+silence_ignored
 state=$(connected)
 log "watching; connected: $(cut -f1 <<<"$state" | tr '\n' ' ')"
 if grep -q "^$LAPTOP"$'\t' <<<"$state" && grep -q '^DP-' <<<"$state"; then
@@ -81,6 +99,7 @@ while read -r line; do
     [[ $line == UDEV* ]] || continue
     # Drain the burst; one check after it ends.
     while read -r -t 1.5 _; do :; done
+    silence_ignored
     new=$(connected)
     react "$state" "$new"
     state=$new
