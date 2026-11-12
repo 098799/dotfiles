@@ -1,0 +1,8 @@
+#!/bin/sh
+# ec FILE... — open in a NEW emacsclient frame. The one way this desktop opens
+# files in Emacs: never plain `emacs`, never a client into an old frame.
+# Talks to the pgtk (Wayland) daemon; with none up, start that one first.
+# (`emacsclient -a ""` would start the X11 emacs on PATH, /usr/local/bin.)
+# Used by: Mod+X (niri/binds.kdl), emacsclient.desktop (xdg-open), the bar.
+emacsclient -c "$@" && exit 0
+"$HOME/Programs/emacs-pgtk/src/emacs" --daemon && exec emacsclient -c "$@"

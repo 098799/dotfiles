@@ -352,7 +352,7 @@ class CamPanel(Panel):
         x += button(cr, hits, x, y, "off", lambda: c.transcribe(False), on=not on and c.scribe_wait != "on",
                     tone="bg3", w=64) + 6
         if sc.get("path") and os.path.exists(sc["path"]):
-            button(cr, hits, x, y, "open", lambda p=sc["path"]: core.spawn(["xdg-open", p]) or True, glyph=GLYPH_FILE)
+            button(cr, hits, x, y, "open", lambda p=sc["path"]: core.spawn([os.path.expanduser("~/bin/ec"), p]) or True, glyph=GLYPH_FILE)
         return y + 36
 
     def size(self):

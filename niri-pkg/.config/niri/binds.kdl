@@ -129,9 +129,9 @@ binds {
     // the terminal under the focused window instead, in the same column.
     Mod+Shift+Z hotkey-overlay-title="alacritty below" { spawn "niri-spawn-below" "alacritty"; }
     // GNU Emacs, the Wayland (pgtk) build in ~/Programs/emacs-pgtk (startup.kdl starts
-    // its daemon). With no daemon up, start that one: `-a ""` would start the X11
-    // emacs on PATH (/usr/local/bin). Neomacs again: { spawn "neomacs-try"; }
-    Mod+X hotkey-overlay-title="emacs"     { spawn-sh "emacsclient -c || { $HOME/Programs/emacs-pgtk/src/emacs --daemon && emacsclient -c; }"; }
+    // its daemon). `ec` = emacsclient -c, and starts that daemon when none is up
+    // (`-a ""` would start the X11 emacs on PATH). Neomacs again: { spawn "neomacs-try"; }
+    Mod+X hotkey-overlay-title="emacs"     { spawn "/home/tgrining/bin/ec"; }
     Mod+Q hotkey-overlay-title="thunar"    { spawn "thunar"; }
     // sonnet/claw name their tmux session after the cwd, so start them in ~/legartis.
     // claw-fast, not `zsh -ic`: a type-ahead box at once, no full .zshrc (~1.7 s).

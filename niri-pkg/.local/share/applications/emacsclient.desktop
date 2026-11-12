@@ -1,0 +1,23 @@
+[Desktop Entry]
+# Overrides /usr/local/share/applications/emacsclient.desktop (same file name,
+# user dir wins). The stock one opens a file with --display=$DISPLAY and no
+# --create-frame, so xdg-open (the bar's transcript "open" button, Thunar, ...)
+# landed in an X11 frame or a stray new Emacs. Rule: always `emacsclient -c`,
+# via ~/bin/ec (niri-pkg/bin/ec), the same path as Mod+X and the bar.
+Name=Emacs (Client)
+GenericName=Text Editor
+Comment=Edit text
+MimeType=text/english;text/plain;text/markdown;text/x-makefile;text/x-c++hdr;text/x-c++src;text/x-chdr;text/x-csrc;text/x-java;text/x-moc;text/x-pascal;text/x-tcl;text/x-tex;text/x-python;text/x-python3;application/json;application/x-shellscript;text/x-c;text/x-c++;x-scheme-handler/org-protocol;
+Exec=/home/tgrining/bin/ec %F
+Icon=emacs
+Type=Application
+Terminal=false
+Categories=Development;TextEditor;
+StartupNotify=true
+StartupWMClass=Emacs
+Keywords=emacsclient;
+Actions=new-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=/home/tgrining/bin/ec %F
