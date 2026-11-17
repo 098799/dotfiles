@@ -21,9 +21,9 @@ stub when it has no fresh reading). Six full cells took 636 px and pushed the cl
 off the screen; the panel (hover) still shows every account at full size.
 
 The panel: every account's week full size, its 5h peaks against burn's ceiling, the
-pool totals. Two columns: cc (Claude Code) and agy (Antigravity). Each has two
-sections: "main (private)" (the personal Max accounts: private, main2, agy's main)
-and "work (others)" (everything else). Pinned: u/p earlier/later week, i/o select
+pool totals. Two columns: "main (private)" (the personal Max accounts: private,
+main2, agy's main) and "work" (everything else). Each has two sections: cc (Claude
+Code) and agy (Antigravity). Pinned: u/p earlier/later week, i/o select
 (down each column, then the next), Enter or a click on a card opens `qtop <account>`.
 """
 
@@ -517,16 +517,16 @@ HEAD_H = 46
 COLHEAD_H = 26  # the column titles, under the header and not scrolled
 TOP_H = HEAD_H + COLHEAD_H  # where the cards' band starts
 CARD_H = 112
-SEC_H = 28  # a section's header: "main (private)"
+SEC_H = 28  # a section's header: "cc · Claude Code"
 EMPTY_H = 24  # an empty section's one dim line
 FOOT_H = 26
 SCROLL_STEP = 48  # px per wheel notch (PgUp/PgDn move a whole band)
 
-# The columns: qtop's Claude accounts, then agy's (the AGY_KEY ones).
-COLUMNS = (("cc", "cc · Claude Code", False), ("agy", "agy · Antigravity", True))
-# The personal Max accounts: the "main (private)" section. agy's home main is one too.
+# The columns: the personal Max accounts (agy's home main is one too), then the work ones.
+COLUMNS = (("main (private)", True), ("work", False))
 PRIVATE = ("private", "main2")
-SECTIONS = ("main (private)", "work (others)")
+# The sections in each column: qtop's Claude accounts, then agy's (the AGY_KEY ones).
+SECTIONS = (("cc · Claude Code", False), ("agy · Antigravity", True))
 
 
 def is_private(account: str) -> bool:
@@ -539,10 +539,10 @@ def is_private(account: str) -> bool:
 def sections(accounts: list[str]) -> list[tuple[str, list[tuple[str, list[str]]]]]:
     """Each column as (title, [(section title, its accounts)]), in the order drawn."""
     out = []
-    for _, title, is_agy in COLUMNS:
-        mine = [a for a in accounts if a.startswith(Q.AGY_KEY) == is_agy]
-        out.append((title, [(SECTIONS[0], [a for a in mine if is_private(a)]),
-                            (SECTIONS[1], [a for a in mine if not is_private(a)])]))
+    for title, private in COLUMNS:
+        mine = [a for a in accounts if is_private(a) == private]
+        out.append((title, [(sec, [a for a in mine if a.startswith(Q.AGY_KEY) == is_agy])
+                            for sec, is_agy in SECTIONS]))
     return out
 
 
