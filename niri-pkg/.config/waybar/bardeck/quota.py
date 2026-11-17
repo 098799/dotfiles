@@ -23,7 +23,8 @@ off the screen; the panel (hover) still shows every account at full size.
 The panel: every account's week full size, its 5h peaks against burn's ceiling, the
 pool totals. Two columns: "main (private)" (the personal Max accounts: private,
 main2, agy's main) and "work" (everything else). Each has two sections: cc (Claude
-Code) and agy (Antigravity). Pinned: u/p earlier/later week, i/o select
+Code) and agy (Antigravity). An agy account with both a Claude/GPT and a Gemini quota
+gets one card for each; the Gemini Argon bucket is not shown. Pinned: u/p earlier/later week, i/o select
 (down each column, then the next), Enter or a click on a card opens `qtop <account>`.
 """
 
@@ -107,6 +108,13 @@ class Row:
 AGY_HISTORY = os.environ.get("AGY_USAGE_HISTORY") or f"{core.REAL_HOME}/.local/state/w95/agy-usage.csv"
 AGY_FIVE = {"gemini-weekly": "gemini-5h", "3p-weekly": "3p-5h"}  # a weekly bucket's 5h sibling
 FLOAT_S = 1800  # an unused bucket's reset floats at now + its window; this close = not started
+HIDDEN = ("gemini-argon",)  # bucket id prefixes nobody wants to see (Tomek, 17 Nov 2026)
+# An agy account with both kinds of bucket gets one card per group: "agy:<home>#<group>".
+AGY_GROUPS = {"cg": "Claude/GPT", "gem": "Gemini"}
+
+
+def group_of(bucket: str) -> str:
+    return "cg" if bucket.startswith("3p") else "gem"
 
 
 def _floating(t: float, used: float, reset: float, window: float) -> bool:
@@ -163,7 +171,8 @@ class AgyHistory:
         """The weekly buckets of one home, in the snapshot's order where it has one."""
         acc = Q.agy_account(home) or {}
         order = [str(b.get("id")) for b in acc.get("buckets") or [] if isinstance(b, dict)]
-        have = [b for (h, b) in self.rows if h == home and b.endswith("-weekly")]
+        have = [b for (h, b) in self.rows if h == home and b.endswith("-weekly")
+                and not b.startswith(HIDDEN)]
         return [b for b in order if b in have] + sorted(b for b in have if b not in order)
 
     def last(self, home: str, bucket: str) -> tuple[float, float, float] | None:
@@ -206,17 +215,19 @@ def agy_label(bucket: str) -> str:
 
 
 class AgyRow(Row):
-    """An agy account's card. Its week is the weekly bucket with the most used (the
-    one that stops agy first: no Gemini left means no Opus either); the other weekly
-    buckets ride along in `extra`, drawn as thin lines on the same chart."""
+    """An agy account's card, or one group's card ("agy:<home>#cg", see cards()). Its
+    week is the weekly bucket with the most used (the one that stops it first); the
+    other weekly buckets ride along in `extra`, drawn as thin lines on the same chart."""
 
     def __init__(self, m, account: str, now: float, back: int = 0):
-        home = account[len(Q.AGY_KEY):]
+        home, _, group = account[len(Q.AGY_KEY):].partition("#")
         hist: AgyHistory = m.agy
         who = Q.AGY_NAME.get(home, home)
         self.account = account
         self.label = "g" + Q.LETTER.get(who, who[:2].upper())
         self.name = f"agy · {who}" + (f" · {home}" if home != who else "")
+        if group:  # the card is narrow: home and group only, the section says agy
+            self.name = f"{home} · {AGY_GROUPS[group]}"
         self.active = False
         self.pool = "agy"
         self.ceiling = 100.0  # burn sets no 5h ceiling for agy
@@ -226,6 +237,8 @@ class AgyRow(Row):
 
         live = []
         for b in hist.buckets(home):
+            if group and group_of(b) != group:
+                continue
             ws = hist.weeks(home, b)
             if ws:
                 live.append((b, ws))
@@ -239,8 +252,12 @@ class AgyRow(Row):
             self.back = max(0, min(back, len(ws) - 1))
             self.week, self.weeks = ws[-1 - self.back], len(ws)
             for b, other in live[1:]:
-                near = min(other, key=lambda w: abs(w.reset - self.week.reset))
-                self.extra.append((agy_label(b), near))
+                # Only a week that overlaps this one; never a finished one on the live card.
+                cand = [w for w in other if w.reset > self.week.start
+                        and (self.back or not w.over(now))]
+                if cand:
+                    near = min(cand, key=lambda w: abs(w.reset - self.week.reset))
+                    self.extra.append((agy_label(b), near))
 
         five = hist.last(home, AGY_FIVE.get(self.bucket or "", ""))
         self.five_live = bool(five and five[2] > now and not self.stale
@@ -260,10 +277,25 @@ class AgyRow(Row):
         self.over = self.week is None or (back == 0 and self.week.over(now))
 
 
+def cards(m) -> list[str]:
+    """qtop's accounts, with an agy account that has both a Claude/GPT and a Gemini
+    bucket split into one card per group."""
+    out = []
+    for a in m.accounts():
+        if a.startswith(Q.AGY_KEY):
+            groups = sorted({group_of(b) for b in m.agy.buckets(a[len(Q.AGY_KEY):])},
+                            key=list(AGY_GROUPS).index)
+            if len(groups) > 1:
+                out += [f"{a}#{g}" for g in groups]
+                continue
+        out.append(a)
+    return out
+
+
 def rows(m, now: float, back: int = 0) -> list[Row]:
     active = read_active()
     return [AgyRow(m, a, now, back) if a.startswith(Q.AGY_KEY) else Row(m, a, active, now, back)
-            for a in m.accounts()]
+            for a in cards(m)]
 
 
 def read_active() -> str:
@@ -531,7 +563,7 @@ SECTIONS = (("cc · Claude Code", False), ("agy · Antigravity", True))
 
 def is_private(account: str) -> bool:
     if account.startswith(Q.AGY_KEY):
-        home = account[len(Q.AGY_KEY):]
+        home = account[len(Q.AGY_KEY):].partition("#")[0]
         return Q.AGY_NAME.get(home, home) == "private"
     return account in PRIVATE
 
@@ -832,7 +864,7 @@ class QuotaPanel(Panel):
         self.top = 0.0  # the cards' scroll, px, under the column titles
 
     def content_h(self) -> int:
-        return int(TOP_H + layout(self.q.m.accounts())[2] + FOOT_H)
+        return int(TOP_H + layout(cards(self.q.m))[2] + FOOT_H)
 
     def room(self) -> float:
         """The panel's height the output leaves it, in panel px (before the zoom).
@@ -853,11 +885,11 @@ class QuotaPanel(Panel):
         return self.size()[1] - TOP_H - FOOT_H
 
     def max_top(self) -> float:
-        return max(0.0, layout(self.q.m.accounts())[2] - self.card_span())
+        return max(0.0, layout(cards(self.q.m))[2] - self.card_span())
 
     def follow(self) -> None:
         """Scroll so the selected card is in the band."""
-        pos = layout(self.q.m.accounts())[0]
+        pos = layout(cards(self.q.m))[0]
         if self.sel not in pos:
             return
         y = pos[self.sel][1]
@@ -868,7 +900,7 @@ class QuotaPanel(Panel):
         self.top = min(max(self.top, 0.0), self.max_top())
 
     def opened(self) -> None:
-        accts = self.q.m.accounts()
+        accts = cards(self.q.m)
         active = read_active()
         self.back, self.sel = 0, (active if active in accts else None)
         self.top = 0.0
@@ -889,7 +921,7 @@ class QuotaPanel(Panel):
             hits.add(x, y0, COL_W, y1 - y0, lambda a=account: open_qtop(a))
 
     def key(self, key: str, ctrl: bool) -> bool:
-        steps = order(self.q.m.accounts())
+        steps = order(cards(self.q.m))
         n = len(steps)
         if n == 0:
             return False
@@ -925,5 +957,5 @@ def open_qtop(account: str) -> bool:
     now = time.monotonic()
     if now - _qtop_at >= QTOP_GAP_S:
         _qtop_at = now
-        core.spawn(["alacritty", "-e", "qtop", account])
+        core.spawn(["alacritty", "-e", "qtop", account.partition("#")[0]])
     return True  # close the panel
