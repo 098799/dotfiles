@@ -339,7 +339,7 @@ class WsStrip:
                     floating.append(w)
             columns = [sorted(cols[k], key=lambda w: w["layout"]["pos_in_scrolling_layout"][1])
                        for k in sorted(cols)]
-            label = ws.get("name") or str(ws["idx"])
+            label = ws.get("name") or "+"  # unnamed: niri's spare (its index reads as an i3 name)
             x0 = c.x
             focused, active, urgent = ws.get("is_focused"), ws.get("is_active"), ws.get("is_urgent")
             # Measure first: the chip's background goes under its content.
@@ -690,7 +690,7 @@ class WsPanel(Panel):
                 ex = x
                 ex += text(cr, ex, y + 4, "empty", 11, "dim") + 8
                 for ws in empty:
-                    label_e = ws.get("name") or str(ws["idx"])
+                    label_e = ws.get("name") or "+"  # unnamed: niri's spare (its index reads as an i3 name)
                     cw = core.text_w(cr, label_e, 11) + 14
                     if ex + cw > x + ow:
                         break
@@ -714,7 +714,7 @@ class WsPanel(Panel):
         cr.set_source_rgba(*rgba("urgent" if urgent else ("accent" if focused else "bg2"), 0.9 if focused else 1))
         cr.set_line_width(1.2 if focused or urgent else 1)
         cr.stroke()
-        label = ws.get("name") or str(ws["idx"])
+        label = ws.get("name") or "+"  # unnamed: niri's spare (its index reads as an i3 name)
         hx, mid = x + 10, y + self.HEAD_H / 2 + 1
         lw = core.text_w(cr, label, 13, bold=True) + 12
         tone_bg = "urgent" if urgent else ("accent" if focused else ("bg2" if active else None))
@@ -783,7 +783,7 @@ class WsPanel(Panel):
             for target, glyph in ((down, GLYPH_DOWN), (up, GLYPH_UP)):
                 if target is None:
                     continue
-                tl = target.get("name") or str(target["idx"])
+                tl = target.get("name") or "+"
                 right -= button(cr, hits, right - self.chip_w(cr, tl, glyph), y + 4, tl,
                                 lambda t=target: self.move(wid, t), h=H - 8, size=11, glyph=glyph) + 5
         else:

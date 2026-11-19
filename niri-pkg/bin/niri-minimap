@@ -219,7 +219,7 @@ def snapshot(ws_id: int) -> dict | None:
         view_x = xs[active] + off
     return {
         "ws_id": ws_id,
-        "name": ws.get("name") or str(ws["idx"]),
+        "name": ws.get("name") or "+",
         "out": dict(out),
         "gap": gap,
         "cols": [[dict(w) for w in c] for c in cols],
