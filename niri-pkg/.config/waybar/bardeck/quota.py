@@ -20,8 +20,8 @@ one thin gauge after it — its weekly % as the fill, in the verdict's colour (a
 stub when it has no fresh reading). Six full cells took 636 px and pushed the clock
 off the screen; the panel (hover) still shows every account at full size.
 
-The panel: every account's week full size, its 5h peaks against burn's ceiling, the
-pool totals. Two columns: "main (private)" (the personal Max accounts: private,
+The panel: every account's week full size, its 5h peaks against burn's ceiling, its
+per-model weekly caps (Fable: "team · Fable 12%" under the name), the pool totals. Two columns: "main (private)" (the personal Max accounts: private,
 main2, agy's main) and "work" (everything else). Each has two sections: cc (Claude
 Code) and agy (Antigravity). An agy account with both a Claude/GPT and a Gemini quota
 gets one card for each; the Gemini Argon bucket is not shown. Pinned: u/p earlier/later week, i/o select
@@ -61,8 +61,29 @@ def load_qtop():
 Q = load_qtop()
 
 
+def model_caps(m, account: str, now: float) -> list[tuple[str, float, float | None]]:
+    """The account's per-model weekly caps (Fable, Opus), as (name, %, reset or None):
+    the same snapshot fields qtop's "caps" block reads. [] when it has none."""
+    for row in m.fed().get("accounts") or []:
+        if not isinstance(row, dict) or row.get("account") != account:
+            continue
+        caps = [(str(c.get("name") or "scoped"), c) for c in row.get("scoped") or []
+                if isinstance(c, dict) and c.get("percent") is not None]
+        opus = row.get("seven_day_opus")
+        if isinstance(opus, dict) and opus.get("percent") is not None:
+            caps.append(("Opus", opus))
+        out = []
+        for name, c in caps:
+            reset = Q.iso_ts(c.get("resets_at"))
+            out.append((name, float(c.get("percent") or 0), reset if reset and reset > now else None))
+        return out
+    return []
+
+
 class Row:
     """One account now: its week (or a past one), its 5h window, and how to say it."""
+
+    caps: list = []  # per-model weekly caps (model_caps); agy cards have none
 
     def __init__(self, m, account: str, active: str, now: float, back: int = 0):
         self.account = account
@@ -87,6 +108,8 @@ class Row:
         self.over = self.week is None or (back == 0 and self.week.over(now))
         self.name = account + (f" · {Q.ALIAS[account]}" if account in Q.ALIAS else "")
         self.ceiling = Q.CEILING[self.pool]
+        # Now-values: not on a past week, not from a reading too old to trust.
+        self.caps = [] if back or self.stale else model_caps(m, account, now)
         self.extra: list[tuple[str, object]] = []  # agy: the other weekly buckets (label, Week)
 
     @property
@@ -706,7 +729,15 @@ def draw_card(cr, r: Row, now: float, x: float, y: float, w: float, h: float) ->
     lw = text(cr, x + 4, y - 2, r.label, 22, "title" if r.active else "fg", bold=True)
     text(cr, x + 12 + lw, y + 1, r.name, 14, "title")
     pool_x = x + 12 + lw
-    text(cr, pool_x, y + 17, r.pool + (" · active" if r.active else ""), 12, "max" if r.pool == "max" else "team")
+    cap_x = pool_x + text(cr, pool_x, y + 17, r.pool + (" · active" if r.active else ""), 12,
+                          "max" if r.pool == "max" else "team")
+    # The per-model caps (Fable): their own weekly quota, beside the pool.
+    for name, pct, reset in r.caps:
+        cap_x += text(cr, cap_x, y + 17, f" · {name} ", 12, "dim")
+        cap_x += text(cr, cap_x, y + 17, f"{pct:.0f}%", 12, Q.level_role(pct), bold=pct >= 70)
+        # Its reset only when it is not the week's (the big ↻ under it says that one).
+        if reset is not None and (r.week is None or abs(reset - r.week.reset) > 3600):
+            cap_x += text(cr, cap_x, y + 17, f" ↻ {Q.dur(reset - now)}", 12, "dim")
 
     wk = r.week
     if wk is not None and not r.over:
