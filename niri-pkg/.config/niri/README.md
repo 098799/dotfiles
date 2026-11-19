@@ -136,6 +136,18 @@ i3blocks scripts' menus.
 | clip (no strip: **Mod+Shift+V**, `bardeck open clip`) | — | **The clipboard history** (`bardeck/clip.py`, `clipstore.py`): newest first, pinned on top; text as two lines, images as thumbnails. Enter or click copies an entry back (`wl-copy`, an image with its MIME type), closes, and **pastes it into the window you opened it from** (ydotool — real keys through /dev/uinput, so X11 apps such as Emacs get them too; wtype only without ydotoold — sends that app's paste key: Ctrl+Shift+V in a terminal, Ctrl+V for an image there — Claude Code's image paste; in Thunar Ctrl+Shift+V for an image = `niri-paste-image`, a new file in the open folder; Ctrl+V elsewhere); `y` copies only; hover a row for pin / ×. Keys: `i`/`o` select, `k`/`l` half a list, Enter paste, `y` copy only, `p` pin, `x` remove, `c` clear all but the pinned (twice), `/` search (every word; Enter back to the list, Esc clears). |
 | wallpaper (also "Wallpaper: choose…" in `Mod+BackSpace` and the displays panel; `bardeck open wallpaper`) | A thumbnail of the wallpaper on screen (16:9, its middle for a wide one), a pin when it is pinned. | **The wallpaper, chosen on purpose** (`bardeck/wallpaper.py`): the current theme's designs (`<palette>-<mode>-N-*.png`), each in the version for the focused screen, the one on screen outlined; thumbnails cached in `~/.cache/bardeck/wallthumbs`. A click or Enter **pins** the design: `wallpaper-pick --pin N` writes `~/.config/theme/wallpaper-pin` (one line per theme), and a layout change then shows the same design in the new shape, not a random one. "shuffle" (`s`) unpins and picks at random. A screen change never rolls a new design: `wallpaper-pick --keep` shows the same one in the new shape. Keys: `j`/`;` `i`/`o` move. |
 
+**Fit: the bar never overflows.** (`bardeck/fit.py`, 19 Nov 2026.) The daemon knows
+each strip's width, so every second it adds up each bar (the workspace strip, the
+other strips, the tray from the StatusNotifierWatcher's item count, the gaps) and
+compares the sum with the output's width. Too wide: it applies the next step of
+`fit.STEPS`, least needed first, until the bar fits. With room again (the step's
+saving plus 24 px) it takes the last step back. The big bar's steps: no wallpaper
+pill, then network / audio / next meeting / system / clock / quota in their compact
+form. The laptop's bar is compact already, so it only drops pills: wallpaper, then
+displays. A pill in its compact form still opens its panel; a pill that is off has
+its entry in `Mod+BackSpace`. To change what goes first, change the order in
+`fit.STEPS`. Each change is one `bardeck: fit …` line on waybar's stderr.
+
 **Caffeine.** niri's own `org.freedesktop.ScreenSaver.Inhibit`, on the session
 bus, in-process: niri marks its idle notifications inhibited, and swayidle
 (`niri-idle`) never hears the seat went idle. niri drops the inhibitor itself when

@@ -42,7 +42,7 @@ import socket
 import sys
 import time
 
-from . import core
+from . import core, fit
 from .core import RUN_DIR
 
 VARIANTS = (("full", 1), ("compact", 2))
@@ -175,6 +175,11 @@ class Daemon:
         self.last_variants = None
         self.last_outputs = None
         self.keys: dict[tuple, object] = {}  # (strip, variant) -> the inputs it was drawn from
+        # Fit (fit.py): per bar, how many of its steps are on, what each one saved,
+        # and every strip's width in bar px as last written.
+        self.fit = {v: 0 for v, _ in VARIANTS}
+        self.saved: dict[str, list[float]] = {v: [] for v, _ in VARIANTS}
+        self.wpx: dict[str, float] = {}
         # The raw state, compared raw: a theme that falls back to gruvbox (no colors.d
         # file) must not look like a change on every tick, or waybar reloads for ever.
         self.theme = core.theme_key()
@@ -201,16 +206,74 @@ class Daemon:
         return tuple(v for v in VARIANTS if (v[0] == "compact" and laptop) or (v[0] == "full" and other))
 
     def write(self, name: str, surf) -> None:
+        variant = name.rpartition("-")[2]
+        if variant in self.fit:  # not ws: its name ends in the output's place
+            self.wpx[name] = surf.get_width() / dict(VARIANTS)[variant]
         if core.write_strip(f"{RUN_DIR}/{name}.argb", surf):
             self.dirty = True
 
     def draw_strip(self, name: str, strip, variant: str, scale: int) -> None:
-        """Draw unless its inputs are the same as last time (strip.key, when it has one)."""
-        key = strip.key(variant) if hasattr(strip, "key") else None
-        if key is not None and self.keys.get((name, variant)) == key:
+        """Draw unless its inputs are the same as last time (strip.key, when it has one).
+        `variant` is the bar's; fit may have the strip drawn in another, or not at all."""
+        as_ = fit.drawn_as(name, variant, self.fit[variant])
+        key = strip.key(as_ or variant) if hasattr(strip, "key") else None
+        if key is not None and self.keys.get((name, variant)) == (as_, key):
             return
-        self.keys[(name, variant)] = key
-        self.write(f"{name}-{variant}", strip.draw(variant, scale * core.ZOOM[variant]))
+        self.keys[(name, variant)] = (as_, key)
+        zoom = scale * core.ZOOM[variant]
+        self.write(f"{name}-{variant}", strip.draw(as_, zoom) if as_ else self.no_pill(zoom))
+
+    @staticmethod
+    def no_pill(scale: float):
+        """A strip that shows nothing: 1 px of bar, as next's when no meeting is near."""
+        import cairo
+
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, 1, core.px(core.BAR_H, scale))
+        surf.set_device_scale(scale, scale)
+        return surf
+
+    def draw_quota(self, variant: str, scale: int) -> None:
+        as_ = fit.drawn_as("quota", variant, self.fit[variant])
+        zoom = scale * core.ZOOM[variant]
+        self.write(f"quota-{variant}", self.quota.strips(as_, zoom) if as_ else self.no_pill(zoom))
+
+    def redraw(self, name: str, variant: str, scale: int) -> None:
+        """Draw one strip again now: fit changed how it is drawn."""
+        if name == "quota":
+            if self.quota is not None:
+                self.draw_quota(variant, scale)
+        elif name in self.strips:
+            self.keys.pop((name, variant), None)
+            self.draw_strip(name, self.strips[name][0], variant, scale)
+
+    def refit(self, variants) -> None:
+        """Apply fit's next step while a bar is too wide; take the last one back when
+        there is room for it again (fit.py)."""
+        for variant, scale in variants:
+            steps = fit.STEPS.get(variant, ())
+            ws = [(o["logical"]["width"], self.ws.widths[(o["logical"]["x"], o["logical"]["y"], variant)])
+                  for name, o in self.ws.outputs.items()
+                  if (variant == "compact") == name.startswith("eDP") and o.get("logical")
+                  and (o["logical"]["x"], o["logical"]["y"], variant) in self.ws.widths]
+            for _ in range(len(steps) + 1):
+                over = fit.overflow(variant, self.wpx, ws)
+                if over is None:
+                    break
+                k, saved = self.fit[variant], self.saved[variant]
+                if over > 0 and k < len(steps):
+                    name = steps[k][0]
+                    before = self.wpx.get(f"{name}-{variant}", 0.0)
+                    self.fit[variant] = k + 1
+                    self.redraw(name, variant, scale)
+                    saved.append(before - self.wpx.get(f"{name}-{variant}", 0.0))
+                    core.log(f"fit {variant}: {over:.0f} px over, {name} -> {steps[k][1] or 'off'} (saves {saved[-1]:.0f})")
+                elif over <= 0 and k > 0 and -over >= saved[-1] + fit.HYSTERESIS:
+                    self.fit[variant] = k - 1
+                    saved.pop()
+                    self.redraw(steps[k - 1][0], variant, scale)
+                    core.log(f"fit {variant}: {-over:.0f} px of room, {steps[k - 1][0]} back")
+                else:
+                    break
 
     def tick(self) -> bool:
         t0 = time.perf_counter()
@@ -246,8 +309,9 @@ class Daemon:
                         self.draw_strip(name, strip, variant, scale)
             if self.quota is not None and (n % 2 == 0 or fresh) and self.quota.changed():
                 for variant, scale in variants:
-                    self.write(f"quota-{variant}", self.quota.strips(variant, scale * core.ZOOM[variant]))
+                    self.draw_quota(variant, scale)
                 self.deck.invalidate("quota")
+            self.refit(variants)
         except Exception as err:  # keep the bar alive across one bad reading
             core.log(f"tick: {err!r}")
             if core.TRACE:

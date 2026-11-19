@@ -8,6 +8,9 @@
 // middle clicks are in modules.jsonc. One daemon reads /proc, /sys and niri's
 // socket for all of them, instead of a script per block per bar.
 //
+// When a bar's pills do not fit its screen, bardeck draws the least needed ones
+// compact, or not at all, until they do (bardeck/fit.py: the order is there).
+//
 // Two bars, the same pills: the laptop screen (eDP-1, 1536 logical px at scale 1.25)
 // takes the "compact" strips, drawn at 2x; every other screen the "full" ones at 1x.
 //
