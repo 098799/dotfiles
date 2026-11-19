@@ -140,40 +140,45 @@ binds {
     // opus main2: claw takes the account first, then --model (claw-fast's own `opus`
     // mapping would put main2 after --model, where claw does not read it as an account).
     Mod+Ctrl+S hotkey-overlay-title="opus main2" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "claw" "main2" "--model" "opus"; }
+    // fable: the biggest model gets the most keys (sonnet 2, opus 3, fable 4).
+    // `fable` is a function in claw.zsh; claw-fast sources it, so it runs as is.
+    Mod+Alt+Shift+S hotkey-overlay-title="fable" { spawn "alacritty" "--working-directory" "/home/tgrining/legartis" "-e" "/home/tgrining/bin/claw-fast" "fable"; }
 
     // ---- workspaces (i3 keys, i3 names) ------------------------------------
-    Mod+R     { focus-workspace "c"; }
-    Mod+T     { focus-workspace "0"; }
-    Mod+Y     { focus-workspace "1"; }
-    Mod+U     { focus-workspace "2"; }
-    Mod+I     { focus-workspace "3"; }
-    Mod+O     { focus-workspace "4"; }
-    Mod+P     { focus-workspace "5"; }
-    Mod+Alt+Shift+Y { focus-workspace "6"; }
-    Mod+Alt+Shift+U { focus-workspace "7"; }
-    Mod+Alt+Shift+I { focus-workspace "8"; }
-    Mod+Alt+Shift+O { focus-workspace "9"; }
-    Mod+Alt+Shift+P { focus-workspace "10"; }
-    Mod+G     { focus-workspace "w"; }
-    Mod+H     { focus-workspace "s"; }
-    Mod+Slash { focus-workspace "p"; }
-    Mod+M     { focus-workspace "6"; }
-    Mod+Comma { focus-workspace "7"; }
-    Mod+Period { focus-workspace "8"; }
+    // Through niri-ws, not focus-workspace: a workspace is made when you go to it or
+    // send a column to it, and is gone when it is empty and you leave (as in i3).
+    Mod+R     { spawn "niri-ws" "go" "c"; }
+    Mod+T     { spawn "niri-ws" "go" "0"; }
+    Mod+Y     { spawn "niri-ws" "go" "1"; }
+    Mod+U     { spawn "niri-ws" "go" "2"; }
+    Mod+I     { spawn "niri-ws" "go" "3"; }
+    Mod+O     { spawn "niri-ws" "go" "4"; }
+    Mod+P     { spawn "niri-ws" "go" "5"; }
+    Mod+Alt+Shift+Y { spawn "niri-ws" "go" "6"; }
+    Mod+Alt+Shift+U { spawn "niri-ws" "go" "7"; }
+    Mod+Alt+Shift+I { spawn "niri-ws" "go" "8"; }
+    Mod+Alt+Shift+O { spawn "niri-ws" "go" "9"; }
+    Mod+Alt+Shift+P { spawn "niri-ws" "go" "10"; }
+    Mod+G     { spawn "niri-ws" "go" "w"; }
+    Mod+H     { spawn "niri-ws" "go" "s"; }
+    Mod+Slash { spawn "niri-ws" "go" "p"; }
+    Mod+M     { spawn "niri-ws" "go" "6"; }
+    Mod+Comma { spawn "niri-ws" "go" "7"; }
+    Mod+Period { spawn "niri-ws" "go" "8"; }
 
-    Mod+Shift+R     { move-column-to-workspace "c"; }
-    Mod+Shift+T     { move-column-to-workspace "0"; }
-    Mod+Shift+Y     { move-column-to-workspace "1"; }
-    Mod+Shift+U     { move-column-to-workspace "2"; }
-    Mod+Shift+I     { move-column-to-workspace "3"; }
-    Mod+Shift+O     { move-column-to-workspace "4"; }
-    Mod+Shift+P     { move-column-to-workspace "5"; }
-    Mod+Shift+G     { move-column-to-workspace "w"; }
-    Mod+Shift+H     { move-column-to-workspace "s"; }
-    Mod+Shift+Slash { move-column-to-workspace "p"; }
-    Mod+Shift+M     { move-column-to-workspace "6"; }
-    Mod+Shift+Comma { move-column-to-workspace "7"; }
-    Mod+Shift+Period { move-column-to-workspace "8"; }
+    Mod+Shift+R     { spawn "niri-ws" "send" "c"; }
+    Mod+Shift+T     { spawn "niri-ws" "send" "0"; }
+    Mod+Shift+Y     { spawn "niri-ws" "send" "1"; }
+    Mod+Shift+U     { spawn "niri-ws" "send" "2"; }
+    Mod+Shift+I     { spawn "niri-ws" "send" "3"; }
+    Mod+Shift+O     { spawn "niri-ws" "send" "4"; }
+    Mod+Shift+P     { spawn "niri-ws" "send" "5"; }
+    Mod+Shift+G     { spawn "niri-ws" "send" "w"; }
+    Mod+Shift+H     { spawn "niri-ws" "send" "s"; }
+    Mod+Shift+Slash { spawn "niri-ws" "send" "p"; }
+    Mod+Shift+M     { spawn "niri-ws" "send" "6"; }
+    Mod+Shift+Comma { spawn "niri-ws" "send" "7"; }
+    Mod+Shift+Period { spawn "niri-ws" "send" "8"; }
 
     // i3: workspace back_and_forth
     Mod+B { focus-workspace-previous; }
@@ -201,7 +206,6 @@ binds {
     // ---- screenshots (scrot → grim/slurp/niri) ------------------------------
     Mod+Alt+Shift+K { screenshot-screen; }                 // scrot
     Mod+Alt+Shift+J hotkey-overlay-title="screenshot region → clipboard" { screenshot; }  // niri freezes the frame first, so open popups stay in the shot (slurp took focus and closed them)
-    Mod+Alt+Shift+S { screenshot; }                        // scrot -s: niri's own picker
     Print           { screenshot; }
     Alt+Print       { screenshot-window; }
 

@@ -1,0 +1,144 @@
+#!/usr/bin/python3 -I
+"""i3's workspaces on niri: a workspace exists only while it is used.
+
+  niri-ws go NAME     Mod+letter: go to workspace NAME; make it when there is none
+  niri-ws send NAME   Mod+Shift+letter: move the focused column there (and follow it)
+  niri-ws daemon      startup: drop a named workspace that is empty and not on a screen
+
+niri keeps every workspace named in config.kdl for ever, empty or not: fifteen of
+them in the overview and under a three-finger swipe. niri's own unnamed workspaces
+do what i3 does (made when used, gone when empty), but have no names. So config.kdl
+names none, and this script names them at runtime (niri's set-workspace-name):
+
+  go / send   No workspace NAME yet: the spare empty workspace at the end of the
+              focused output gets the name and moves to NAME's place in ORDER.
+  daemon      A named workspace with no window that is not the active one of its
+              output loses its name, and niri then removes it. At login it names the
+              first workspace ORDER[0].
+
+niri always keeps one unnamed empty workspace at the end of each output. That one
+stays: it cannot be removed.
+"""
+
+import json
+import os
+import select
+import socket
+import sys
+
+# i3's workspace names in the order Mod+Page_Down walks them (9 and 10 go last).
+ORDER = ["c", "0", "1", "2", "3", "4", "5", "w", "s", "6", "7", "8", "p", "9", "10"]
+SETTLE_S = 0.25  # the daemon looks this long after the last event: go/send finish first
+
+
+def connect() -> socket.socket:
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(os.environ["NIRI_SOCKET"])
+    return s
+
+
+def niri(request):
+    """One request, one reply: the Ok payload, or None."""
+    try:
+        with connect() as s:
+            s.settimeout(1.0)
+            s.sendall((json.dumps(request) + "\n").encode())
+            buf = b""
+            while not buf.endswith(b"\n"):
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+        ok = json.loads(buf).get("Ok")
+    except (OSError, ValueError, KeyError, AttributeError):
+        return None
+    if isinstance(ok, dict) and len(ok) == 1:
+        return next(iter(ok.values()))
+    return ok
+
+
+def action(kind: str, /, **args) -> None:
+    niri({"Action": {kind: args}})
+
+
+def rank(name) -> int:
+    return ORDER.index(name) if name in ORDER else len(ORDER)
+
+
+def make(name: str, wss: list) -> bool:
+    """Give the focused output's spare workspace this name, at its place in ORDER."""
+    focused = next((w for w in wss if w["is_focused"]), None)
+    if focused is None:
+        return False
+    mine = [w for w in wss if w["output"] == focused["output"]]
+    used = {w["workspace_id"] for w in niri("Windows") or []}
+    spare = [w for w in mine if w["name"] is None and w["id"] not in used]
+    if not spare:
+        return False
+    ws = max(spare, key=lambda w: w["idx"])  # niri's own empty one, at the end
+    action("SetWorkspaceName", name=name, workspace={"Id": ws["id"]})
+    before = [w["idx"] for w in mine if w["name"] is not None and rank(w["name"]) < rank(name)]
+    index = max(before) + 1 if before else 1
+    if index != ws["idx"]:
+        action("MoveWorkspaceToIndex", index=index, reference={"Id": ws["id"]})
+    return True
+
+
+def go(name: str, send: bool) -> int:
+    wss = niri("Workspaces")
+    if wss is None:
+        return 1
+    if not any(w["name"] == name for w in wss) and not make(name, wss):
+        return 1
+    if send:
+        action("MoveColumnToWorkspace", reference={"Name": name}, focus=True)
+    else:
+        action("FocusWorkspace", reference={"Name": name})
+    return 0
+
+
+def sweep(first: bool = False) -> None:
+    wss, wins = niri("Workspaces"), niri("Windows")
+    if wss is None or wins is None:
+        return
+    if first and not any(w["name"] for w in wss):
+        ws = next((w for w in wss if w["is_focused"]), None)
+        if ws is not None:
+            action("SetWorkspaceName", name=ORDER[0], workspace={"Id": ws["id"]})
+        return
+    used = {w["workspace_id"] for w in wins}
+    for w in wss:
+        if w["name"] is not None and not w["is_active"] and w["id"] not in used:
+            action("UnsetWorkspaceName", reference={"Id": w["id"]})
+
+
+def daemon() -> int:
+    sweep(first=True)
+    s = connect()
+    s.sendall(b'"EventStream"\n')
+    pending = True
+    while True:
+        ready, _, _ = select.select([s], [], [], SETTLE_S if pending else None)
+        if not ready:
+            pending = False
+            sweep()
+            continue
+        chunk = s.recv(65536)
+        if not chunk:
+            return 1  # niri went away
+        # Any workspace or window event can empty a workspace or move the view.
+        if b'"Work' in chunk or b'"Window' in chunk:
+            pending = True
+
+
+def main(argv: list) -> int:
+    if len(argv) == 3 and argv[1] in ("go", "send"):
+        return go(argv[2], argv[1] == "send")
+    if len(argv) == 2 and argv[1] == "daemon":
+        return daemon()
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

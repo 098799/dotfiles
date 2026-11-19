@@ -47,25 +47,10 @@ input {
 //     mode "2560x1440@144"
 // }
 
-// i3 workspace names, in the order Tomek cycles through them (Mod+Page_Down
-// walks this list). 9 and 10 are outside the cycle, so they go last. Named
-// workspaces are pinned to the top of every output; the `open-on-output` lines
-// are commented until the Wayland connector names are known (`niri msg outputs`).
-workspace "c"
-workspace "0"
-workspace "1"
-workspace "2"
-workspace "3"
-workspace "4"
-workspace "5"
-workspace "w"  // { open-on-output "DP-1"; }
-workspace "s" // { open-on-output "DP-1"; }
-workspace "6"
-workspace "7"
-workspace "8"
-workspace "p"  // { open-on-output "DP-1"; }
-workspace "9"
-workspace "10"
+// No `workspace "name"` lines: niri keeps a workspace named here for ever, empty or
+// not. The i3 names (c 0 1 2 3 4 5 w s 6 7 8 p 9 10) are given at runtime by
+// niri-ws (~/bin/niri-ws: the binds call it, its daemon runs from startup.kdl), so
+// a workspace exists only while it is used, as in i3. The order is in that script.
 
 prefer-no-csd
 screenshot-path "~/Pictures/Screenshots/%Y-%m-%d_%H-%M-%S.png"
