@@ -21,7 +21,8 @@ stub when it has no fresh reading). Six full cells took 636 px and pushed the cl
 off the screen; the panel (hover) still shows every account at full size.
 
 The panel: every account's week full size, its 5h peaks against burn's ceiling, its
-per-model weekly caps (Fable: "team · Fable 12%" under the name), the pool totals. Two columns: "main (private)" (the personal Max accounts: private,
+per-model weekly caps (Fable: "team · Fable 12%" under the name, and a faint line on
+the week chart), the pool totals. Two columns: "main (private)" (the personal Max accounts: private,
 main2, agy's main) and "work" (everything else). Each has two sections: cc (Claude
 Code) and agy (Antigravity). An agy account with both a Claude/GPT and a Gemini quota
 gets one card for each; the Gemini Argon bucket is not shown. Pinned: u/p earlier/later week, i/o select
@@ -80,10 +81,54 @@ def model_caps(m, account: str, now: float) -> list[tuple[str, float, float | No
     return []
 
 
+class CapHistory:
+    """The per-model cap's readings from claude-usage.csv (scoped_util, scoped_name),
+    read incrementally: {account: [(t, %)]}. qtop's Store does not keep these columns."""
+
+    def __init__(self, path: str | None = None):
+        self.path = path or Q.CSV
+        self.offset, self.inode, self.tail = 0, None, ""
+        self.rows: dict[str, list[tuple[float, float]]] = {}
+
+    def load(self) -> bool:
+        try:
+            st = os.stat(self.path)
+        except OSError:
+            return False
+        if st.st_ino != self.inode or st.st_size < self.offset:
+            self.offset, self.tail, self.rows, self.inode = 0, "", {}, st.st_ino
+        if st.st_size == self.offset:
+            return False
+        with open(self.path, encoding="utf-8", errors="replace") as fh:
+            fh.seek(self.offset)
+            chunk = fh.read()
+            self.offset = fh.tell()
+        lines = (self.tail + chunk).split("\n")
+        self.tail = lines.pop()
+        for line in lines:
+            p = line.split(",")
+            if len(p) < 8 or p[0] == "timestamp" or not p[7]:
+                continue
+            t = Q.iso_ts(p[0])
+            try:
+                used = float(p[6])
+            except ValueError:
+                continue
+            if t is not None:
+                self.rows.setdefault(p[1], []).append((t, used))
+        return True
+
+    def trim(self, cutoff: float) -> None:
+        for rs in self.rows.values():
+            if rs and rs[0][0] < cutoff:
+                rs[:] = [r for r in rs if r[0] >= cutoff]
+
+
 class Row:
     """One account now: its week (or a past one), its 5h window, and how to say it."""
 
     caps: list = []  # per-model weekly caps (model_caps); agy cards have none
+    cap_line: list = []  # the cap's readings in this card's week, [(t, %)]: a faint line
 
     def __init__(self, m, account: str, active: str, now: float, back: int = 0):
         self.account = account
@@ -110,6 +155,9 @@ class Row:
         self.ceiling = Q.CEILING[self.pool]
         # Now-values: not on a past week, not from a reading too old to trust.
         self.caps = [] if back or self.stale else model_caps(m, account, now)
+        if self.week is not None:
+            self.cap_line = [(t, v) for t, v in m.caps.rows.get(account, [])
+                             if self.week.start <= t <= self.week.reset]
         self.extra: list[tuple[str, object]] = []  # agy: the other weekly buckets (label, Week)
 
     @property
@@ -423,6 +471,15 @@ def week_chart(cr, x: float, y: float, w: float, h: float, row: Row, now: float,
                 cr.arc(X(full), Y(100) + (3 if detail else 1.2), 3 if detail else 1.4, 0, 2 * math.pi)
                 cr.set_source_rgba(*rgba("hit"))
                 cr.fill()
+
+    # The per-model cap (Fable) through this week: a faint line, under the week's own.
+    if detail and len(row.cap_line) >= 2:
+        cr.move_to(X(row.cap_line[0][0]), Y(row.cap_line[0][1]))
+        for t, v in row.cap_line[1:]:
+            cr.line_to(X(t), Y(v))
+        cr.set_source_rgba(*rgba("fg", 0.35))
+        cr.set_line_width(1.0)
+        cr.stroke()
 
     # agy: the other weekly buckets, thin lines on this week's clock.
     if detail:
@@ -832,6 +889,8 @@ def model():
     store.weeks = weeks
     m.agy = AgyHistory()
     m.agy.load()
+    m.caps = CapHistory()
+    m.caps.load()
     return m
 
 
@@ -863,6 +922,8 @@ class Quota:
             self.trim(time.time())
         if self.m.agy.load():
             self.m.agy.trim(time.time() - self.KEEP_S)
+        if self.m.caps.load():
+            self.m.caps.trim(time.time() - self.KEEP_S)
         return True
 
     KEEP_S = 36 * 86400  # five quota weeks: the panel's u/p history, and no more
